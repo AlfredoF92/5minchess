@@ -1,4 +1,5 @@
 /** Libro aperture ECO (Lichess) + descrizioni in italiano. */
+import { getLang, t } from "./i18n.js";
 
 function normalizeSan(san) {
   return String(san).replace(/[+#?!]+$/g, "");
@@ -169,9 +170,10 @@ const NAME_IT = [
 ];
 
 export function translateOpeningName(name) {
+  if (getLang() !== "it") return name;
   let out = name;
-  NAME_IT.forEach(([re, it]) => {
-    out = out.replace(re, it);
+  NAME_IT.forEach(([re, itName]) => {
+    out = out.replace(re, itName);
   });
   return out.replace(/\s{2,}/g, " ").trim();
 }
@@ -445,85 +447,85 @@ function structureOf(sans) {
   const b = sans[1];
   if (!w) {
     return {
-      label: "In attesa",
+      label: t("struct.wait"),
       text: "Scegli la prima mossa: 1.e4 (partita aperta), 1.d4 (partita chiusa) o 1.c4 (Inglese).",
     };
   }
   if (w === "e4" && b === "e5") {
     return {
-      label: "Apertura aperta",
+      label: t("struct.open"),
       text: "Entrambi hanno spinto il pedone di re. Gioco libero, pezzi veloci, lotta per d4 e d5.",
     };
   }
   if (w === "e4" && b) {
     return {
-      label: "Apertura semiaperta",
+      label: t("struct.semiopen"),
       text: "Il Bianco ha giocato e4, il Nero non ha risposto e5. Strutture asimmetriche, spesso con contropoco.",
     };
   }
   if (w === "e4") {
     return {
-      label: "Apertura di re",
+      label: t("struct.king"),
       text: "1.e4 occupa il centro e libera donna e alfiere. Il Nero può rispondere e5, c5 (Siciliana), e6, c6…",
     };
   }
   if (w === "d4" && b === "d5") {
     return {
-      label: "Apertura chiusa",
+      label: t("struct.closed"),
       text: "Pedoni di donna nel centro. Gioco più posizionale: catene, colonne c e e, piani lunghi.",
     };
   }
   if (w === "d4" && b) {
     return {
-      label: "Apertura semichiusa",
+      label: t("struct.semiclosed"),
       text: "Il Bianco ha d4, il Nero non ha simmetrico d5 (spesso Nf6). Tipiche le difese indiane.",
     };
   }
   if (w === "d4") {
     return {
-      label: "Apertura di donna",
+      label: t("struct.queen"),
       text: "1.d4 prende il centro e copre e5. Solida: poi c4, o un sistema (Londra, Catalana).",
     };
   }
   if (w === "c4") {
     return {
-      label: "Apertura di fianco",
+      label: t("struct.flank"),
       text: "1.c4 (Inglese): controlli d5 dal lato. Flessibile, spesso con fianchetto.",
     };
   }
   if (w === "Nf3") {
     return {
-      label: "Apertura di fianco",
+      label: t("struct.flank"),
       text: "Cavallo in f3: aspetti a spingere i pedoni. Può diventare Réti, Catalana o Inglese.",
     };
   }
   return {
-    label: "Apertura irregolare",
+    label: t("struct.irregular"),
     text: "Prima mossa inusuale. Sviluppa i pezzi, occupa o colpisci il centro, metti il re al sicuro.",
   };
 }
 
 function phaseOf(game, sans, leftBook) {
   const pieces = game.board().flat().filter(Boolean).length;
-  if (pieces <= 12) return "Finale";
-  if (leftBook && sans.length >= 16) return "Mediogioco";
-  if (leftBook && sans.length >= 10) return "Mediogioco";
-  return "Apertura";
+  if (pieces <= 12) return t("phase.end");
+  if (leftBook && sans.length >= 16) return t("phase.middle");
+  if (leftBook && sans.length >= 10) return t("phase.middle");
+  return t("phase.opening");
 }
 
 export function describePosition(sans, game) {
   const moves = sans.map(normalizeSan);
   const { match, leftBook } = lookupOpening(moves);
   const structure = structureOf(moves);
-  const phase = game ? phaseOf(game, moves, leftBook) : "Apertura";
+  const phase = game ? phaseOf(game, moves, leftBook) : t("phase.opening");
 
   if (!moves.length) {
     return {
-      phase: "Apertura",
+      phase: t("phase.opening"),
       kind: "apertura",
-      kindLabel: "Apertura",
+      kindLabel: t("kind.apertura"),
       eco: "",
-      title: "Scegli un'apertura",
+      title: t("opening.choose"),
       variant: "",
       structure: structure.label,
       blurb: structure.text,
@@ -535,7 +537,7 @@ export function describePosition(sans, game) {
     return {
       phase,
       kind: "apertura",
-      kindLabel: KIND_LABEL.apertura,
+      kindLabel: t("kind.apertura"),
       eco: "",
       title: structure.label,
       variant: "",
@@ -550,19 +552,20 @@ export function describePosition(sans, game) {
   const translated = translateOpeningName(match.name);
   const [main, ...rest] = translated.split(":");
   const variant = rest.join(":").trim();
+  const name = getLang() === "it" && family ? family.family : main.trim();
   let blurb = family ? family.blurb : structure.text;
-  if (leftBook && phase === "Mediogioco") {
-    blurb = `Fuori teoria dalla ${family ? family.family : main.trim()}. ${blurb}`;
+  if (leftBook && phase === t("phase.middle")) {
+    blurb = t("opening.outBook", { name, blurb });
   } else if (leftBook) {
-    blurb = `Linea meno nota, ma resti nell'idea della ${family ? family.family : main.trim()}. ${blurb}`;
+    blurb = t("opening.rareLine", { name, blurb });
   }
 
   return {
     phase,
     kind,
-    kindLabel: KIND_LABEL[kind],
+    kindLabel: t(`kind.${kind}`),
     eco: match.eco || "",
-    title: family ? family.family : main.trim(),
+    title: name,
     variant: variant || (family && translated !== family.family ? translated : ""),
     structure: structure.label,
     blurb,

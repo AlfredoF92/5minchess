@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+
 const FILES = "abcdefgh";
 const PIECE_SRC = {
   wp: "pieces/wP.svg",
@@ -68,7 +70,7 @@ export class Board {
     this.root.innerHTML = `
       <div class="board-frame">
         <div class="board-stack">
-          <div class="board frozen" tabindex="0" aria-label="Scacchiera"></div>
+          <div class="board frozen" tabindex="0" aria-label="${t("board.aria")}"></div>
           <svg class="board-arrows" viewBox="0 0 8 8" preserveAspectRatio="none">
             <g class="arrow-lines"></g>
           </svg>
@@ -222,8 +224,8 @@ export class Board {
       if (threatened && !pip) {
         pip = document.createElement("span");
         pip.className = "danger-pip";
-        pip.title = "Sotto attacco";
-        pip.setAttribute("aria-label", "Pezzo sotto attacco");
+        pip.title = t("pip.attack");
+        pip.setAttribute("aria-label", t("pip.aria"));
         el.appendChild(pip);
       } else if (!threatened && pip) {
         pip.remove();

@@ -1,11 +1,29 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>5 Min Chess - impara le 4 mosse migliori</title>
+  <title>5 Min Chess — learn the 6 best moves</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
+  <script>
+    (function () {
+      var KEY = "5minchess.uiLang";
+      var lang = "en";
+      try {
+        var saved = localStorage.getItem(KEY);
+        if (saved === "it" || saved === "en") lang = saved;
+      } catch (e) {}
+      document.documentElement.lang = lang;
+      window.CHESS_LANG = lang;
+      window.setChessLang = function (next) {
+        if (next !== "it" && next !== "en") return false;
+        try { localStorage.setItem(KEY, next); } catch (e) {}
+        location.reload();
+        return false;
+      };
+    })();
+  </script>
 </head>
 <body>
   <div class="page">
@@ -14,33 +32,52 @@
         <span class="brand-mark">♟</span>
         <div>
           <strong>5 Min Chess</strong>
-          <span>Allenamento: tu contro il computer, con 4 suggerimenti a mossa</span>
+          <span data-i18n="brand.tagline">Training: you vs the computer, with 6 hints every move</span>
         </div>
+      </div>
+      <div class="lang-switch" role="group" data-i18n-aria="lang.group" aria-label="Language">
+        <button type="button" id="btn-lang-it" data-lang="it" data-i18n-aria="lang.it" aria-label="Italiano" onclick="return setChessLang('it')">
+          <svg class="lang-flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="1" height="2" fill="#009246"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ce2b37"/></svg>
+          IT
+        </button>
+        <button type="button" id="btn-lang-en" class="is-on" data-lang="en" data-i18n-aria="lang.en" aria-label="English" onclick="return setChessLang('en')">
+          <svg class="lang-flag" viewBox="0 0 60 30" aria-hidden="true">
+            <clipPath id="uk-flag"><path d="M0 0h60v30H0z"/></clipPath>
+            <g clip-path="url(#uk-flag)">
+              <path d="M0 0h60v30H0z" fill="#012169"/>
+              <path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="6"/>
+              <path d="M0 0l60 30M60 0L0 30" stroke="#C8102E" stroke-width="4"/>
+              <path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/>
+              <path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/>
+            </g>
+          </svg>
+          EN
+        </button>
       </div>
     </header>
 
     <main class="game">
       <section class="board-col">
         <div id="board-root"></div>
-        <p id="turn-banner" class="turn-banner">Caricamento</p>
+        <p id="turn-banner" class="turn-banner">Loading</p>
 
         <aside class="panel">
           <div class="card">
             <div class="player opponent">
               <span class="dot"></span>
               <div>
-                <div id="engine-label" class="name">Stockfish livello 1 · principiante · 1350 Elo</div>
+                <div id="engine-label" class="name">Stockfish level 1 · beginner · 1350 Elo</div>
                 <label class="skill-wrap">
-                  Difficoltà
-                  <select id="skill" aria-label="Livello Stockfish">
-                    <option value="1" selected>1 — Principiante · 1350 Elo</option>
-                    <option value="2">2 — Facile · 1450 Elo</option>
-                    <option value="3">3 — Amichevole · 1550 Elo</option>
-                    <option value="4">4 — Intermedio · 1650 Elo</option>
-                    <option value="5">5 — Medio · 1750 Elo</option>
-                    <option value="6">6 — Impegnativo · 1850 Elo</option>
-                    <option value="7">7 — Difficile · 2000 Elo</option>
-                    <option value="8">8 — Esperto · 2150 Elo</option>
+                  <span data-i18n="difficulty">Difficulty</span>
+                  <select id="skill" data-i18n-aria="skill.aria" aria-label="Stockfish level">
+                    <option value="1" selected>1 — Beginner · 1350 Elo</option>
+                    <option value="2">2 — Easy · 1450 Elo</option>
+                    <option value="3">3 — Friendly · 1550 Elo</option>
+                    <option value="4">4 — Intermediate · 1650 Elo</option>
+                    <option value="5">5 — Medium · 1750 Elo</option>
+                    <option value="6">6 — Challenging · 1850 Elo</option>
+                    <option value="7">7 — Hard · 2000 Elo</option>
+                    <option value="8">8 — Expert · 2150 Elo</option>
                   </select>
                 </label>
               </div>
@@ -48,58 +85,48 @@
 
             <div class="start-box">
               <label class="skill-wrap">
-                Inizio partita
-                <select id="start-opening" aria-label="Apertura iniziale">
-                  <option value="start" selected>Posizione iniziale</option>
-                  <option value="italian">Partita Italiana (12 mosse)</option>
-                  <option value="spanish">Partita Spagnola (12 mosse)</option>
-                  <option value="sicilian">Difesa Siciliana (12 mosse)</option>
-                  <option value="french">Difesa Francese (12 mosse)</option>
-                  <option value="caro">Difesa Caro-Kann (12 mosse)</option>
-                  <option value="qgd">Gambetto di Donna (12 mosse)</option>
-                  <option value="kid">Difesa Est-Indiana (12 mosse)</option>
-                  <option value="english">Apertura Inglese (12 mosse)</option>
-                  <option value="london">Sistema Londra (12 mosse)</option>
-                  <option value="scotch">Partita Scozzese (12 mosse)</option>
+                <span data-i18n="start.game">Game start</span>
+                <select id="start-opening" data-i18n-aria="start.aria" aria-label="Starting opening">
+                  <option value="start" selected>Starting position</option>
                 </select>
               </label>
-              <p id="opening-line" class="opening-line">Si parte dalla posizione iniziale.</p>
+              <p id="opening-line" class="opening-line">Starting from the initial position.</p>
             </div>
 
             <div class="toolbar">
-              <button id="btn-flip" type="button" title="Gira la scacchiera">
+              <button id="btn-flip" type="button" data-i18n-title="toolbar.flip" title="Flip the board">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 7h10v2H9v8H7V7zm10 10H7v-2h8V7h2v10z"/></svg>
               </button>
-              <button id="btn-undo" type="button" title="Annulla l'ultima mossa">
+              <button id="btn-undo" type="button" data-i18n-title="toolbar.undo" title="Undo the last move">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 18l-6-6 6-6v4h8v4h-8v4z"/></svg>
               </button>
-              <button id="btn-white" type="button" title="Nuova partita con il Bianco">♔</button>
-              <button id="btn-black" type="button" title="Nuova partita con il Nero">♚</button>
-              <button id="btn-new" type="button" title="Nuova partita">
+              <button id="btn-white" type="button" data-i18n-title="toolbar.white" title="New game as White">♔</button>
+              <button id="btn-black" type="button" data-i18n-title="toolbar.black" title="New game as Black">♚</button>
+              <button id="btn-new" type="button" data-i18n-title="toolbar.new" title="New game">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 6v2.5l3.5-3.5L12 1.5V4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6z"/></svg>
               </button>
             </div>
 
             <div class="status">
               <div id="status-icon" class="status-icon" data-kind="info">i</div>
-              <p id="status-text" class="status-color">Preparazione della scacchiera</p>
-              <h2 id="status-title">Caricamento</h2>
+              <p id="status-text" class="status-color">Setting up the board</p>
+              <h2 id="status-title">Loading</h2>
             </div>
 
-            <div id="moves" class="moves" aria-label="Elenco mosse"></div>
+            <div id="moves" class="moves" data-i18n-aria="moves.aria" aria-label="Move list"></div>
 
             <div class="actions">
-              <button id="btn-resign" type="button" title="Abbandona">
+              <button id="btn-resign" type="button" data-i18n-title="resign" title="Resign">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3h2v18H6V3zm3 1l10 5-10 5V4z"/></svg>
-                Abbandona
+                <span data-i18n="resign">Resign</span>
               </button>
             </div>
 
             <div class="player you">
               <span class="dot"></span>
               <div>
-                <div id="player-name" class="name">Tu</div>
-                <div class="rating">giocatore</div>
+                <div id="player-name" class="name" data-i18n="you">You</div>
+                <div class="rating" data-i18n="you.rating">player</div>
               </div>
             </div>
           </div>
@@ -110,21 +137,21 @@
         <div class="king-talk">
           <div class="king-side">
             <img src="pieces/wK.svg" alt="">
-            <strong>Il Re</strong>
+            <strong data-i18n="king">The King</strong>
           </div>
           <blockquote class="speech" aria-live="polite">
-            <p id="king-note">Buona fortuna!</p>
+            <p id="king-note">Good luck!</p>
           </blockquote>
         </div>
         <div class="aid-bar">
-          <button id="btn-aid-moves" class="is-on" type="button">Evidenzia le mosse</button>
-          <button id="btn-aid-threats" type="button">Evidenzia i minacciati</button>
+          <button id="btn-aid-moves" class="is-on" type="button" data-i18n="aid.moves">Highlight moves</button>
+          <button id="btn-aid-threats" type="button" data-i18n="aid.threats">Highlight threatened</button>
         </div>
-        <div id="hints" class="hints" aria-label="Suggerimenti del Re"></div>
+        <div id="hints" class="hints" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
         <div class="hint-nav">
-          <button id="btn-prev-hints" class="hint-nav-btn" type="button" disabled title="4 mosse precedenti" aria-label="4 mosse precedenti">◀</button>
-          <button id="btn-more-hints" class="more-hints" type="button" disabled>Carica altre 4 mosse</button>
-          <button id="btn-next-hints" class="hint-nav-btn" type="button" disabled title="4 mosse successive" aria-label="4 mosse successive">▶</button>
+          <button id="btn-prev-hints" class="hint-nav-btn" type="button" disabled data-i18n-title="hints.prev" data-i18n-aria="hints.prev" title="Previous 6 moves" aria-label="Previous 6 moves">◀</button>
+          <button id="btn-more-hints" class="more-hints" type="button" disabled data-i18n="hints.more">Load 6 more moves</button>
+          <button id="btn-next-hints" class="hint-nav-btn" type="button" disabled data-i18n-title="hints.next" data-i18n-aria="hints.next" title="Next 6 moves" aria-label="Next 6 moves">▶</button>
         </div>
       </section>
     </main>
@@ -138,6 +165,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=20260822k"></script>
 </body>
 </html>

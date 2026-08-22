@@ -2,36 +2,22 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js";
 import { Board } from "./board.js";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-
-const PIECE_IT = {
-  p: "Pedone",
-  n: "Cavallo",
-  b: "Alfiere",
-  r: "Torre",
-  q: "Donna",
-  k: "Re",
-};
+import { applyStaticI18n, getLang, t } from "./i18n.js";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+const HINTS_PER_PAGE = 6;
+const HINT_POOL_SIZE = 12;
+
+function pieceName(type) {
+  return t(`piece.${type}`) || t("hints.move");
+}
 
 function namedPiece(type) {
-  return {
-    p: "il pedone",
-    n: "il Cavallo",
-    b: "l'Alfiere",
-    r: "la Torre",
-    q: "la Donna",
-    k: "il Re",
-  }[type] || "il pezzo";
+  return t(`plain.${type || "x"}`);
 }
 
 function ourPieceName(type) {
-  if (type === "q") return "La nostra Donna";
-  if (type === "r") return "La nostra Torre";
-  if (type === "b") return "Il nostro Alfiere";
-  if (type === "n") return "Il nostro Cavallo";
-  if (type === "k") return "Il nostro Re";
-  return "Il nostro pedone";
+  return t(`our.${type || "p"}`);
 }
 
 function joinTalk(parts) {
@@ -39,22 +25,11 @@ function joinTalk(parts) {
 }
 
 function lossPhrase(type) {
-  if (type === "q") return "Perdi la donna";
-  if (type === "r") return "Perdi la torre";
-  if (type === "n") return "Perdi il cavallo";
-  if (type === "b") return "Perdi l'alfiere";
-  if (type === "p") return "Perdi un pedone";
-  if (type === "k") return "Prendi matto";
-  return "Mossa molto inferiore";
+  return t(`loss.${type}`) || t("loss.weak");
 }
 
 function thePiece(type) {
-  if (type === "b") return "l'alfiere";
-  if (type === "r") return "la torre";
-  if (type === "q") return "la donna";
-  if (type === "n") return "il cavallo";
-  if (type === "k") return "il re";
-  return "il pedone";
+  return getLang() === "en" ? t(`piece.${type}`).toLowerCase() : t(`plain.${type}`);
 }
 
 function isCenterSquare(square) {
@@ -79,90 +54,90 @@ function explainMove(before, move, after, hint) {
   const threatenedBefore = new Set(playerPiecesUnderAttack(before, us));
   const threatenedAfter = new Set(playerPiecesUnderAttack(after, us));
 
-  if (move.san.includes("#")) return "Scacco matto! Chiudi la partita.";
-  if (move.san.includes("+")) return "Scacco al re: l'avversario deve reagire.";
+  if (move.san.includes("#")) return t("explain.mate");
+  if (move.san.includes("+")) return t("explain.check");
 
-  if (move.san.startsWith("O-O-O")) return "Arrocco lungo: re al sicuro, torre al centro.";
-  if (move.san.startsWith("O-O")) return "Arrocco: metti il re al sicuro e attiva la torre.";
+  if (move.san.startsWith("O-O-O")) return t("explain.castleLong");
+  if (move.san.startsWith("O-O")) return t("explain.castle");
 
   if (move.promotion) {
-    return `Promozione: il pedone diventa ${PIECE_IT[move.promotion].toLowerCase()}!`;
+    return t("explain.promo", { piece: thePiece(move.promotion) });
   }
 
   if (String(move.flags).includes("e")) {
-    return "Presa en passant: cattura il pedone al volo.";
+    return t("explain.ep");
   }
 
   if (threatenedBefore.has(move.from) && !threatenedAfter.has(move.to)) {
-    return `Salva ${thePiece(move.piece)}: era sotto attacco.`;
+    return t("explain.save", { piece: thePiece(move.piece) });
   }
 
   for (const square of threatenedBefore) {
     if (square === move.from) continue;
     if (threatenedAfter.has(square)) continue;
     const rescued = before.get(square);
-    if (rescued) return `Proteggi ${thePiece(rescued.type)}: era in pericolo.`;
+    if (rescued) return t("explain.guard", { piece: thePiece(rescued.type) });
   }
 
   if (move.captured) {
     const ours = PIECE_VALUE[move.piece];
     const theirs = PIECE_VALUE[move.captured];
-    if (theirs > ours) return `Guadagno di materiale: prendi ${thePiece(move.captured)}!`;
+    if (theirs > ours) return t("explain.winMat", { piece: thePiece(move.captured) });
     if (theirs === ours && move.piece !== "p") {
-      return `Scambio di pezzi: dai ${thePiece(move.piece)}, prendi ${thePiece(move.captured)}.`;
+      return t("explain.trade", { give: thePiece(move.piece), take: thePiece(move.captured) });
     }
-    return `Vai all'attacco: cattura ${thePiece(move.captured)}.`;
+    return t("explain.capture", { piece: thePiece(move.captured) });
   }
 
   const attacks = after.moves({ square: move.to, verbose: true }).filter((m) => m.captured);
   attacks.sort((a, b) => PIECE_VALUE[b.captured] - PIECE_VALUE[a.captured]);
   const threat = attacks[0];
   if (threat && PIECE_VALUE[threat.captured] >= 5) {
-    return `Minaccia ${thePiece(threat.captured)} avversaria.`;
+    return t("explain.threatQ", { piece: thePiece(threat.captured) });
   }
   if (threat && PIECE_VALUE[threat.captured] >= 3) {
-    return `Attacca ${thePiece(threat.captured)} nemico.`;
+    return t("explain.threat", { piece: thePiece(threat.captured) });
   }
 
   if ((move.piece === "n" || move.piece === "b") && move.from[1] === backRank) {
     if (isCenterSquare(move.to) || isWideCenter(move.to)) {
-      return `Sviluppa ${thePiece(move.piece)} verso il centro.`;
+      return t("explain.devCenter", { piece: thePiece(move.piece) });
     }
-    return `Sviluppa ${thePiece(move.piece)} e mettilo in gioco.`;
+    return t("explain.dev", { piece: thePiece(move.piece) });
   }
 
   if (move.piece === "p") {
-    if (isCenterSquare(move.to)) return "Avanza il pedone e occupa il centro!";
+    if (isCenterSquare(move.to)) return t("explain.pawnCenter");
     if (Math.abs(Number(move.to[1]) - Number(move.from[1])) === 2) {
-      return "Avanza il pedone di due case.";
+      return t("explain.pawnTwo");
     }
     if (move.to[0] === "c" || move.to[0] === "f") {
-      return "Avanza il pedone e apri la diagonale all'alfiere.";
+      return t("explain.pawnDiag");
     }
-    return "Avanza il pedone!";
+    return t("explain.pawn");
   }
 
   if (move.piece === "r") {
     const file = move.to[0];
     const pawnsOnFile = SQUARES.some((sq) => sq[0] === file && after.get(sq)?.type === "p");
-    if (!pawnsOnFile) return "Torre sulla colonna aperta: fai pressione.";
-    return "Attiva la torre.";
+    if (!pawnsOnFile) return t("explain.rookOpen");
+    return t("explain.rook");
   }
 
   if (move.piece === "q") {
     if (isCenterSquare(move.to) || isWideCenter(move.to)) {
-      return "Centralizza la donna: più case sotto controllo.";
+      return t("explain.queenCenter");
     }
-    return "Riposiziona la donna verso l'attacco.";
+    return t("explain.queen");
   }
 
-  if (move.piece === "k") return "Porta il re in gioco: nel finale deve aiutare.";
+  if (move.piece === "k") return t("explain.king");
 
-  if (hint?.scoreType === "mate" && hint.score > 0) return "Cerca il matto!";
+  if (hint?.scoreType === "mate" && hint.score > 0) return t("explain.huntMate");
   if (typeof hint?.score === "number" && hint.scoreType === "cp" && hint.score < -80) {
-    return "Mossa di difesa: limita i danni.";
+    return t("explain.defend");
   }
-  return "Mossa solida: migliora la posizione.";
+  return t("explain.solid");
 }
 
 const ARROW_GREEN = "#8ec85a";
@@ -178,22 +153,12 @@ const SKILL_ELO = {
   8: 2150,
 };
 
-const SKILL_LABELS = {
-  1: "livello 1 · principiante",
-  2: "livello 2 · facile",
-  3: "livello 3 · amichevole",
-  4: "livello 4 · intermedio",
-  5: "livello 5 · medio",
-  6: "livello 6 · impegnativo",
-  7: "livello 7 · difficile",
-  8: "livello 8 · esperto",
-};
-
 function engineLabelText(skill) {
-  return `Stockfish ${SKILL_LABELS[skill]} · ${SKILL_ELO[skill]} Elo`;
+  return `Stockfish ${t(`engine.${skill}`)} · ${SKILL_ELO[skill]} Elo`;
 }
 
-function italianSan(san) {
+function localizeSan(san) {
+  if (getLang() === "en") return san;
   if (san.startsWith("O-O-O")) return `0-0-0${san.slice(5)}`;
   if (san.startsWith("O-O")) return `0-0${san.slice(3)}`;
   return san.replace(/^[NBRQK]/, (letter) => ({ N: "C", B: "A", R: "T", Q: "D", K: "R" }[letter]));
@@ -217,7 +182,7 @@ function playedFromHint(hint) {
 
 function hintSan(hint) {
   const played = playedFromHint(hint);
-  return played ? italianSan(played.san) : hint?.uci || "";
+  return played ? localizeSan(played.san) : hint?.uci || "";
 }
 
 function uciToMove(uci) {
@@ -239,9 +204,9 @@ function hintScore(info) {
 function formatHintEval(info) {
   if (!info || info.synthetic) return "—";
   if (info.scoreType === "mate") {
-    if (info.score > 0) return `Matto in ${info.score}`;
-    if (info.score < 0) return `Matto in ${Math.abs(info.score)}`;
-    return "Matto";
+    if (info.score > 0) return t("eval.mateIn", { n: info.score });
+    if (info.score < 0) return t("eval.mateIn", { n: Math.abs(info.score) });
+    return t("eval.mate");
   }
   const pawns = info.score / 100;
   if (pawns > 0) return `+${pawns.toFixed(2)}`;
@@ -258,15 +223,15 @@ function evalClass(info) {
 }
 
 function moveHeadline(move) {
-  if (!move) return "Mossa";
-  if (move.san.startsWith("O-O-O")) return "Arrocco lungo";
-  if (move.san.startsWith("O-O")) return "Arrocco corto";
-  const piece = PIECE_IT[move.piece] || "Pezzo";
+  if (!move) return t("hints.move");
+  if (move.san.startsWith("O-O-O")) return t("headline.castleLong");
+  if (move.san.startsWith("O-O")) return t("headline.castle");
+  const piece = pieceName(move.piece);
   if (move.promotion) {
-    return `${piece} diventa ${PIECE_IT[move.promotion]} in ${move.to}`;
+    return t("headline.promo", { piece, promo: pieceName(move.promotion), to: move.to });
   }
-  if (move.captured) return `${piece} mangia in ${move.to}`;
-  return `${piece} muove in ${move.to}`;
+  if (move.captured) return t("headline.capture", { piece, to: move.to });
+  return t("headline.move", { piece, to: move.to });
 }
 
 function pieceIcon(move, color) {
@@ -300,7 +265,7 @@ function fillHintPool(engineLines, game) {
       seen.add(line.uci);
       pool.push(line);
     });
-  if (pool.length < 12) {
+  if (pool.length < HINT_POOL_SIZE) {
     game.moves({ verbose: true }).forEach((move) => {
       const uci = uciFromVerbose(move);
       if (seen.has(uci)) return;
@@ -314,32 +279,35 @@ function fillHintPool(engineLines, game) {
       });
     });
   }
-  const ranked = pool.slice(0, 12);
+  const ranked = pool.slice(0, HINT_POOL_SIZE);
   state.hintBestScore = ranked.length ? hintScore(ranked[0]) : -Infinity;
   const pages = [];
-  for (let i = 0; i < ranked.length; i += 4) {
-    pages.push(...shuffle(ranked.slice(i, i + 4)));
+  for (let i = 0; i < ranked.length; i += HINTS_PER_PAGE) {
+    pages.push(...shuffle(ranked.slice(i, i + HINTS_PER_PAGE)));
   }
   return pages;
 }
 
 function hintPageCount() {
-  return Math.max(1, Math.ceil(state.hintPool.length / 4));
+  return Math.max(1, Math.ceil(state.hintPool.length / HINTS_PER_PAGE));
 }
 
 function visibleHints() {
-  const start = state.hintPage * 4;
-  return state.hintPool.slice(start, start + 4);
+  const start = state.hintPage * HINTS_PER_PAGE;
+  return state.hintPool.slice(start, start + HINTS_PER_PAGE);
 }
 
 function syncHintNav() {
   const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && !state.kingSpeaking;
   const lastPage = hintPageCount() - 1;
-  const canLoadMore = canUse && state.hintPool.length > 4 && state.hintsUnlocked < lastPage;
+  const canLoadMore = canUse && state.hintPool.length > HINTS_PER_PAGE && state.hintsUnlocked < lastPage;
   if (els.moreHints) {
     els.moreHints.textContent = canLoadMore
-      ? "Carica altre 4 mosse"
-      : `Mosse ${state.hintPage * 4 + 1}–${Math.min((state.hintPage + 1) * 4, state.hintPool.length) || 4}`;
+      ? t("hints.more")
+      : t("hints.range", {
+        from: state.hintPage * HINTS_PER_PAGE + 1,
+        to: Math.min((state.hintPage + 1) * HINTS_PER_PAGE, state.hintPool.length) || HINTS_PER_PAGE,
+      });
     els.moreHints.disabled = !canLoadMore;
   }
   if (els.prevHints) {
@@ -444,30 +412,20 @@ function hintDanger(hint) {
   const loss = worstImmediateLoss(after, state.playerColor);
   const tooWeak = drop >= 150 || (hint.scoreType === "mate" && hint.score < 0);
   if (loss && (tooWeak || PIECE_VALUE[loss] >= 3 || drop >= 80)) return lossPhrase(loss);
-  if (tooWeak) return "Mossa molto inferiore";
+  if (tooWeak) return t("loss.weak");
   return null;
 }
 
-function plainPiece(type) {
-  return {
-    p: "il pedone",
-    n: "il cavallo",
-    b: "l'alfiere",
-    r: "la torre",
-    q: "la donna",
-    k: "il re",
-  }[type] || "il pezzo";
-}
-
 function pieceOnSquare(type, square) {
-  return `${plainPiece(type)} in <strong>${square}</strong>`;
+  return `${t(`plain.${type || "x"}`)} ${t("prep.in")} <strong>${square}</strong>`;
 }
 
 function joinIt(items) {
+  const and = t("conj.and");
   if (!items.length) return "";
   if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} e ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}`;
+  if (items.length === 2) return `${items[0]} ${and} ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} ${and} ${items[items.length - 1]}`;
 }
 
 function hitsFromSquare(game, square, attackerColor, defenderColor) {
@@ -495,41 +453,16 @@ function threatsFromMove(after, move, defenderColor) {
   });
 }
 
-function yourPiece(type) {
-  return {
-    p: "il tuo pedone",
-    n: "il tuo cavallo",
-    b: "il tuo alfiere",
-    r: "la tua torre",
-    q: "la tua donna",
-    k: "il tuo re",
-  }[type] || "il tuo pezzo";
-}
-
 function ourSingular(type) {
-  return {
-    p: "il nostro pedone",
-    n: "il nostro cavallo",
-    b: "il nostro alfiere",
-    r: "la nostra torre",
-    q: "la nostra donna",
-    k: "il nostro re",
-  }[type] || "il nostro pezzo";
+  return t(`our.${type || "p"}`);
 }
 
 function ourPlural(type) {
-  return {
-    p: "i nostri pedoni",
-    n: "i nostri cavalli",
-    b: "i nostri alfieri",
-    r: "le nostre torri",
-    q: "le nostre donne",
-    k: "i nostri re",
-  }[type] || "i nostri pezzi";
+  return t(`ours.${type || "p"}`);
 }
 
 function squareList(squares) {
-  return joinIt(squares.map((square) => `in <strong>${square}</strong>`));
+  return joinIt(squares.map((square) => `${t("prep.in")} <strong>${square}</strong>`));
 }
 
 function ourHitsPhrase(hits) {
@@ -556,8 +489,8 @@ function ourHitsPhrase(hits) {
 function hangingAdvice(hits) {
   if (!hits.length) return "";
   const phrase = ourHitsPhrase(hits);
-  if (hits.length === 1) return `Attenzione che ${phrase} non è protetto.`;
-  return `Attenzione che ${phrase} non sono protetti.`;
+  if (hits.length === 1) return t("king.hang1", { phrase });
+  return t("king.hangN", { phrase });
 }
 
 function capturedOn(move) {
@@ -566,49 +499,54 @@ function capturedOn(move) {
 }
 
 function opponentLead(move) {
-  if (move.san.startsWith("O-O-O")) return "L'avversario fa arrocco lungo";
-  if (move.san.startsWith("O-O")) return "L'avversario arrocca";
+  if (move.san.startsWith("O-O-O")) return t("king.castleLong");
+  if (move.san.startsWith("O-O")) return t("king.castle");
   if (move.captured) {
-    return `L'avversario muove ${pieceOnSquare(move.piece, move.to)} e mangia ${ourSingular(move.captured)} ${squareList([capturedOn(move)])}`;
+    return t("king.capture", {
+      mover: pieceOnSquare(move.piece, move.to),
+      victim: `${ourSingular(move.captured)} ${squareList([capturedOn(move)])}`,
+    });
   }
-  return `L'avversario gioca ${pieceOnSquare(move.piece, move.to)}`;
+  return t("king.play", { mover: pieceOnSquare(move.piece, move.to) });
 }
 
 function narrateOpponentMove(before, move, after) {
   if (move.san.includes("#")) {
-    return "L'avversario dà scacco matto. La partita è finita.";
+    return t("king.mateOpp");
   }
   const hits = threatsFromMove(after, move, state.playerColor).slice(0, 3);
   const labels = ourHitsPhrase(hits);
   let lead = opponentLead(move);
   if (labels) {
-    lead += move.captured ? `. Ora minaccia ${labels}.` : ` e minaccia ${labels}.`;
+    lead += move.captured
+      ? `. ${t("king.nowThreats", { list: labels })}`
+      : ` ${t("king.andThreats", { list: labels })}`;
   } else {
     lead += ".";
   }
-  if (move.san.includes("+")) lead += " È scacco.";
+  if (move.san.includes("+")) lead += ` ${t("king.check")}`;
 
   const hanging = hits.filter((hit) => !isSquareDefended(after, hit.to, state.playerColor));
   const parts = [lead];
   const warning = hangingAdvice(hanging);
   if (warning) parts.push(warning);
-  return `${joinTalk(parts)}<br><span class="king-closer">Calcolo le nuove mosse, buona fortuna.</span>`;
+  return `${joinTalk(parts)}<br><span class="king-closer">${t("king.closer")}</span>`;
 }
 
 function narratePlayerMove(before, move, after) {
-  const san = italianSan(move.san);
-  const parts = [`Hai scelto ${san}.`];
+  const san = localizeSan(move.san);
+  const parts = [t("king.chose", { san })];
   if (after.in_checkmate()) {
-    parts.push("Scacco matto! Hai vinto.");
+    parts.push(t("king.youMate"));
     return joinTalk(parts);
   }
   const loss = worstImmediateLoss(after, state.playerColor);
-  if (loss === "q") parts.push("Attenzione: la Donna resta in presa, l'avversario può prenderla.");
-  else if (loss === "r") parts.push("Attenzione: perdi la Torre.");
-  else if (loss === "n") parts.push("Attenzione: perdi il Cavallo.");
-  else if (loss === "b") parts.push("Attenzione: perdi l'Alfiere.");
+  if (loss === "q") parts.push(t("king.hangQueen"));
+  else if (loss === "r") parts.push(t("king.hangRook"));
+  else if (loss === "n") parts.push(t("king.hangKnight"));
+  else if (loss === "b") parts.push(t("king.hangBishop"));
   else parts.push(explainMove(before, move, after, null));
-  parts.push("Vediamo come risponde l'avversario.");
+  parts.push(t("king.seeReply"));
   return joinTalk(parts);
 }
 
@@ -631,7 +569,7 @@ function allThreatenedSquares() {
 function pieceSquareLabel(square) {
   const piece = state.game.get(square);
   if (!piece) return square;
-  return `${namedPiece(piece.type)} in ${square}`;
+  return `${namedPiece(piece.type)} ${t("prep.in")} ${square}`;
 }
 
 function boldItems(items) {
@@ -644,15 +582,15 @@ function kingTurnAdvice() {
   const theirs = hangingSquares(state.game, opponent).map(pieceSquareLabel);
   const parts = [];
   if (ours.length) {
-    parts.push(`I tuoi pezzi minacciati e non protetti: ${boldItems(ours)}.`);
+    parts.push(t("king.ourHanging", { list: boldItems(ours) }));
   }
   if (theirs.length) {
-    parts.push(`Pezzi dell'avversario minacciati e non protetti: ${boldItems(theirs)}.`);
+    parts.push(t("king.theirHanging", { list: boldItems(theirs) }));
   }
   if (!ours.length && !theirs.length) {
-    parts.push("Nessun pezzo scoperto in questo momento.");
+    parts.push(t("king.noneHanging"));
   }
-  parts.push("Fai la mossa giusta.");
+  parts.push(t("turn.make"));
   return parts.join(" ");
 }
 
@@ -811,6 +749,7 @@ const state = {
   kingSpeaking: false,
   pendingHintReveal: false,
   gameId: 0,
+  kingReplay: null,
   pendingPromo: null,
 };
 
@@ -827,9 +766,9 @@ function setStatus(title, text, kind = "info") {
 
 function openingAside() {
   const info = describePosition(state.game.history(), state.game);
-  if (!info?.title || info.title === "Scegli un'apertura") return "";
-  if (info.variant) return ` Siamo nella ${info.title} (${info.variant}).`;
-  return ` Siamo nella ${info.title}.`;
+  if (!info?.title || info.title === t("opening.choose")) return "";
+  if (info.variant) return ` ${t("king.inOpeningVar", { title: info.title, variant: info.variant })}`;
+  return ` ${t("king.inOpening", { title: info.title })}`;
 }
 
 function sleep(ms) {
@@ -892,22 +831,24 @@ function waitingForHints() {
 function loadingHintCard(rank) {
   const color = state.playerColor === "w" ? "w" : "b";
   const ghosts = [
-    { piece: "N", san: "Cd4", caption: "Cavallo muove in d4", eval: "+0.24" },
-    { piece: "P", san: "d5", caption: "Pedone muove in d5", eval: "+0.12" },
-    { piece: "B", san: "Af5", caption: "Alfiere muove in f5", eval: "0.00" },
-    { piece: "Q", san: "Dd2", caption: "Donna muove in d2", eval: "-0.08" },
+    { piece: "n", to: "d4" },
+    { piece: "p", to: "d5" },
+    { piece: "b", to: "f5" },
+    { piece: "q", to: "d2" },
+    { piece: "r", to: "e1" },
+    { piece: "p", to: "e4" },
   ];
   const ghost = ghosts[rank - 1];
+  const letter = { n: "N", b: "B", q: "Q", r: "R" }[ghost.piece];
+  const san = localizeSan(ghost.piece === "p" ? ghost.to : letter + ghost.to);
   return `
     <button class="hint-btn is-loading" disabled>
       <span class="hint-rank">${rank}</span>
       <span class="hint-move-row">
-        <img class="hint-icon" src="pieces/${color}${ghost.piece}.svg" alt="">
-        <span class="hint-main">${ghost.san}</span>
+        <img class="hint-icon" src="pieces/${color}${ghost.piece.toUpperCase()}.svg" alt="">
+        <span class="hint-main">${san}</span>
       </span>
-      <span class="hint-piece">${ghost.caption}</span>
-      <span class="hint-eval">${ghost.eval}</span>
-      <span class="hint-calc">Calcolo delle mosse consigliate</span>
+      <span class="hint-calc">${t("hints.loading")}</span>
     </button>`;
 }
 
@@ -960,11 +901,11 @@ function renderHistory() {
   let html = "";
   for (let i = 0; i < history.length; i += 2) {
     const n = i / 2 + 1;
-    const white = italianSan(history[i].san);
-    const black = history[i + 1] ? italianSan(history[i + 1].san) : "";
+    const white = localizeSan(history[i].san);
+    const black = history[i + 1] ? localizeSan(history[i + 1].san) : "";
     html += `<div class="move-row"><span class="move-n">${n}.</span><span>${white}</span><span>${black}</span></div>`;
   }
-  els.moves.innerHTML = html || `<div class="moves-empty">Nessuna mossa ancora.</div>`;
+  els.moves.innerHTML = html || `<div class="moves-empty">${t("moves.empty")}</div>`;
   els.moves.scrollTop = els.moves.scrollHeight;
 }
 
@@ -989,14 +930,14 @@ function syncBoard(options = {}) {
 function renderHints() {
   if (waitingForHints()) {
     state.hints = [];
-    els.hints.innerHTML = [1, 2, 3, 4].map((rank) => loadingHintCard(rank)).join("");
+    els.hints.innerHTML = Array.from({ length: HINTS_PER_PAGE }, (_, i) => loadingHintCard(i + 1)).join("");
     syncHintNav();
     state.board?.setArrows([]);
     return;
   }
   state.hints = visibleHints();
   const buttons = [];
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < HINTS_PER_PAGE; i += 1) {
     const hint = state.hints[i];
     const rank = i + 1;
     if (!hint) {
@@ -1008,8 +949,7 @@ function renderHints() {
       continue;
     }
     const played = playedFromHint(hint);
-    const san = played ? italianSan(played.san) : hint.uci;
-    const caption = played ? moveHeadline(played) : "Mossa";
+    const san = played ? localizeSan(played.san) : hint.uci;
     const icon = played ? pieceIcon(played, state.game.turn()) : "";
     const danger = hintDanger(hint);
     buttons.push(`
@@ -1019,8 +959,6 @@ function renderHints() {
           ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
           <span class="hint-main">${san}</span>
         </span>
-        <span class="hint-piece">${escapeHtml(caption)}</span>
-        <span class="hint-eval${evalClass(hint)}${danger ? " is-neg" : ""}">${formatHintEval(hint)}</span>
         ${danger ? `<span class="hint-warn">${escapeHtml(danger)}</span>` : ""}
       </button>`);
   }
@@ -1058,7 +996,7 @@ function showHintArrows(index = null, { reveal = false, onlyActive = false } = {
 }
 
 function youLabel() {
-  return state.playerColor === "w" ? "Sei il Bianco" : "Sei il Nero";
+  return state.playerColor === "w" ? t("you.white") : t("you.black");
 }
 
 async function refreshHints() {
@@ -1072,7 +1010,7 @@ async function refreshHints() {
   const fen = state.game.fen();
   clearHints();
   renderHints();
-  setStatus("Tocca a te!", `${youLabel()}.`, "think");
+  setStatus(t("turn.you"), `${youLabel()}.`, "think");
   try {
     const lines = await state.engine.analyze(fen, {
       depth: 11,
@@ -1083,15 +1021,15 @@ async function refreshHints() {
     state.hintPage = 0;
     state.hintsUnlocked = 0;
     revealHintsIfReady();
-    setStatus("Tocca a te!", `${youLabel()}. Fai la mossa giusta.`, "play");
+    setStatus(t("turn.you"), `${youLabel()}. ${t("turn.make")}`, "play");
   } catch (err) {
     if (err.message === "aborted") return;
     console.error(err);
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
     clearHints();
     renderHints();
-    speakKing("Il calcolo si è interrotto. Attendi i nuovi suggerimenti.", { calculating: false });
-    setStatus("Tocca a te!", "Motore occupato: attendi i nuovi suggerimenti.", "info");
+    speakKing(t("king.analyzeFail"), { calculating: false });
+    setStatus(t("turn.you"), t("king.busy"), "info");
   }
 }
 
@@ -1099,12 +1037,12 @@ function endMessage() {
   if (state.game.in_checkmate()) {
     const userWon = state.game.turn() !== state.playerColor;
     return userWon
-      ? ["Scacco matto!", "Hai vinto. Bella partita.", "win"]
-      : ["Scacco matto!", "Il computer ha vinto. Riprova con i suggerimenti.", "lose"];
+      ? [t("end.mateWinTitle"), t("end.mateWin"), "win"]
+      : [t("end.mateLoseTitle"), t("end.mateLose"), "lose"];
   }
-  if (state.game.in_stalemate()) return ["Stallo", "La partita è patta.", "draw"];
-  if (state.game.in_draw()) return ["Patta", "Nessuno dei due ha vinto.", "draw"];
-  return ["Fine partita", "", "info"];
+  if (state.game.in_stalemate()) return [t("end.staleTitle"), t("end.stale"), "draw"];
+  if (state.game.in_draw()) return [t("end.drawTitle"), t("end.draw"), "draw"];
+  return [t("end.overTitle"), "", "info"];
 }
 
 function finishGame() {
@@ -1114,6 +1052,7 @@ function finishGame() {
   syncBoard();
   const [title, text, kind] = endMessage();
   setStatus(title, text, kind);
+  state.kingReplay = { type: "end" };
   speakKing(`${title} ${text}`.trim(), { calculating: false });
 }
 
@@ -1137,8 +1076,9 @@ async function computerMove() {
   clearHints();
   renderHints();
   syncBoard();
-  setStatus("Tocca al computer", "In attesa dell'avversario...", "think");
-  if (!state.kingSpeaking) speakKing("In attesa dell'avversario...");
+  setStatus(t("turn.opp"), t("king.waiting"), "think");
+  state.kingReplay = { type: "waiting" };
+  if (!state.kingSpeaking) speakKing(t("king.waiting"));
   const fen = state.game.fen();
   const startedAt = Date.now();
   try {
@@ -1165,6 +1105,7 @@ async function computerMove() {
       flashThreatenedPieces(played);
       const talk = kingComment(fen, played, true);
       state.lastKingTalk = talk;
+      state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played } };
       renderHints();
       await sleep(1500);
       if (gameId !== state.gameId) return;
@@ -1173,7 +1114,7 @@ async function computerMove() {
   } catch (err) {
     if (err.message === "aborted" || gameId !== state.gameId) return;
     console.error(err);
-    setStatus("Errore", "Il computer non è riuscito a muovere. Nuova partita?", "lose");
+    setStatus(t("error"), t("king.engineFail"), "lose");
     state.busy = false;
     syncBoard();
     return;
@@ -1217,7 +1158,8 @@ async function applyUserMove(from, to, promotion) {
     finishGame();
     return;
   }
-  speakKing("In attesa dell'avversario...");
+  state.kingReplay = { type: "waiting" };
+  speakKing(t("king.waiting"));
   state.busy = false;
   await computerMove();
 }
@@ -1228,8 +1170,8 @@ function openPromo(from, to) {
   els.promo.innerHTML = ["q", "r", "b", "n"]
     .map(
       (p) =>
-        `<button type="button" data-piece="${p}" title="${PIECE_IT[p]}">
-           <img src="pieces/${color}${p.toUpperCase()}.svg" alt="${PIECE_IT[p]}">
+        `<button type="button" data-piece="${p}" title="${pieceName(p)}">
+           <img src="pieces/${color}${p.toUpperCase()}.svg" alt="${pieceName(p)}">
          </button>`
     )
     .join("");
@@ -1287,9 +1229,63 @@ els.nextHints.addEventListener("click", () => {
 });
 
 function openingOptionLabel(opening) {
+  const name = t(`opening.${opening.id}`);
   const n = opening.sans.length;
-  if (!n) return opening.name;
-  return `${opening.name} (${n} mosse)`;
+  if (!n) return name;
+  return t("opening.moves", { name, n });
+}
+
+function fillSkillSelect() {
+  const select = els.skill;
+  if (!select) return;
+  const current = select.value || "1";
+  select.innerHTML = [1, 2, 3, 4, 5, 6, 7, 8]
+    .map((n) => `<option value="${n}"${String(n) === current ? " selected" : ""}>${t(`skill.${n}`)}</option>`)
+    .join("");
+}
+
+function replayKingTalk() {
+  const replay = state.kingReplay;
+  if (!replay) return;
+  if (replay.type === "opening") {
+    speakKing(startOpeningTalk(), { calculating: playerIsSideToMove() });
+    return;
+  }
+  if (replay.type === "waiting") {
+    speakKing(t("king.waiting"));
+    return;
+  }
+  if (replay.type === "opponent" && replay.move && replay.beforeFen) {
+    const before = new Chess(replay.beforeFen);
+    const after = new Chess(replay.afterFen || state.game.fen());
+    speakKing(narrateOpponentMove(before, replay.move, after), { calculating: true, html: true });
+    return;
+  }
+  if (replay.type === "resign") {
+    speakKing(t("king.resign"));
+    return;
+  }
+  if (replay.type === "end") {
+    const [title, text] = endMessage();
+    speakKing(`${title} ${text}`.trim());
+    return;
+  }
+  if (replay.type === "boot") speakKing(t("king.boot"), { calculating: true });
+}
+
+function applyLanguage() {
+  applyStaticI18n();
+  fillSkillSelect();
+  fillStartOpeningSelect();
+  if (els.engineLabel) els.engineLabel.textContent = engineLabelText(state.skill);
+  if (els.openingLine) {
+    els.openingLine.textContent = state.startOpening?.sans?.length
+      ? formatOpeningLine(state.game)
+      : t("opening.startPos");
+  }
+  renderHistory();
+  renderHints();
+  replayKingTalk();
 }
 
 function fillStartOpeningSelect() {
@@ -1303,12 +1299,12 @@ function fillStartOpeningSelect() {
 
 function formatOpeningLine(game) {
   const history = game.history({ verbose: true });
-  if (!history.length) return "Si parte dalla posizione iniziale.";
+  if (!history.length) return t("opening.startPos");
   let text = "";
   for (let i = 0; i < history.length; i += 2) {
     const n = i / 2 + 1;
-    const white = italianSan(history[i].san);
-    const black = history[i + 1] ? italianSan(history[i + 1].san) : "";
+    const white = localizeSan(history[i].san);
+    const black = history[i + 1] ? localizeSan(history[i + 1].san) : "";
     text += `${n}.${white}${black ? ` ${black}` : ""} `;
   }
   return text.trim();
@@ -1332,25 +1328,17 @@ function applyStartOpening() {
   if (els.openingLine) {
     els.openingLine.textContent = opening.sans.length
       ? formatOpeningLine(state.game)
-      : "Si parte dalla posizione iniziale.";
+      : t("opening.startPos");
   }
 }
 
 function startOpeningTalk() {
   const opening = state.startOpening;
-  const info = describePosition(state.game.history(), state.game);
-  const title =
-    info?.title && info.title !== "Scegli un'apertura"
-      ? info.title
-      : opening?.sans?.length
-        ? opening.name
-        : "";
-  const start = title
-    ? `Buona fortuna. Iniziamo la partita con l'apertura ${title}.`
-    : "Buona fortuna. Iniziamo la partita.";
-  const next = playerIsSideToMove()
-    ? "Fai la tua mossa."
-    : "Aspetta il turno dell'avversario.";
+  const title = opening?.id && opening.id !== "start"
+    ? t(`opening.${opening.id}`)
+    : "";
+  const start = title ? t("king.startNamed", { title }) : t("king.start");
+  const next = playerIsSideToMove() ? t("king.yourMove") : t("king.waitTurn");
   return `${start} ${next}`;
 }
 
@@ -1395,12 +1383,13 @@ function startGame(playerColor = state.playerColor) {
   renderHistory();
   syncBoard({ keepArrows: true });
   setStatus(
-    playerIsSideToMove() ? "Tocca a te!" : "Tocca al computer",
+    playerIsSideToMove() ? t("turn.you") : t("turn.opp"),
     youLabel(),
     "play"
   );
   const talk = startOpeningTalk();
   state.lastKingTalk = talk;
+  state.kingReplay = { type: "opening" };
   speakKing(talk, { calculating: playerIsSideToMove() });
   computerMove();
 }
@@ -1439,8 +1428,9 @@ document.getElementById("btn-resign").addEventListener("click", () => {
   state.busy = false;
   clearHints();
   renderHints();
-  setStatus("Hai abbandonato", "Nuova partita quando vuoi.", "lose");
-  speakKing("Hai abbandonato. Quando vuoi, ricominciamo.", { calculating: false });
+  setStatus(t("end.resignTitle"), t("end.resign"), "lose");
+  state.kingReplay = { type: "resign" };
+  speakKing(t("king.resign"), { calculating: false });
   state.board.setInteractive(false);
 });
 els.skill.addEventListener("change", () => {
@@ -1455,10 +1445,13 @@ state.board = new Board(els.boardRoot, {
   onMove: (from, to) => applyUserMove(from, to),
 });
 
-setStatus("Caricamento", "Avvio del motore e del libro aperture…", "think");
-speakKing("Buona fortuna! Sto preparando la scacchiera…", { calculating: true });
-els.hints.innerHTML = "";
+applyStaticI18n();
+fillSkillSelect();
 fillStartOpeningSelect();
+setStatus(t("status.loading"), t("status.boot"), "think");
+state.kingReplay = { type: "boot" };
+speakKing(t("king.boot"), { calculating: true });
+els.hints.innerHTML = "";
 renderHints();
 
 Promise.all([
@@ -1468,5 +1461,5 @@ Promise.all([
   .then(() => startFirstVisitGame())
   .catch((err) => {
     console.error(err);
-    setStatus("Errore", "Impossibile avviare Stockfish. Apri il sito da XAMPP (http://localhost/5minchess/).", "lose");
+    setStatus(t("error"), t("error.stockfish"), "lose");
   });
