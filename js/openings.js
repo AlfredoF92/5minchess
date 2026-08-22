@@ -25,6 +25,20 @@ function insertLine(eco, name, sans) {
   node.name = name;
 }
 
+export const START_OPENINGS = [
+  { id: "start", name: "Posizione iniziale", sans: [] },
+  { id: "italian", name: "Partita Italiana", sans: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5"] },
+  { id: "spanish", name: "Partita Spagnola", sans: ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"] },
+  { id: "sicilian", name: "Difesa Siciliana", sans: ["e4", "c5", "Nf3", "d6", "d4", "cxd4"] },
+  { id: "french", name: "Difesa Francese", sans: ["e4", "e6", "d4", "d5", "Nc3", "Nf6"] },
+  { id: "caro", name: "Difesa Caro-Kann", sans: ["e4", "c6", "d4", "d5", "Nc3", "dxe4"] },
+  { id: "qgd", name: "Gambetto di Donna", sans: ["d4", "d5", "c4", "e6", "Nc3", "Nf6"] },
+  { id: "kid", name: "Difesa Est-Indiana", sans: ["d4", "Nf6", "c4", "g6", "Nc3", "Bg7"] },
+  { id: "english", name: "Apertura Inglese", sans: ["c4", "e5", "Nc3", "Nf6", "Nf3", "Nc6"] },
+  { id: "london", name: "Sistema Londra", sans: ["d4", "d5", "Nf3", "Nf6", "Bf4", "e6"] },
+  { id: "scotch", name: "Partita Scozzese", sans: ["e4", "e5", "Nf3", "Nc6", "d4", "exd4"] },
+];
+
 export async function loadOpenings() {
   if (loaded) return;
   const files = ["a", "b", "c", "d", "e"];

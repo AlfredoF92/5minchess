@@ -1,7 +1,7 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js";
 import { Board } from "./board.js";
-import { loadOpenings, describePosition } from "./openings.js";
+import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
 
 const PIECE_IT = {
   p: "Pedone",
@@ -530,10 +530,14 @@ function narratePlayerMove(before, move, after) {
 }
 
 function markDanger(paint = true) {
-  const threatened = playerPiecesUnderAttack(state.game, state.playerColor);
-  const protectedSquares = threatened.filter((square) => (
-    isSquareDefended(state.game, square, state.playerColor)
-  ));
+  const opponent = state.playerColor === "w" ? "b" : "w";
+  const ours = playerPiecesUnderAttack(state.game, state.playerColor);
+  const theirs = playerPiecesUnderAttack(state.game, opponent);
+  const threatened = [...ours, ...theirs];
+  const protectedSquares = threatened.filter((square) => {
+    const piece = state.game.get(square);
+    return Boolean(piece && isSquareDefended(state.game, square, piece.color));
+  });
   state.board.setDanger(threatened, paint, protectedSquares);
 }
 
@@ -567,6 +571,8 @@ const els = {
   statusIcon: document.getElementById("status-icon"),
   engineLabel: document.getElementById("engine-label"),
   skill: document.getElementById("skill"),
+  startOpening: document.getElementById("start-opening"),
+  openingLine: document.getElementById("opening-line"),
   moves: document.getElementById("moves"),
   playerName: document.getElementById("player-name"),
   turnBanner: document.getElementById("turn-banner"),
@@ -593,6 +599,8 @@ const state = {
   hintPage: 0,
   hintsUnlocked: 0,
   hintBestScore: -Infinity,
+  openingPly: 0,
+  startOpening: START_OPENINGS[0],
   gameId: 0,
   pendingPromo: null,
 };
@@ -934,6 +942,71 @@ els.nextHints.addEventListener("click", () => {
   showHintPage(state.hintPage + 1);
 });
 
+function openingOptionLabel(opening) {
+  const n = opening.sans.length;
+  if (!n) return opening.name;
+  return `${opening.name} (${n} mosse)`;
+}
+
+function fillStartOpeningSelect() {
+  const select = els.startOpening;
+  if (!select) return;
+  const current = select.value || "start";
+  select.innerHTML = START_OPENINGS.map((opening) => (
+    `<option value="${opening.id}"${opening.id === current ? " selected" : ""}>${openingOptionLabel(opening)}</option>`
+  )).join("");
+}
+
+function formatOpeningLine(game) {
+  const history = game.history({ verbose: true });
+  if (!history.length) return "Si parte dalla posizione iniziale.";
+  let text = "";
+  for (let i = 0; i < history.length; i += 2) {
+    const n = i / 2 + 1;
+    const white = italianSan(history[i].san);
+    const black = history[i + 1] ? italianSan(history[i + 1].san) : "";
+    text += `${n}.${white}${black ? ` ${black}` : ""} `;
+  }
+  return text.trim();
+}
+
+function selectedStartOpening() {
+  const id = els.startOpening?.value || "start";
+  return START_OPENINGS.find((opening) => opening.id === id) || START_OPENINGS[0];
+}
+
+function applyStartOpening() {
+  const opening = selectedStartOpening();
+  state.startOpening = opening;
+  for (const san of opening.sans) {
+    if (!state.game.move(san)) break;
+  }
+  state.openingPly = state.game.history().length;
+  const hist = state.game.history({ verbose: true });
+  const last = hist[hist.length - 1];
+  state.board.setLastMove(last ? last.from : null, last ? last.to : null);
+  if (els.openingLine) {
+    els.openingLine.textContent = opening.sans.length
+      ? formatOpeningLine(state.game)
+      : "Si parte dalla posizione iniziale.";
+  }
+}
+
+function startOpeningTalk() {
+  const opening = state.startOpening;
+  if (!opening?.sans?.length) {
+    return playerIsSideToMove()
+      ? "Buona fortuna! Ora ti consiglio queste mosse."
+      : "Buona fortuna! L'avversario muove per primo.";
+  }
+  const info = describePosition(state.game.history(), state.game);
+  const title = info?.title && info.title !== "Scegli un'apertura" ? info.title : opening.name;
+  if (playerIsSideToMove()) {
+    return `Partiamo da: ${title}. Buona fortuna! Ora ti consiglio queste mosse.`;
+  }
+  return `Partiamo da: ${title}. Buona fortuna! L'avversario muove per primo.`;
+}
+
 function startGame(playerColor = state.playerColor) {
   state.gameId += 1;
   state.engine.stop();
@@ -946,30 +1019,25 @@ function startGame(playerColor = state.playerColor) {
   els.promo.hidden = true;
   els.engineLabel.textContent = engineLabelText(state.skill);
   state.board.setOrientation(playerColor === "w" ? "white" : "black");
-  state.board.setLastMove(null, null);
+  applyStartOpening();
   renderHints();
   renderHistory();
-  syncBoard();
+  syncBoard({ keepArrows: true });
   setStatus(
     playerIsSideToMove() ? "Tocca a te!" : "Tocca al computer",
     youLabel(),
     "play"
   );
-  speakKing(
-    playerIsSideToMove()
-      ? "Buona fortuna! Ora ti consiglio queste mosse."
-      : "Buona fortuna! L'avversario muove per primo.",
-    { calculating: playerIsSideToMove() }
-  );
+  speakKing(startOpeningTalk(), { calculating: playerIsSideToMove() });
   computerMove();
 }
 
 function undoFullTurn() {
-  if (state.busy || !state.game.history().length) return;
+  if (state.busy || state.game.history().length <= state.openingPly) return;
   state.gameId += 1;
   state.engine.stop();
   state.game.undo();
-  if (state.game.turn() !== state.playerColor && state.game.history().length) {
+  if (state.game.turn() !== state.playerColor && state.game.history().length > state.openingPly) {
     state.game.undo();
   }
   const hist = state.game.history({ verbose: true });
@@ -1006,6 +1074,7 @@ els.skill.addEventListener("change", () => {
   state.skill = Number(els.skill.value);
   els.engineLabel.textContent = engineLabelText(state.skill);
 });
+els.startOpening.addEventListener("change", () => startGame(state.playerColor));
 
 state.board = new Board(els.boardRoot, {
   onMove: (from, to) => applyUserMove(from, to),
@@ -1014,6 +1083,7 @@ state.board = new Board(els.boardRoot, {
 setStatus("Caricamento", "Avvio del motore e del libro aperture…", "think");
 speakKing("Buona fortuna! Sto preparando la scacchiera…", { calculating: true });
 els.hints.innerHTML = "";
+fillStartOpeningSelect();
 renderHints();
 
 Promise.all([
