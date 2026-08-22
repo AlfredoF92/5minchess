@@ -1,12 +1,60 @@
 import { Chess, SQUARES } from "./chess.min.js";
-import { Engine } from "./engine.js";
+import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260822hidhints";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260822bestmove";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-const HINTS_PER_PAGE = 6;
-const HINT_POOL_SIZE = 12;
+const HINT_LAYOUT_KEY = "5minchess.hintLayout";
+const HINT_LAYOUTS = {
+  "6x1": { perPage: 6, pages: 1 },
+  "4x1": { perPage: 4, pages: 1 },
+  "6x2": { perPage: 6, pages: 2 },
+  "4x2": { perPage: 4, pages: 2 },
+  "4x3": { perPage: 4, pages: 3 },
+};
+const CLOCK_KEY = "5minchess.moveClock";
+const CLOCK_OPTIONS = [0, 30, 45, 60];
+const HINT_RECALC_MS = 8000;
+
+function readHintLayout() {
+  try {
+    const saved = localStorage.getItem(HINT_LAYOUT_KEY);
+    if (HINT_LAYOUTS[saved]) return saved;
+  } catch {
+    /* ignore */
+  }
+  return "6x1";
+}
+
+function hintLayout() {
+  return HINT_LAYOUTS[state.hintLayout] || HINT_LAYOUTS["6x1"];
+}
+
+function hintsPerPage() {
+  return hintLayout().perPage;
+}
+
+function hintPoolSize() {
+  const layout = hintLayout();
+  return layout.perPage * layout.pages;
+}
+
+function readMoveClock() {
+  try {
+    const n = Number(localStorage.getItem(CLOCK_KEY));
+    if (CLOCK_OPTIONS.includes(n)) return n;
+  } catch {
+    /* ignore */
+  }
+  return 0;
+}
+
+function moveClockSec() {
+  return CLOCK_OPTIONS.includes(state.moveClockSec) ? state.moveClockSec : 0;
+}
+
+const MOVE_CLOCK_DELAY_MS = 2000;
 
 function pieceName(type) {
   return t(`piece.${type}`) || t("hints.move");
@@ -330,6 +378,27 @@ const OPPONENT_FEEDBACK_KEYS = {
   mateRisk: ["ofb.32", "ofb.33"],
 };
 
+const FEEDBACK_REACT = {
+  best: "🤩",
+  excellent: "🔥",
+  strong: "👌",
+  good: "👍",
+  inaccuracy: "🤔",
+  mistake: "😅",
+  blunder: "😱",
+  mateMiss: "🙈",
+  mateRisk: "😠",
+  heartHalf: "🙁",
+  heartOne: "😢",
+  heartMany: "😭",
+};
+
+const FEEDBACK_LEGEND = [
+  "best", "excellent", "strong", "good",
+  "inaccuracy", "mistake", "blunder", "mateMiss", "mateRisk",
+  "heartHalf", "heartOne", "heartMany",
+];
+
 const SEE_REPLY_KEYS = [
   "wait.1", "wait.2", "wait.3", "wait.4", "wait.5",
   "wait.6", "wait.7", "wait.8", "wait.9", "wait.10",
@@ -373,6 +442,70 @@ function pickFeedbackKey(hint, bestScore, pool) {
   return pickKey(FEEDBACK_BAND_KEYS[feedbackBand(hint, bestScore, pool)] || FEEDBACK_BAND_KEYS.good, "lastFeedbackKey");
 }
 
+function bandFromFeedbackKey(key) {
+  return Object.keys(FEEDBACK_BAND_KEYS).find((band) => FEEDBACK_BAND_KEYS[band].includes(key)) || "";
+}
+
+function renderKingLegend() {
+  const root = els.kingLegend;
+  if (!root) return;
+  root.innerHTML = FEEDBACK_LEGEND.map((band) => (
+    `<span class="legend-item${state.lastFeedbackBand === band ? " is-on" : ""}" data-band="${band}">
+      <span class="legend-emoji">${FEEDBACK_REACT[band]}</span>
+      <span class="legend-label">${t(`legend.${band}`)}</span>
+    </span>`
+  )).join("");
+}
+
+function hideKingReactEmoji() {
+  if (!els.kingReact) return;
+  els.kingReact.hidden = true;
+  els.kingReact.textContent = "";
+  els.kingReact.classList.remove("is-pop");
+}
+
+function showKingReact(band) {
+  const emoji = FEEDBACK_REACT[band];
+  state.lastFeedbackBand = band || "";
+  renderKingLegend();
+  clearTimeout(state.reactTimer);
+  if (!els.kingReact) return;
+  if (!emoji) {
+    hideKingReactEmoji();
+    return;
+  }
+  els.kingReact.hidden = false;
+  els.kingReact.textContent = emoji;
+  els.kingReact.classList.remove("is-pop");
+  void els.kingReact.offsetWidth;
+  els.kingReact.classList.add("is-pop");
+  state.reactTimer = setTimeout(hideKingReactEmoji, 3000);
+}
+
+function clearKingReact() {
+  clearTimeout(state.reactTimer);
+  state.lastFeedbackBand = "";
+  hideKingReactEmoji();
+  renderKingLegend();
+}
+
+function pickOpponentKeyFromEval(beforeScore, afterScore) {
+  if (!Number.isFinite(beforeScore) || !Number.isFinite(afterScore)) {
+    return pickKey(OPPONENT_FEEDBACK_KEYS.strong, "lastOppFeedbackKey");
+  }
+  const swing = beforeScore - afterScore;
+  let band = "good";
+  if (afterScore < -80000) band = "best";
+  else if (swing >= -20) band = "best";
+  else if (swing >= -50) band = "excellent";
+  else if (swing >= -90) band = "strong";
+  else if (swing >= -160) band = "good";
+  else if (swing >= -250) band = "inaccuracy";
+  else if (swing >= -400) band = "mistake";
+  else band = "blunder";
+  return pickKey(OPPONENT_FEEDBACK_KEYS[band] || OPPONENT_FEEDBACK_KEYS.good, "lastOppFeedbackKey");
+}
+
 function pickOpponentFeedbackKey(hint, bestScore, pool) {
   if (!hint || hint.synthetic) {
     return pickKey(OPPONENT_FEEDBACK_KEYS.mistake, "lastOppFeedbackKey");
@@ -387,15 +520,15 @@ function pickSeeReplyKey() {
   return pickKey(SEE_REPLY_KEYS, "lastSeeReplyKey");
 }
 
-function playerFeedbackHtml(fbKey, replyKey) {
-  const body = escapeHtml(t(fbKey));
+function playerFeedbackTalk(fbKey, replyKey) {
+  const body = t(fbKey);
   if (!replyKey) return body;
-  return `${body}<span class="king-closer">${escapeHtml(t(replyKey))}</span>`;
+  return `${body}\n\n${t(replyKey)}`;
 }
 
 async function scorePlayedUci(fen, uci) {
   try {
-    const lines = await state.engine.analyze(fen, { depth: 11, multipv: 12 });
+    const lines = await state.engine.analyze(fen, { depth: 15, multipv: 12 });
     const pool = (lines || []).filter((line) => line?.uci);
     const best = pool.length ? Math.max(...pool.map(hintScore)) : -Infinity;
     const hint = pool.find((line) => line.uci === uci) || null;
@@ -574,8 +707,6 @@ function coachLine(before, move, after, hint) {
     if (movedHangs && isCheck && holds && replyOnTo) return say("talk.decoy");
     if (movedHangs && holds && ourVal >= 3 && captureVal < ourVal) return say("talk.sac");
     if (move.piece === "r" && (move.captured === "n" || move.captured === "b") && holds) return say("talk.exchange");
-    if (riskyTake) return say(isCheck ? "talk.checkTakeCare" : "talk.takeCare", { hang: hangPiece });
-    if (!movedHangs && drop >= 180) return say("talk.poisoned");
     if (recapture) return say("talk.recapture");
     if (isCheck) return say("talk.checkTake");
     if (newlyLoose.length && captureVal <= 5) {
@@ -587,12 +718,6 @@ function coachLine(before, move, after, hint) {
       if (typeof hint?.score === "number" && hint.scoreType === "cp" && hint.score >= 150) return say("talk.simplifyWin");
       if (typeof hint?.score === "number" && hint.scoreType === "cp" && Math.abs(hint.score) <= 40) return say("talk.trade");
       return say("talk.trade");
-    }
-    if (otherHang) {
-      const hanging = after.get(otherHang);
-      if (hanging && (PIECE_VALUE[hanging.type] || 0) >= 3) {
-        return say("talk.takeOtherCare", { hang: talkPiece(hanging.type) });
-      }
     }
     if (enemyCastledShort(before, enemy) && "gh".includes(move.to[0]) && (move.piece === "p" || move.captured === "p")) {
       return say("talk.breakCastle");
@@ -660,7 +785,7 @@ function coachLine(before, move, after, hint) {
   if ((move.piece === "q" || move.piece === "r") && enemyKing) {
     const beforeDist = Math.abs(fileOf(move.from) - fileOf(enemyKing)) + Math.abs(fromRank - rankOf(enemyKing));
     const afterDist = Math.abs(fileOf(move.to) - fileOf(enemyKing)) + Math.abs(toRank - rankOf(enemyKing));
-    if (afterDist < beforeDist - 1) return say("talk.huntKing");
+    if (afterDist < beforeDist - 1) return say(intoAttackKey());
   }
   if (openedLine) return say("talk.openHunt");
   if (linedUp) return say("talk.lineUp");
@@ -767,7 +892,7 @@ function coachLine(before, move, after, hint) {
     const facing = front && after.get(front);
     if (facing?.type === "p" && facing.color === enemy) return say("talk.fixPawn");
     if (enemyCastledShort(before, enemy) && "gh".includes(move.from[0]) && (us === "w" ? toRank > fromRank : toRank < fromRank)) {
-      return say(move.captured ? "talk.breakCastle" : "talk.storm");
+      return say(move.captured ? "talk.breakCastle" : intoAttackKey());
     }
     if (touchesEnemyChain(before, move.to, enemy) && (move.captured || "cf".includes(move.from[0]))) {
       return say("talk.pawnBreak");
@@ -822,6 +947,11 @@ function coachLine(before, move, after, hint) {
   return say("talk.reposition");
 }
 
+function intoAttackKey() {
+  const keys = ["talk.intoAttack", "talk.intoAttack2", "talk.intoAttack3"];
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
 function hintTalk(hint) {
   if (hint?.talk) return hint.talk;
   const { played, after } = tryHint(hint);
@@ -839,13 +969,18 @@ function prepareHintTalks() {
   }
 }
 
-async function computeHintPool(game) {
+async function computeHintPool(game, { movetime = 3000 } = {}) {
   if (game.game_over()) return [];
-  const lines = await state.engine.analyze(game.fen(), {
-    depth: 11,
-    multipv: 12,
-  });
-  return fillHintPool(lines, game);
+  try {
+    const lines = await state.engine.analyze(game.fen(), {
+      multipv: 12,
+      movetime,
+    });
+    return fillHintPool(lines || [], game);
+  } catch (err) {
+    if (err.message === "aborted") throw err;
+    return fillHintPool([], game);
+  }
 }
 
 function explainMove(before, move, after, hint) {
@@ -942,19 +1077,27 @@ function explainMove(before, move, after, hint) {
 
 const ARROW_GREEN = "#8ec85a";
 
-const SKILL_ELO = {
-  1: 1350,
-  2: 1450,
-  3: 1550,
-  4: 1650,
-  5: 1750,
-  6: 1850,
-  7: 2000,
-  8: 2150,
+const SKILL_LEVELS = {
+  1: { elo: 1200, skill: 0, movetime: 350 },
+  2: { elo: 1400, skill: 1, movetime: 400 },
+  3: { elo: 1600, movetime: 500 },
+  4: { elo: 1800, movetime: 600 },
+  5: { elo: 2000, movetime: 700 },
+  6: { elo: 2200, movetime: 800 },
+  7: { elo: 2400, movetime: 900 },
+  8: { elo: 2600, movetime: 1000 },
+  9: { elo: 0, unlimited: true, movetime: 1200 },
 };
 
+function skillSettings(skill) {
+  return SKILL_LEVELS[Number(skill)] || SKILL_LEVELS[1];
+}
+
 function engineLabelText(skill) {
-  return `Stockfish ${t(`engine.${skill}`)} · ${SKILL_ELO[skill]} Elo`;
+  const settings = skillSettings(skill);
+  return settings.unlimited
+    ? `Stockfish ${t("engine.9")}`
+    : `Stockfish ${settings.elo} Elo`;
 }
 
 function localizeSan(san) {
@@ -999,6 +1142,17 @@ function hintScore(info) {
     return info.score > 0 ? 100000 - info.score : -100000 - info.score;
   }
   return Number.isFinite(info.score) ? info.score : -Infinity;
+}
+
+function hintRankTag(hint, pool = state.hintPool) {
+  const scored = (pool || []).filter((line) => line && !line.synthetic && Number.isFinite(hintScore(line)));
+  if (!hint || hint.synthetic || !Number.isFinite(hintScore(hint)) || !scored.length) return "";
+  const mine = hintScore(hint);
+  const best = Math.max(...scored.map(hintScore));
+  const worst = Math.min(...scored.map(hintScore));
+  if (mine >= best) return t("hint.tag.best");
+  if (best !== worst && mine <= worst) return t("hint.tag.worst");
+  return t("hint.tag.normal");
 }
 
 function formatHintEval(info) {
@@ -1065,7 +1219,8 @@ function fillHintPool(engineLines, game) {
       seen.add(line.uci);
       pool.push(line);
     });
-  if (pool.length < HINT_POOL_SIZE) {
+  const want = hintPoolSize();
+  if (pool.length < want) {
     game.moves({ verbose: true }).forEach((move) => {
       const uci = uciFromVerbose(move);
       if (seen.has(uci)) return;
@@ -1079,62 +1234,137 @@ function fillHintPool(engineLines, game) {
       });
     });
   }
-  const ranked = pool.slice(0, HINT_POOL_SIZE);
+  const ranked = pool.slice(0, want);
   state.hintBestScore = ranked.length ? hintScore(ranked[0]) : -Infinity;
-  const pages = [];
-  for (let i = 0; i < ranked.length; i += HINTS_PER_PAGE) {
-    pages.push(...shuffle(ranked.slice(i, i + HINTS_PER_PAGE)));
+  const realBest = ranked.find((line) => line && !line.synthetic);
+  if (realBest && Number.isFinite(hintScore(realBest))) {
+    state.gameEval = evalForPlayer(hintScore(realBest), game);
   }
-  return pages;
+  return shuffle(ranked);
+}
+
+function evalForPlayer(score, game) {
+  const stm = game.turn();
+  const me = isLocalVsHuman() ? stm : state.playerColor;
+  return stm === me ? score : -score;
+}
+
+function livesFromCp(cp) {
+  if (!Number.isFinite(cp) || cp >= -40) return 6;
+  if (cp > -120) return 5;
+  if (cp > -220) return 4;
+  if (cp > -350) return 3;
+  if (cp > -550) return 2;
+  return 1;
+}
+
+function kingLifeHalves() {
+  if (Number.isFinite(state.livesForced)) return state.livesForced;
+  if (state.game.in_checkmate()) {
+    return state.game.turn() !== state.playerColor ? 6 : 0;
+  }
+  if (state.game.game_over()) return 6;
+  return livesFromCp(state.gameEval);
+}
+
+function opponentReactBand(afterGame, beforeEval) {
+  if (afterGame.in_checkmate() || afterGame.in_check()) return "mateRisk";
+  const lost = livesFromCp(beforeEval) - livesFromCp(state.gameEval);
+  if (lost >= 3) return "heartMany";
+  if (lost >= 2) return "heartOne";
+  if (lost >= 1) return "heartHalf";
+  return "";
+}
+
+function renderKingLives() {
+  const root = els.kingLives;
+  if (!root) return;
+  const halves = kingLifeHalves();
+  root.innerHTML = [0, 1, 2]
+    .map((i) => {
+      const left = halves - i * 2;
+      const kind = left >= 2 ? "full" : left === 1 ? "half" : "empty";
+      return `<span class="king-heart is-${kind}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg">♥</span></span>`;
+    })
+    .join("");
 }
 
 function hintPageCount() {
-  return Math.max(1, Math.ceil(state.hintPool.length / HINTS_PER_PAGE));
+  const perPage = hintsPerPage();
+  const maxPages = hintLayout().pages;
+  return Math.max(1, Math.min(maxPages, Math.ceil(state.hintPool.length / perPage)));
 }
 
 function visibleHints() {
-  const start = state.hintPage * HINTS_PER_PAGE;
-  return state.hintPool.slice(start, start + HINTS_PER_PAGE);
+  const perPage = hintsPerPage();
+  const start = state.hintPage * perPage;
+  return state.hintPool.slice(start, start + perPage);
+}
+
+function syncHintLayoutUi() {
+  const n = hintsPerPage();
+  els.hints?.classList.toggle("is-four", n === 4);
+  els.hints?.classList.toggle("is-six", n !== 4);
 }
 
 function syncHintNav() {
   const hidden = waitingForHints();
+  const perPage = hintsPerPage();
+  const label = t("hints.more", { n: perPage });
   els.hints?.classList.toggle("is-waiting", hidden);
   els.hintNav?.classList.toggle("is-waiting", hidden);
   const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && !hidden;
-  const lastPage = hintPageCount() - 1;
-  const canLoadMore = canUse && state.hintPool.length > HINTS_PER_PAGE && state.hintsUnlocked < lastPage;
+  const canToggle = canUse && hintPageCount() > 1;
+  if (els.hintNav) els.hintNav.hidden = hintPageCount() <= 1;
   if (els.moreHints) {
-    els.moreHints.textContent = canLoadMore
-      ? t("hints.more")
-      : t("hints.range", {
-        from: state.hintPage * HINTS_PER_PAGE + 1,
-        to: Math.min((state.hintPage + 1) * HINTS_PER_PAGE, state.hintPool.length) || HINTS_PER_PAGE,
-      });
-    els.moreHints.disabled = !canLoadMore;
+    els.moreHints.textContent = label;
+    els.moreHints.title = label;
+    els.moreHints.setAttribute("aria-label", label);
+    els.moreHints.disabled = !canToggle;
   }
-  if (els.prevHints) {
-    els.prevHints.disabled = !canUse || state.hintPage === 0;
-  }
-  if (els.nextHints) {
-    els.nextHints.disabled = !canUse || state.hintPage >= state.hintsUnlocked || state.hintPage >= lastPage;
-  }
+  syncRecalcButton();
+}
+
+function syncRecalcButton() {
+  if (!els.recalcHints) return;
+  const hidden = waitingForHints();
+  const canRecalc = playerIsSideToMove()
+    && !state.busy
+    && !state.recalcHints
+    && !state.recalcUsedThisTurn
+    && !state.game.game_over()
+    && !hidden
+    && state.hintPool.length;
+  const label = state.recalcHints ? t("hints.recalcing") : t("hints.recalc");
+  els.recalcHints.textContent = label;
+  els.recalcHints.title = label;
+  els.recalcHints.setAttribute("aria-label", label);
+  els.recalcHints.disabled = !canRecalc;
+  els.recalcWrap?.classList.toggle("is-busy", Boolean(state.recalcHints));
+  const show = state.recalcHints || canRecalc;
+  if (els.recalcWrap) els.recalcWrap.hidden = !show;
 }
 
 function showHintPage(page) {
   const lastPage = hintPageCount() - 1;
-  const cap = Math.min(state.hintsUnlocked, lastPage);
-  state.hintPage = Math.max(0, Math.min(page, cap));
+  const pages = lastPage + 1;
+  if (pages <= 1) {
+    state.hintPage = 0;
+  } else {
+    state.hintPage = ((page % pages) + pages) % pages;
+  }
   renderHints();
   if (state.aids.moves) showHintArrows(null, { reveal: true });
 }
 
 function clearHints() {
+  stopMoveClock();
   state.hints = [];
   state.hintPool = [];
   state.hintPage = 0;
   state.hintsUnlocked = 0;
   state.hintBestScore = -Infinity;
+  state.recalcUsedThisTurn = false;
 }
 
 function playerPiecesUnderAttack(game, playerColor) {
@@ -1220,7 +1450,7 @@ function hintDanger(hint) {
 }
 
 function pieceOnSquare(type, square) {
-  return `${t(`plain.${type || "x"}`)} ${t("prep.in")} <strong>${square}</strong>`;
+  return `${t(`plain.${type || "x"}`)} ${t("prep.in")} ${square}`;
 }
 
 function joinIt(items) {
@@ -1265,7 +1495,7 @@ function ourPlural(type) {
 }
 
 function squareList(squares) {
-  return joinIt(squares.map((square) => `${t("prep.in")} <strong>${square}</strong>`));
+  return joinIt(squares.map((square) => `${t("prep.in")} ${square}`));
 }
 
 function ourHitsPhrase(hits) {
@@ -1315,7 +1545,7 @@ function opponentLead(move) {
 
 function narrateOpponentMove(before, move, after, feedbackKey) {
   if (move.san.includes("#")) {
-    return escapeHtml(t("king.mateOpp"));
+    return t("king.mateOpp");
   }
   const hits = threatsFromMove(after, move, state.playerColor).slice(0, 3);
   const labels = ourHitsPhrase(hits);
@@ -1332,11 +1562,11 @@ function narrateOpponentMove(before, move, after, feedbackKey) {
   const hanging = hits.filter((hit) => !isSquareDefended(after, hit.to, state.playerColor));
   const warning = hangingAdvice(hanging);
   const bits = [];
-  if (feedbackKey) bits.push(escapeHtml(t(feedbackKey)));
-  bits.push(escapeHtml(lead));
-  if (warning) bits.push(`<span class="king-hang">${escapeHtml(warning)}</span>`);
-  bits.push(`<span class="king-closer">${escapeHtml(t("king.closer"))}</span>`);
-  return bits.join(" ");
+  if (feedbackKey) bits.push(t(feedbackKey));
+  bits.push(lead);
+  if (warning) bits.push(warning);
+  bits.push(t("king.closer"));
+  return bits.join("\n\n");
 }
 
 function narratePlayerMove(before, move, after) {
@@ -1379,7 +1609,7 @@ function pieceSquareLabel(square) {
 }
 
 function boldItems(items) {
-  return items.map((item) => `<strong>${escapeHtml(item)}</strong>`).join(", ");
+  return items.join(", ");
 }
 
 function kingTurnAdvice() {
@@ -1405,7 +1635,7 @@ function clearBoardAids() {
   state.aids.threats = false;
   if (state.board) {
     state.board.setArrows([]);
-    if (Date.now() >= state.pipUntil) state.board.setDanger([]);
+    paintActiveThreats();
   }
   syncAidButtons();
 }
@@ -1416,7 +1646,7 @@ function syncAidButtons() {
 }
 
 function paintThreatPips() {
-  state.board.setDanger(allThreatenedSquares());
+  paintActiveThreats();
 }
 
 function squaresAttackedByMovedPiece(move) {
@@ -1436,16 +1666,20 @@ function squaresAttackedByMovedPiece(move) {
   return [...seen];
 }
 
+function threatPipSquares() {
+  const squares = [];
+  if (state.aids.threats) squares.push(...allThreatenedSquares());
+  else if (Date.now() < state.pipUntil) squares.push(...(state.flashSquares || []));
+  if (state.game?.in_check()) {
+    const king = kingSquare(state.game, state.game.turn());
+    if (king) squares.push(king);
+  }
+  return [...new Set(squares)];
+}
+
 function paintActiveThreats() {
-  if (state.aids.threats) {
-    paintThreatPips();
-    return;
-  }
-  if (Date.now() < state.pipUntil) {
-    state.board.setDanger(state.flashSquares);
-    return;
-  }
-  state.board.setDanger([]);
+  if (!state.board) return;
+  state.board.setDanger(threatPipSquares());
 }
 
 function showAid(kind) {
@@ -1515,15 +1749,28 @@ const els = {
   skill: document.getElementById("skill"),
   skillRow: document.getElementById("skill-row"),
   playMode: document.getElementById("play-mode"),
+  playColor: document.getElementById("play-color"),
+  colorRow: document.getElementById("color-row"),
+  startKind: document.getElementById("start-kind"),
+  customOpeningRow: document.getElementById("custom-opening-row"),
+  newGame: document.getElementById("new-game"),
+  btnNewCancel: document.getElementById("btn-new-cancel"),
+  btnNewStart: document.getElementById("btn-new-start"),
   startOpening: document.getElementById("start-opening"),
+  hintLayout: document.getElementById("hint-layout"),
+  moveClockSelect: document.getElementById("move-clock-sec"),
   openingLine: document.getElementById("opening-line"),
   moves: document.getElementById("moves"),
   playerTop: document.getElementById("player-top"),
   playerYou: document.getElementById("player-you"),
   playerName: document.getElementById("player-name"),
   playerRating: document.getElementById("player-rating"),
+  playerRatingTop: document.getElementById("player-rating-top"),
   kingPiece: document.getElementById("king-piece"),
   kingTitle: document.getElementById("king-title"),
+  kingLives: document.getElementById("king-lives"),
+  kingReact: document.getElementById("king-react"),
+  kingLegend: document.getElementById("king-legend"),
   turnBanner: document.getElementById("turn-banner"),
   overlay: document.getElementById("overlay"),
   overlayTitle: document.getElementById("overlay-title"),
@@ -1531,10 +1778,17 @@ const els = {
   promo: document.getElementById("promo"),
   kingNote: document.getElementById("king-note"),
   moreHints: document.getElementById("btn-more-hints"),
-  prevHints: document.getElementById("btn-prev-hints"),
-  nextHints: document.getElementById("btn-next-hints"),
   hintNav: document.getElementById("hint-nav"),
   hintPanel: document.getElementById("hint-panel"),
+  recalcWrap: document.getElementById("hint-recalc"),
+  recalcHints: document.getElementById("btn-recalc-hints"),
+  recalcBar: document.getElementById("hint-recalc-bar"),
+  recalcFill: document.getElementById("hint-recalc-fill"),
+  moveClock: document.getElementById("move-clock"),
+  moveClockNum: document.getElementById("move-clock-num"),
+  moveClockFill: document.getElementById("move-clock-fill"),
+  graveTop: document.getElementById("grave-top"),
+  graveBottom: document.getElementById("grave-bottom"),
   aidMoves: document.getElementById("btn-aid-moves"),
   aidThreats: document.getElementById("btn-aid-threats"),
 };
@@ -1545,13 +1799,23 @@ const state = {
   board: null,
   playerColor: "w",
   mode: "engine",
-  skill: 1,
+  skill: 2,
+  playColorPref: "random",
+  startKind: "custom",
+  startOpeningId: "random",
   busy: false,
+  recalcHints: false,
+  recalcUsedThisTurn: false,
   hints: [],
   hintPool: [],
   hintPage: 0,
   hintsUnlocked: 0,
   hintBestScore: -Infinity,
+  gameEval: 0,
+  livesForced: null,
+  hintLayout: readHintLayout(),
+  moveClockSec: readMoveClock(),
+  hasGame: false,
   openingPly: 0,
   startOpening: START_OPENINGS[0],
   aids: { moves: true, threats: false },
@@ -1567,9 +1831,15 @@ const state = {
   gameId: 0,
   kingReplay: null,
   lastFeedbackKey: "",
+  lastFeedbackBand: "",
+  reactTimer: null,
   lastOppFeedbackKey: "",
   lastSeeReplyKey: "",
+  lastPlayerScore: -Infinity,
   pendingPromo: null,
+  moveClockToken: 0,
+  moveClockTimer: null,
+  moveClockTick: null,
 };
 
 function isLocalVsHuman() {
@@ -1598,23 +1868,28 @@ function syncCoach() {
       : t("king");
   }
   document.body.classList.toggle("is-local", isLocalVsHuman());
-  if (els.skillRow) els.skillRow.hidden = isLocalVsHuman();
   const whiteBottom = state.board?.orientation !== "black";
   if (isLocalVsHuman()) {
     const topColor = whiteBottom ? "b" : "w";
     const botColor = whiteBottom ? "w" : "b";
     if (els.engineLabel) els.engineLabel.textContent = t(topColor === "w" ? "player.white" : "player.black");
+    if (els.playerRatingTop) {
+      els.playerRatingTop.hidden = false;
+      els.playerRatingTop.textContent = t("player.local");
+    }
     if (els.playerName) els.playerName.textContent = t(botColor === "w" ? "player.white" : "player.black");
     if (els.playerRating) els.playerRating.textContent = t("player.local");
     els.playerTop?.classList.toggle("is-turn", state.game.turn() === topColor);
     els.playerYou?.classList.toggle("is-turn", state.game.turn() === botColor);
   } else {
     if (els.engineLabel) els.engineLabel.textContent = engineLabelText(state.skill);
+    if (els.playerRatingTop) els.playerRatingTop.hidden = true;
     if (els.playerName) els.playerName.textContent = t("you");
     if (els.playerRating) els.playerRating.textContent = t("you.rating");
     els.playerTop?.classList.remove("is-turn");
     els.playerYou?.classList.toggle("is-turn", playerIsSideToMove());
   }
+  renderKingLives();
 }
 
 function setStatus(title, text, kind = "info") {
@@ -1648,7 +1923,10 @@ function wrapKingWords(root) {
     parts.forEach((part) => {
       if (!part) return;
       if (/^\s+$/.test(part)) {
-        frag.appendChild(document.createTextNode(part));
+        part.split("\n").forEach((chunk, i) => {
+          if (i) frag.appendChild(document.createElement("br"));
+          if (chunk) frag.appendChild(document.createTextNode(chunk));
+        });
         return;
       }
       const word = document.createElement("span");
@@ -1663,17 +1941,16 @@ function wrapKingWords(root) {
 function paintKingNote(note, html) {
   if (!els.kingNote) return 0;
   const source = document.createElement("div");
-  if (html) source.innerHTML = note;
-  else source.textContent = note;
+  source.textContent = note || "";
   wrapKingWords(source);
   els.kingNote.innerHTML = source.innerHTML;
   const words = [...els.kingNote.querySelectorAll(".king-word")];
   let delay = 0;
   words.forEach((word) => {
     word.style.animationDelay = `${delay}ms`;
-    delay += /[.!?…]$/.test(word.textContent.trim()) ? 520 : 175;
+    delay += /[.!?…]$/.test(word.textContent.trim()) ? 110 : 40;
   });
-  return delay + 900;
+  return delay + 220;
 }
 
 function clearKingTalk() {
@@ -1712,7 +1989,85 @@ function loadingHintCard(rank) {
     </button>`;
 }
 
+function paintMoveClock(sec) {
+  if (els.moveClockNum) els.moveClockNum.textContent = String(Math.max(0, sec));
+  if (els.moveClockFill) {
+    els.moveClockFill.style.transform = `scaleX(${Math.max(0, sec) / moveClockSec()})`;
+  }
+  els.moveClock?.classList.toggle("is-low", sec <= 5);
+}
+
+function stopMoveClock() {
+  state.moveClockToken += 1;
+  if (state.moveClockTimer) {
+    clearTimeout(state.moveClockTimer);
+    state.moveClockTimer = null;
+  }
+  if (state.moveClockTick) {
+    clearInterval(state.moveClockTick);
+    state.moveClockTick = null;
+  }
+  if (els.moveClock) {
+    els.moveClock.hidden = true;
+    els.moveClock.classList.remove("is-on", "is-low");
+  }
+}
+
+function startMoveClock() {
+  stopMoveClock();
+  if (!moveClockSec()) return;
+  if (!playerIsSideToMove() || state.game.game_over() || !state.hintPool.length) return;
+  const token = (state.moveClockToken += 1);
+  const gameId = state.gameId;
+  if (els.moveClock) {
+    els.moveClock.hidden = false;
+    els.moveClock.classList.add("is-on");
+    els.moveClock.classList.remove("is-low");
+  }
+  if (els.moveClockFill) {
+    els.moveClockFill.style.transition = "none";
+    els.moveClockFill.style.transform = "scaleX(1)";
+  }
+  paintMoveClock(moveClockSec());
+  state.moveClockTimer = setTimeout(() => {
+    if (token !== state.moveClockToken || gameId !== state.gameId) return;
+    if (!playerIsSideToMove() || state.busy || state.game.game_over() || !state.hintPool.length) return;
+    let left = moveClockSec();
+    if (els.moveClockFill) {
+      void els.moveClockFill.offsetWidth;
+      els.moveClockFill.style.transition = "transform 1s linear, background 0.2s ease";
+    }
+    paintMoveClock(left);
+    state.moveClockTick = setInterval(() => {
+      if (token !== state.moveClockToken || gameId !== state.gameId) return;
+      left -= 1;
+      paintMoveClock(left);
+      if (left > 0) return;
+      stopMoveClock();
+      playWorstHint();
+    }, 1000);
+  }, MOVE_CLOCK_DELAY_MS);
+}
+
+function worstPoolHint() {
+  const pool = (state.hintPool || []).filter((hint) => hint?.uci);
+  const real = pool.filter((hint) => !hint.synthetic);
+  const list = real.length ? real : pool;
+  if (!list.length) return null;
+  return list.reduce((worst, hint) => (hintScore(hint) < hintScore(worst) ? hint : worst));
+}
+
+function playWorstHint() {
+  if (state.busy || !playerIsSideToMove() || state.game.game_over()) return;
+  const hint = worstPoolHint();
+  if (!hint) return;
+  const move = uciToMove(hint.uci);
+  applyUserMove(move.from, move.to, move.promotion, hint);
+}
+
 function hideHintPanel() {
+  stopMoveClock();
+  stopRecalcProgress();
   els.hintPanel?.classList.add("is-waiting");
   els.hints?.classList.remove("is-reveal");
   els.hints?.classList.add("is-waiting");
@@ -1741,6 +2096,7 @@ function revealHintsIfReady() {
   els.hints.classList.add("is-reveal");
   state.pendingHintReveal = false;
   if (state.aids.moves) showHintArrows(null, { reveal: true });
+  startMoveClock();
 }
 
 async function speakKing(note, { calculating = false, html = false } = {}) {
@@ -1773,6 +2129,57 @@ function kingComment(beforeFen, played, asOpponent, feedbackKey) {
     : narratePlayerMove(before, played, after);
 }
 
+function capturedSets() {
+  const lost = { w: [], b: [] };
+  const order = { q: 0, r: 1, b: 2, n: 3, p: 4 };
+  for (const move of state.game.history({ verbose: true })) {
+    if (!move.captured) continue;
+    const victimColor = move.color === "w" ? "b" : "w";
+    lost[victimColor].push(move.captured);
+  }
+  for (const color of ["w", "b"]) {
+    lost[color].sort((a, b) => {
+      const byValue = (PIECE_VALUE[b] || 0) - (PIECE_VALUE[a] || 0);
+      if (byValue) return byValue;
+      return (order[a] ?? 9) - (order[b] ?? 9);
+    });
+  }
+  return lost;
+}
+
+function graveHtml(types, victimColor, advantage) {
+  const icons = types.map((type) => (
+    `<img class="grave-piece" src="pieces/${victimColor}${String(type).toUpperCase()}.svg" alt="">`
+  )).join("");
+  const score = advantage > 0 ? `<span class="grave-score">+${advantage}</span>` : "";
+  return `${icons}${score}`;
+}
+
+function renderGraveyard() {
+  const lost = capturedSets();
+  const whiteTook = lost.b.reduce((sum, type) => sum + (PIECE_VALUE[type] || 0), 0);
+  const blackTook = lost.w.reduce((sum, type) => sum + (PIECE_VALUE[type] || 0), 0);
+  const whiteAdv = Math.max(0, whiteTook - blackTook);
+  const blackAdv = Math.max(0, blackTook - whiteTook);
+  const whiteBottom = state.board?.orientation !== "black";
+  const topColor = whiteBottom ? "b" : "w";
+  const botColor = whiteBottom ? "w" : "b";
+  if (els.graveTop) {
+    els.graveTop.innerHTML = graveHtml(
+      lost[botColor],
+      botColor,
+      topColor === "w" ? whiteAdv : blackAdv
+    );
+  }
+  if (els.graveBottom) {
+    els.graveBottom.innerHTML = graveHtml(
+      lost[topColor],
+      topColor,
+      botColor === "w" ? whiteAdv : blackAdv
+    );
+  }
+}
+
 function renderHistory() {
   const history = state.game.history({ verbose: true });
   let html = "";
@@ -1784,6 +2191,7 @@ function renderHistory() {
   }
   els.moves.innerHTML = html || `<div class="moves-empty">${t("moves.empty")}</div>`;
   els.moves.scrollTop = els.moves.scrollHeight;
+  renderGraveyard();
 }
 
 function syncBoard(options = {}) {
@@ -1795,13 +2203,7 @@ function syncBoard(options = {}) {
   state.board.setCheck(state.game.in_check() ? kingSquare(state.game, state.game.turn()) : null);
   if (state.aids.moves && !waitingForHints()) showHintArrows(null, { reveal: true });
   else if (!options.keepArrows) state.board.setArrows([]);
-  if (state.aids.threats) {
-    paintThreatPips();
-  } else if (Date.now() < state.pipUntil) {
-    state.board.setDanger(state.flashSquares);
-  } else {
-    state.board.setDanger([]);
-  }
+  paintActiveThreats();
   syncCoach();
 }
 
@@ -1815,7 +2217,7 @@ function renderHints() {
   }
   state.hints = visibleHints();
   const buttons = [];
-  for (let i = 0; i < HINTS_PER_PAGE; i += 1) {
+  for (let i = 0; i < hintsPerPage(); i += 1) {
     const hint = state.hints[i];
     const rank = i + 1;
     if (!hint) {
@@ -1829,7 +2231,8 @@ function renderHints() {
     const played = playedFromHint(hint);
     const san = played ? localizeSan(played.san) : hint.uci;
     const icon = played ? pieceIcon(played, state.game.turn()) : "";
-    const danger = hintDanger(hint);
+    const tag = hintRankTag(hint);
+    const evalLine = [formatHintEval(hint), tag].filter(Boolean).join("  ");
     const talk = (() => {
       try {
         return hint.talk || hintTalk(hint) || `Move to ${played?.to || ""}.`;
@@ -1838,13 +2241,14 @@ function renderHints() {
       }
     })();
     buttons.push(`
-      <button class="hint-btn${danger ? " is-danger" : ""}" data-index="${i}" type="button">
+      <button class="hint-btn" data-index="${i}" type="button">
         <span class="hint-body">
           <span class="hint-rank">${rank}</span>
           <span class="hint-move-row">
             ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
             <span class="hint-main">${san}</span>
           </span>
+          <span class="hint-eval">${escapeHtml(evalLine)}</span>
           <span class="hint-talk">${escapeHtml(talk)}</span>
         </span>
       </button>`);
@@ -1906,6 +2310,7 @@ async function refreshHints({ reveal = true } = {}) {
     state.hintPage = 0;
     state.hintsUnlocked = 0;
     prepareHintTalks();
+    renderKingLives();
     if (reveal) {
       state.pendingHintReveal = true;
       revealHintsIfReady();
@@ -1940,9 +2345,15 @@ function endMessage() {
 
 function finishGame() {
   state.busy = false;
+  if (state.game.in_checkmate()) {
+    state.livesForced = state.game.turn() !== state.playerColor ? 6 : 0;
+  } else {
+    state.livesForced = 6;
+  }
   clearHints();
   renderHints();
   syncBoard();
+  renderKingLives();
   const [title, text, kind] = endMessage();
   setStatus(title, text, kind);
   state.kingReplay = { type: "end" };
@@ -1976,16 +2387,21 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
   const fen = state.game.fen();
   const startedAt = Date.now();
   try {
-    const skill = Number(state.skill);
-    const { uci } = await state.engine.play(fen, {
-      skill,
-      movetime: 250 + skill * 90,
-    });
+    const settings = skillSettings(state.skill);
+    let uci = "";
+    try {
+      const played = await state.engine.play(fen, settings);
+      uci = played?.uci || "";
+    } catch (err) {
+      if (err.message === "aborted") throw err;
+    }
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
+    if (!uci) {
+      const legal = new Chess(fen).moves({ verbose: true });
+      const pick = legal[Math.floor(Math.random() * Math.max(legal.length, 1))];
+      uci = pick ? `${pick.from}${pick.to}${pick.promotion || ""}` : "";
+    }
     if (!uci) throw new Error("Nessuna mossa dal motore");
-    const oppScore = await scorePlayedUci(fen, uci);
-    if (gameId !== state.gameId || state.game.fen() !== fen) return;
-    const oppKey = pickOpponentFeedbackKey(oppScore.hint, oppScore.best, oppScore.pool);
     const preview = new Chess(fen);
     const move = uciToMove(uci);
     const previewPlayed = preview.move({
@@ -1995,13 +2411,16 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
     });
     if (!previewPlayed) throw new Error("Mossa motore illegale");
 
+    const beforeEval = Number.isFinite(state.lastPlayerScore) ? state.lastPlayerScore : state.gameEval;
     let pool = [];
     if (!preview.game_over()) {
       pool = await computeHintPool(preview);
       if (gameId !== state.gameId || state.game.fen() !== fen) return;
     }
+    const oppKey = pickOpponentKeyFromEval(state.lastPlayerScore, state.hintBestScore);
+    const oppBand = opponentReactBand(preview, beforeEval);
 
-    await waitAtLeast(6000, startedAt);
+    await waitAtLeast(7000, startedAt);
     if (afterTalk) await afterTalk;
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
 
@@ -2031,11 +2450,12 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
     prepareHintTalks();
     state.pendingHintReveal = true;
     state.busy = false;
+    if (oppBand) showKingReact(oppBand);
     const talk = kingComment(fen, played, true, oppKey);
     state.lastKingTalk = talk;
-    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey };
+    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey, reactBand: oppBand };
     setStatus(t("turn.you"), `${youLabel()}. ${t("turn.make")}`, "play");
-    speakKing(talk, { calculating: true, html: true });
+    speakKing(talk, { calculating: true });
     syncBoard({ keepArrows: true });
   } catch (err) {
     if (err.message === "aborted" || gameId !== state.gameId) return;
@@ -2059,8 +2479,14 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   const chosen = hintForPlayedMove(from, to, promotion, chosenHint);
   const bestScore = state.hintBestScore;
   const poolSnap = (state.hintPool || []).slice();
+  const band = feedbackBand(chosen, bestScore, poolSnap);
   const fbKey = pickFeedbackKey(chosen, bestScore, poolSnap);
   state.lastFeedbackKey = fbKey;
+  showKingReact(band);
+  state.lastPlayerScore = chosen && !chosen.synthetic ? hintScore(chosen) : -Infinity;
+  if (Number.isFinite(state.lastPlayerScore)) {
+    state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
+  }
   state.busy = true;
   const fen = state.game.fen();
   const played = state.game.move({ from, to, promotion: promotion || undefined });
@@ -2078,9 +2504,10 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   state.board.setPosition(state.game.fen());
   flashThreatenedPieces(played);
   renderHistory();
+  renderKingLives();
   const replyKey = state.game.game_over() ? "" : pickSeeReplyKey();
   state.kingReplay = { type: "feedback", key: fbKey, replyKey };
-  const feedbackTalk = speakKing(playerFeedbackHtml(fbKey, replyKey), { html: true });
+  const feedbackTalk = speakKing(playerFeedbackTalk(fbKey, replyKey));
   if (state.game.game_over()) {
     await feedbackTalk;
     finishGame();
@@ -2092,11 +2519,14 @@ async function applyUserMove(from, to, promotion, chosenHint) {
     const oppKey = pickOpponentFeedbackKey(chosen, bestScore, poolSnap);
     const talk = kingComment(fen, played, true, oppKey);
     state.lastKingTalk = talk;
-    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey };
     state.busy = false;
+    const beforeEval = Number.isFinite(state.lastPlayerScore) ? state.lastPlayerScore : state.gameEval;
     await refreshHints({ reveal: false });
+    const oppBand = opponentReactBand(state.game, beforeEval);
+    if (oppBand) showKingReact(oppBand);
+    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey, reactBand: oppBand };
     state.pendingHintReveal = true;
-    speakKing(talk, { calculating: true, html: true });
+    speakKing(talk, { calculating: true });
     return;
   }
   await computerMove({ silentWait: true, afterTalk: feedbackTalk });
@@ -2146,9 +2576,10 @@ els.hints.addEventListener("click", (event) => {
 
 document.addEventListener("keydown", (event) => {
   if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (els.newGame && !els.newGame.hidden) return;
   const target = event.target;
   if (target && (target.closest("input, select, textarea") || target.isContentEditable)) return;
-  if (event.key < "1" || event.key > String(HINTS_PER_PAGE)) return;
+  if (event.key < "1" || event.key > String(hintsPerPage())) return;
   if (!hintsArePlayable()) return;
   event.preventDefault();
   playHintAt(Number(event.key) - 1);
@@ -2170,20 +2601,85 @@ els.hints.addEventListener("pointerout", (event) => {
 
 els.moreHints.addEventListener("click", () => {
   if (els.moreHints.disabled) return;
-  const lastPage = hintPageCount() - 1;
-  if (state.hintsUnlocked >= lastPage) return;
-  state.hintsUnlocked += 1;
-  showHintPage(state.hintsUnlocked);
-});
-
-els.prevHints.addEventListener("click", () => {
-  if (els.prevHints.disabled) return;
-  showHintPage(state.hintPage - 1);
-});
-
-els.nextHints.addEventListener("click", () => {
-  if (els.nextHints.disabled) return;
   showHintPage(state.hintPage + 1);
+});
+
+function startRecalcProgress(ms) {
+  if (els.recalcBar) {
+    els.recalcBar.hidden = false;
+    els.recalcBar.setAttribute("aria-valuenow", "0");
+  }
+  if (!els.recalcFill) return;
+  els.recalcFill.style.transition = "none";
+  els.recalcFill.style.transform = "scaleX(0)";
+  void els.recalcFill.offsetWidth;
+  els.recalcFill.style.transition = `transform ${ms}ms linear`;
+  els.recalcFill.style.transform = "scaleX(1)";
+}
+
+function stopRecalcProgress() {
+  if (els.recalcFill) {
+    els.recalcFill.style.transition = "none";
+    els.recalcFill.style.transform = "scaleX(0)";
+  }
+  if (els.recalcBar) {
+    els.recalcBar.hidden = true;
+    els.recalcBar.setAttribute("aria-valuenow", "0");
+  }
+}
+
+async function recalculateHints() {
+  if (state.busy || state.recalcHints || state.recalcUsedThisTurn || !playerIsSideToMove() || state.game.game_over()) return;
+  if (!state.hintPool.length) return;
+  const gameId = state.gameId;
+  const fen = state.game.fen();
+  const prevPool = state.hintPool.slice();
+  const prevPage = state.hintPage;
+  const prevBest = state.hintBestScore;
+  const prevEval = state.gameEval;
+  state.recalcHints = true;
+  state.busy = true;
+  stopMoveClock();
+  els.hints?.classList.add("is-recalc");
+  syncRecalcButton();
+  startRecalcProgress(HINT_RECALC_MS);
+  try {
+    const pool = await computeHintPool(state.game, { movetime: HINT_RECALC_MS });
+    if (gameId !== state.gameId || state.game.fen() !== fen) return;
+    state.recalcUsedThisTurn = true;
+    state.hintPool = pool;
+    state.hintPage = 0;
+    state.hintsUnlocked = 0;
+    prepareHintTalks();
+    renderKingLives();
+    renderHints();
+    if (state.aids.moves) showHintArrows(null, { reveal: true });
+    els.hints.classList.remove("is-reveal");
+    void els.hints.offsetWidth;
+    els.hints.classList.add("is-reveal");
+  } catch (err) {
+    if (err.message === "aborted" || gameId !== state.gameId) return;
+    console.error(err);
+    state.hintPool = prevPool;
+    state.hintPage = prevPage;
+    state.hintBestScore = prevBest;
+    state.gameEval = prevEval;
+    renderHints();
+  } finally {
+    stopRecalcProgress();
+    els.hints?.classList.remove("is-recalc");
+    if (gameId === state.gameId) {
+      state.busy = false;
+      state.recalcHints = false;
+      syncHintNav();
+      startMoveClock();
+    }
+  }
+}
+
+els.recalcHints?.addEventListener("click", () => {
+  if (els.recalcHints.disabled) return;
+  recalculateHints();
 });
 
 function openingOptionLabel(opening) {
@@ -2202,13 +2698,150 @@ function fillModeSelect() {
     .join("");
 }
 
+function fillColorSelect() {
+  const select = els.playColor;
+  if (!select) return;
+  const current = select.value || "random";
+  select.innerHTML = ["random", "w", "b"]
+    .map((color) => {
+      const label = color === "random" ? t("newgame.random") : t(color === "w" ? "newgame.white" : "newgame.black");
+      return `<option value="${color}"${color === current ? " selected" : ""}>${label}</option>`;
+    })
+    .join("");
+}
+
+function fillStartKindSelect() {
+  const select = els.startKind;
+  if (!select) return;
+  const current = select.value || "custom";
+  select.innerHTML = ["standard", "custom"]
+    .map((kind) => `<option value="${kind}"${kind === current ? " selected" : ""}>${t(`start.${kind}`)}</option>`)
+    .join("");
+}
+
+function previewOpeningLine() {
+  if (!els.openingLine) return;
+  if (els.startKind?.value !== "custom") {
+    els.openingLine.textContent = t("opening.startPos");
+    return;
+  }
+  const id = els.startOpening?.value || "random";
+  if (id === "random") {
+    els.openingLine.textContent = t("opening.randomHint");
+    return;
+  }
+  const opening = START_OPENINGS.find((item) => item.id === id);
+  if (!opening?.sans?.length) {
+    els.openingLine.textContent = t("opening.startPos");
+    return;
+  }
+  const probe = new Chess();
+  for (const san of opening.sans) {
+    if (!probe.move(san)) break;
+  }
+  els.openingLine.textContent = formatOpeningLine(probe);
+}
+
+function syncNewGameForm() {
+  const local = els.playMode?.value === "local";
+  const custom = els.startKind?.value === "custom";
+  if (els.skillRow) els.skillRow.hidden = local;
+  if (els.colorRow) els.colorRow.hidden = local;
+  if (els.customOpeningRow) els.customOpeningRow.hidden = !custom;
+  previewOpeningLine();
+}
+
+function openNewGameDialog() {
+  fillModeSelect();
+  fillSkillSelect();
+  fillColorSelect();
+  fillStartKindSelect();
+  fillHintLayoutSelect();
+  fillClockSelect();
+  fillStartOpeningSelect();
+  if (els.playMode) els.playMode.value = state.mode === "local" ? "local" : "engine";
+  if (els.skill) els.skill.value = String(state.skill || 2);
+  if (els.playColor) els.playColor.value = state.playColorPref || "random";
+  if (els.startKind) els.startKind.value = state.startKind || "custom";
+  if (els.startOpening) els.startOpening.value = state.startOpeningId || "random";
+  if (els.hintLayout) els.hintLayout.value = HINT_LAYOUTS[state.hintLayout] ? state.hintLayout : "6x1";
+  if (els.moveClockSelect) els.moveClockSelect.value = String(moveClockSec());
+  if (els.btnNewCancel) els.btnNewCancel.hidden = !state.hasGame;
+  syncNewGameForm();
+  if (els.newGame) els.newGame.hidden = false;
+}
+
+function closeNewGameDialog() {
+  if (els.newGame) els.newGame.hidden = true;
+}
+
+function confirmNewGame() {
+  const local = els.playMode?.value === "local";
+  applyHintLayout(els.hintLayout?.value || "6x1");
+  applyMoveClock(els.moveClockSelect?.value ?? 0);
+  state.playColorPref = els.playColor?.value || "random";
+  state.startKind = els.startKind?.value === "standard" ? "standard" : "custom";
+  state.startOpeningId = els.startOpening?.value || "random";
+  let color = "w";
+  if (!local) {
+    if (state.playColorPref === "b") color = "b";
+    else if (state.playColorPref !== "w") color = Math.random() < 0.5 ? "w" : "b";
+  }
+  closeNewGameDialog();
+  startGame(color);
+}
+
 function fillSkillSelect() {
   const select = els.skill;
   if (!select) return;
-  const current = select.value || "1";
-  select.innerHTML = [1, 2, 3, 4, 5, 6, 7, 8]
+  const current = select.value || "2";
+  select.innerHTML = [1, 2, 3, 4, 5, 6, 7, 8, 9]
     .map((n) => `<option value="${n}"${String(n) === current ? " selected" : ""}>${t(`skill.${n}`)}</option>`)
     .join("");
+}
+
+function fillHintLayoutSelect() {
+  const select = els.hintLayout;
+  if (!select) return;
+  const current = HINT_LAYOUTS[state.hintLayout] ? state.hintLayout : "6x1";
+  select.innerHTML = Object.keys(HINT_LAYOUTS)
+    .map((id) => `<option value="${id}"${id === current ? " selected" : ""}>${t(`hints.layout.${id}`)}</option>`)
+    .join("");
+}
+
+function fillClockSelect() {
+  const select = els.moveClockSelect;
+  if (!select) return;
+  const current = String(moveClockSec());
+  select.innerHTML = CLOCK_OPTIONS
+    .map((n) => `<option value="${n}"${String(n) === current ? " selected" : ""}>${t(`clock.${n}`)}</option>`)
+    .join("");
+}
+
+function applyMoveClock(value) {
+  const next = CLOCK_OPTIONS.includes(Number(value)) ? Number(value) : 0;
+  state.moveClockSec = next;
+  try {
+    localStorage.setItem(CLOCK_KEY, String(next));
+  } catch {
+    /* ignore */
+  }
+  if (els.moveClockSelect) els.moveClockSelect.value = String(next);
+  if (els.moveClock && !els.moveClock.hidden && playerIsSideToMove() && state.hintPool.length) {
+    startMoveClock();
+  }
+}
+
+function applyHintLayout(id) {
+  const next = HINT_LAYOUTS[id] ? id : "6x1";
+  state.hintLayout = next;
+  try {
+    localStorage.setItem(HINT_LAYOUT_KEY, next);
+  } catch {
+    /* ignore */
+  }
+  if (els.hintLayout) els.hintLayout.value = next;
+  syncHintLayoutUi();
 }
 
 function replayKingTalk() {
@@ -2223,13 +2856,15 @@ function replayKingTalk() {
     return;
   }
   if (replay.type === "feedback" && replay.key) {
-    speakKing(playerFeedbackHtml(replay.key, replay.replyKey), { html: true });
+    showKingReact(bandFromFeedbackKey(replay.key));
+    speakKing(playerFeedbackTalk(replay.key, replay.replyKey));
     return;
   }
   if (replay.type === "opponent" && replay.move && replay.beforeFen) {
+    if (replay.reactBand) showKingReact(replay.reactBand);
     const before = new Chess(replay.beforeFen);
     const after = new Chess(replay.afterFen || state.game.fen());
-    speakKing(narrateOpponentMove(before, replay.move, after, replay.feedbackKey), { calculating: true, html: true });
+    speakKing(narrateOpponentMove(before, replay.move, after, replay.feedbackKey), { calculating: true });
     return;
   }
   if (replay.type === "resign") {
@@ -2248,7 +2883,12 @@ function applyLanguage() {
   applyStaticI18n();
   fillModeSelect();
   fillSkillSelect();
+  fillColorSelect();
+  fillStartKindSelect();
+  fillHintLayoutSelect();
+  fillClockSelect();
   fillStartOpeningSelect();
+  renderKingLegend();
   syncCoach();
   if (els.openingLine) {
     els.openingLine.textContent = state.startOpening?.sans?.length
@@ -2263,10 +2903,14 @@ function applyLanguage() {
 function fillStartOpeningSelect() {
   const select = els.startOpening;
   if (!select) return;
-  const current = select.value || "start";
-  select.innerHTML = START_OPENINGS.map((opening) => (
-    `<option value="${opening.id}"${opening.id === current ? " selected" : ""}>${openingOptionLabel(opening)}</option>`
-  )).join("");
+  const current = select.value || "random";
+  const named = START_OPENINGS.filter((opening) => opening.id !== "start");
+  select.innerHTML = [
+    `<option value="random"${current === "random" ? " selected" : ""}>${t("opening.random")}</option>`,
+    ...named.map((opening) => (
+      `<option value="${opening.id}"${opening.id === current ? " selected" : ""}>${openingOptionLabel(opening)}</option>`
+    )),
+  ].join("");
 }
 
 function formatOpeningLine(game) {
@@ -2283,8 +2927,12 @@ function formatOpeningLine(game) {
 }
 
 function selectedStartOpening() {
-  const id = els.startOpening?.value || "start";
-  return START_OPENINGS.find((opening) => opening.id === id) || START_OPENINGS[0];
+  if (els.startKind?.value !== "custom") {
+    return START_OPENINGS.find((opening) => opening.id === "start") || START_OPENINGS[0];
+  }
+  const id = els.startOpening?.value || "random";
+  if (id === "random") return pickRandomStartOpening();
+  return START_OPENINGS.find((opening) => opening.id === id) || pickRandomStartOpening();
 }
 
 function applyStartOpening() {
@@ -2322,15 +2970,13 @@ function pickRandomStartOpening() {
 }
 
 function startFirstVisitGame() {
-  const opening = pickRandomStartOpening();
-  const color = Math.random() < 0.5 ? "w" : "b";
-  if (els.skill) els.skill.value = "1";
-  state.skill = 1;
-  if (els.startOpening && opening) els.startOpening.value = opening.id;
-  startGame(color);
+  if (els.skill) els.skill.value = "2";
+  state.skill = 2;
+  openNewGameDialog();
 }
 
 function startGame(playerColor = state.playerColor) {
+  state.hasGame = true;
   state.gameId += 1;
   state.speakToken += 1;
   state.kingSpeaking = false;
@@ -2339,6 +2985,12 @@ function startGame(playerColor = state.playerColor) {
   state.mode = els.playMode?.value === "local" ? "local" : "engine";
   state.skill = Number(els.skill?.value || state.skill || 1);
   state.busy = false;
+  state.recalcHints = false;
+  state.recalcUsedThisTurn = false;
+  stopRecalcProgress();
+  state.gameEval = 0;
+  state.livesForced = null;
+  clearKingReact();
   clearHints();
   clearTimeout(state.aidTimer);
   state.aidToken += 1;
@@ -2390,24 +3042,46 @@ function undoFullTurn() {
   computerMove();
 }
 
-document.getElementById("btn-new").addEventListener("click", () => startGame(state.playerColor));
-document.getElementById("btn-white").addEventListener("click", () => startGame("w"));
-document.getElementById("btn-black").addEventListener("click", () => startGame("b"));
+function setAppMenuOpen(open) {
+  const btn = document.getElementById("btn-menu");
+  const panel = document.getElementById("app-menu-panel");
+  if (!btn || !panel) return;
+  panel.hidden = !open;
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+document.getElementById("btn-menu")?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const panel = document.getElementById("app-menu-panel");
+  setAppMenuOpen(Boolean(panel?.hidden));
+});
+document.getElementById("btn-menu-new")?.addEventListener("click", () => {
+  setAppMenuOpen(false);
+  openNewGameDialog();
+});
+document.addEventListener("click", (event) => {
+  const menu = event.target.closest(".app-menu");
+  if (!menu) setAppMenuOpen(false);
+});
+document.getElementById("btn-new").addEventListener("click", () => openNewGameDialog());
 document.getElementById("btn-flip").addEventListener("click", () => {
   const next = state.board.orientation === "white" ? "black" : "white";
   state.board.setOrientation(next);
   syncCoach();
+  renderGraveyard();
 });
 document.getElementById("btn-undo").addEventListener("click", undoFullTurn);
 document.getElementById("btn-resign").addEventListener("click", () => {
   if (state.game.game_over() || !state.game.history().length) {
-    startGame(state.playerColor);
+    openNewGameDialog();
     return;
   }
   state.engine.stop();
   state.busy = false;
+  state.livesForced = 1;
   clearHints();
   renderHints();
+  renderKingLives();
   if (isLocalVsHuman()) {
     const color = sideName();
     setStatus(t("end.resignTitle"), t("end.resignLocal", { color }), "lose");
@@ -2420,15 +3094,20 @@ document.getElementById("btn-resign").addEventListener("click", () => {
   }
   state.board.setInteractive(false);
 });
-els.skill.addEventListener("change", () => {
-  state.skill = Number(els.skill.value);
-  if (!isLocalVsHuman()) els.engineLabel.textContent = engineLabelText(state.skill);
+els.playMode?.addEventListener("change", () => syncNewGameForm());
+els.startKind?.addEventListener("change", () => syncNewGameForm());
+els.startOpening?.addEventListener("change", () => previewOpeningLine());
+els.btnNewStart?.addEventListener("click", () => confirmNewGame());
+els.btnNewCancel?.addEventListener("click", () => {
+  if (state.hasGame) closeNewGameDialog();
 });
-els.playMode?.addEventListener("change", () => {
-  state.mode = els.playMode.value === "local" ? "local" : "engine";
-  startGame(state.playerColor);
+els.newGame?.addEventListener("click", (event) => {
+  if (event.target === els.newGame && state.hasGame) closeNewGameDialog();
 });
-els.startOpening.addEventListener("change", () => startGame(state.playerColor));
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || els.newGame?.hidden || !state.hasGame) return;
+  closeNewGameDialog();
+});
 els.aidMoves.addEventListener("click", () => showAid("moves"));
 els.aidThreats.addEventListener("click", () => showAid("threats"));
 
@@ -2439,7 +3118,14 @@ state.board = new Board(els.boardRoot, {
 applyStaticI18n();
 fillModeSelect();
 fillSkillSelect();
+fillColorSelect();
+fillStartKindSelect();
+fillHintLayoutSelect();
+fillClockSelect();
 fillStartOpeningSelect();
+syncHintLayoutUi();
+renderKingLives();
+renderKingLegend();
 setStatus(t("status.loading"), t("status.boot"), "think");
 state.kingReplay = { type: "boot" };
 speakKing(t("king.boot"), { calculating: true });

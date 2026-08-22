@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>5 Min Chess — learn the 6 best moves</title>
-  <link rel="stylesheet" href="css/style.css?v=20260822hidhints">
+  <link rel="stylesheet" href="css/style.css?v=20260822recalclink">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -35,30 +35,39 @@
           <span data-i18n="brand.tagline">Training: you vs the computer, with 6 hints every move</span>
         </div>
       </div>
-      <div class="lang-switch" role="group" data-i18n-aria="lang.group" aria-label="Language">
-        <button type="button" id="btn-lang-it" data-lang="it" data-i18n-aria="lang.it" aria-label="Italiano" onclick="return setChessLang('it')">
-          <svg class="lang-flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="1" height="2" fill="#009246"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ce2b37"/></svg>
-          IT
-        </button>
-        <button type="button" id="btn-lang-en" class="is-on" data-lang="en" data-i18n-aria="lang.en" aria-label="English" onclick="return setChessLang('en')">
-          <svg class="lang-flag" viewBox="0 0 60 30" aria-hidden="true">
-            <clipPath id="uk-flag"><path d="M0 0h60v30H0z"/></clipPath>
-            <g clip-path="url(#uk-flag)">
-              <path d="M0 0h60v30H0z" fill="#012169"/>
-              <path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="6"/>
-              <path d="M0 0l60 30M60 0L0 30" stroke="#C8102E" stroke-width="4"/>
-              <path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/>
-              <path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/>
-            </g>
-          </svg>
-          EN
-        </button>
+      <div class="app-menu">
+        <button type="button" id="btn-menu" class="app-menu-btn" data-i18n-aria="menu.aria" aria-label="Menu" aria-expanded="false" aria-controls="app-menu-panel">☰</button>
+        <div id="app-menu-panel" class="app-menu-panel" hidden>
+          <p class="app-menu-label" data-i18n="lang.group">Language</p>
+          <div class="lang-switch" role="group" data-i18n-aria="lang.group" aria-label="Language">
+            <button type="button" id="btn-lang-it" data-lang="it" data-i18n-aria="lang.it" aria-label="Italiano" onclick="return setChessLang('it')">
+              <svg class="lang-flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="1" height="2" fill="#009246"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ce2b37"/></svg>
+              IT
+            </button>
+            <button type="button" id="btn-lang-en" class="is-on" data-lang="en" data-i18n-aria="lang.en" aria-label="English" onclick="return setChessLang('en')">
+              <svg class="lang-flag" viewBox="0 0 60 30" aria-hidden="true">
+                <clipPath id="uk-flag"><path d="M0 0h60v30H0z"/></clipPath>
+                <g clip-path="url(#uk-flag)">
+                  <path d="M0 0h60v30H0z" fill="#012169"/>
+                  <path d="M0 0l60 30M60 0L0 30" stroke="#fff" stroke-width="6"/>
+                  <path d="M0 0l60 30M60 0L0 30" stroke="#C8102E" stroke-width="4"/>
+                  <path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/>
+                  <path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/>
+                </g>
+              </svg>
+              EN
+            </button>
+          </div>
+          <button type="button" id="btn-menu-new" class="app-menu-new" data-i18n="newgame.menu">Start a new game</button>
+        </div>
       </div>
     </header>
 
     <main class="game">
       <section class="board-col">
+        <div id="grave-top" class="grave" data-i18n-aria="grave.aria" aria-label="Captured pieces"></div>
         <div id="board-root"></div>
+        <div id="grave-bottom" class="grave" data-i18n-aria="grave.aria" aria-label="Captured pieces"></div>
         <p id="turn-banner" class="turn-banner">Loading</p>
 
         <aside class="panel">
@@ -66,38 +75,9 @@
             <div class="player opponent" id="player-top">
               <span class="dot"></span>
               <div>
-                <div id="engine-label" class="name">Stockfish level 1 · beginner · 1350 Elo</div>
-                <label class="skill-wrap">
-                  <span data-i18n="mode.label">Opponent</span>
-                  <select id="play-mode" data-i18n-aria="mode.aria" aria-label="Opponent type">
-                    <option value="engine" selected>Stockfish</option>
-                    <option value="local">Play against an opponent on my PC</option>
-                  </select>
-                </label>
-                <label class="skill-wrap" id="skill-row">
-                  <span data-i18n="difficulty">Difficulty</span>
-                  <select id="skill" data-i18n-aria="skill.aria" aria-label="Stockfish level">
-                    <option value="1" selected>1 — Beginner · 1350 Elo</option>
-                    <option value="2">2 — Easy · 1450 Elo</option>
-                    <option value="3">3 — Friendly · 1550 Elo</option>
-                    <option value="4">4 — Intermediate · 1650 Elo</option>
-                    <option value="5">5 — Medium · 1750 Elo</option>
-                    <option value="6">6 — Challenging · 1850 Elo</option>
-                    <option value="7">7 — Hard · 2000 Elo</option>
-                    <option value="8">8 — Expert · 2150 Elo</option>
-                  </select>
-                </label>
+                <div id="engine-label" class="name">Stockfish 1400 Elo</div>
+                <div id="player-rating-top" class="rating" data-i18n="you.rating">player</div>
               </div>
-            </div>
-
-            <div class="start-box">
-              <label class="skill-wrap">
-                <span data-i18n="start.game">Game start</span>
-                <select id="start-opening" data-i18n-aria="start.aria" aria-label="Starting opening">
-                  <option value="start" selected>Starting position</option>
-                </select>
-              </label>
-              <p id="opening-line" class="opening-line">Starting from the initial position.</p>
             </div>
 
             <div class="toolbar">
@@ -107,8 +87,6 @@
               <button id="btn-undo" type="button" data-i18n-title="toolbar.undo" title="Undo the last move">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 18l-6-6 6-6v4h8v4h-8v4z"/></svg>
               </button>
-              <button id="btn-white" class="vs-engine" type="button" data-i18n-title="toolbar.white" title="New game as White">♔</button>
-              <button id="btn-black" class="vs-engine" type="button" data-i18n-title="toolbar.black" title="New game as Black">♚</button>
               <button id="btn-new" type="button" data-i18n-title="toolbar.new" title="New game">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 6v2.5l3.5-3.5L12 1.5V4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6z"/></svg>
               </button>
@@ -144,7 +122,9 @@
         <div class="king-talk">
           <div class="king-side">
             <img id="king-piece" src="pieces/wK.svg" alt="">
+            <span id="king-react" class="king-react" hidden aria-hidden="true"></span>
             <strong id="king-title" data-i18n="king">The King</strong>
+            <div id="king-lives" class="king-lives" data-i18n-aria="king.lives" aria-label="How the game stands"></div>
           </div>
           <blockquote class="speech" aria-live="polite">
             <p id="king-note">Good luck!</p>
@@ -155,13 +135,25 @@
           <button id="btn-aid-moves" class="is-on" type="button" data-i18n="aid.moves">Highlight moves</button>
           <button id="btn-aid-threats" type="button" data-i18n="aid.threats">Highlight threatened</button>
         </div>
+        <div id="move-clock" class="move-clock" hidden data-i18n-aria="clock.aria" aria-label="Move timer">
+          <span id="move-clock-num" class="move-clock-num">20</span>
+          <span class="move-clock-bar" aria-hidden="true"><i id="move-clock-fill"></i></span>
+        </div>
         <div id="hints" class="hints is-waiting" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
+        <div id="hint-recalc" class="hint-recalc">
+          <div id="hint-recalc-bar" class="hint-recalc-bar" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-aria="hints.recalcBar" aria-label="Recalculating moves">
+            <i id="hint-recalc-fill"></i>
+          </div>
+          <button id="btn-recalc-hints" class="recalc-hints" type="button" data-i18n="hints.recalc" disabled>Ricalcolami le mosse</button>
+        </div>
         <div id="hint-nav" class="hint-nav is-waiting">
-          <button id="btn-prev-hints" class="hint-nav-btn" type="button" disabled data-i18n-title="hints.prev" data-i18n-aria="hints.prev" title="Previous 6 moves" aria-label="Previous 6 moves">◀</button>
-          <button id="btn-more-hints" class="more-hints" type="button" disabled data-i18n="hints.more">Load 6 more moves</button>
-          <button id="btn-next-hints" class="hint-nav-btn" type="button" disabled data-i18n-title="hints.next" data-i18n-aria="hints.next" title="Next 6 moves" aria-label="Next 6 moves">▶</button>
+          <button id="btn-more-hints" class="more-hints" type="button" disabled>See the other 6 moves</button>
         </div>
         </div>
+        <details class="legend-acc">
+          <summary data-i18n="legend.toggle">See emoji legend</summary>
+          <div id="king-legend" class="king-legend" data-i18n-aria="legend.aria" aria-label="King reaction legend"></div>
+        </details>
       </section>
     </main>
   </div>
@@ -173,7 +165,80 @@
       <p id="overlay-text"></p>
     </div>
   </div>
+  <div id="new-game" class="new-game" hidden>
+    <div class="new-game-card" role="dialog" aria-modal="true" data-i18n-aria="newgame.title" aria-labelledby="new-game-title">
+      <h2 id="new-game-title" data-i18n="newgame.title">New game</h2>
+      <div class="new-game-form">
+        <label class="skill-wrap">
+          <span data-i18n="mode.label">Opponent</span>
+          <select id="play-mode" data-i18n-aria="mode.aria" aria-label="Opponent type">
+            <option value="engine" selected>Stockfish</option>
+            <option value="local">Play against an opponent on my PC</option>
+          </select>
+        </label>
+        <label class="skill-wrap" id="skill-row">
+          <span data-i18n="difficulty">Difficulty</span>
+          <select id="skill" data-i18n-aria="skill.aria" aria-label="Stockfish level">
+            <option value="1">1 — 1200 Elo</option>
+            <option value="2" selected>2 — 1400 Elo</option>
+            <option value="3">3 — 1600 Elo</option>
+            <option value="4">4 — 1800 Elo</option>
+            <option value="5">5 — 2000 Elo</option>
+            <option value="6">6 — 2200 Elo</option>
+            <option value="7">7 — 2400 Elo</option>
+            <option value="8">8 — 2600 Elo</option>
+            <option value="9">9 — Full strength</option>
+          </select>
+        </label>
+        <label class="skill-wrap" id="color-row">
+          <span data-i18n="newgame.color">Play as</span>
+          <select id="play-color" data-i18n-aria="newgame.colorAria" aria-label="Your color">
+            <option value="random" selected>Random</option>
+            <option value="w">White</option>
+            <option value="b">Black</option>
+          </select>
+        </label>
+        <label class="skill-wrap">
+          <span data-i18n="start.game">Game start</span>
+          <select id="start-kind" data-i18n-aria="start.kindAria" aria-label="Starting type">
+            <option value="standard">Standard</option>
+            <option value="custom" selected>Custom</option>
+          </select>
+        </label>
+        <label class="skill-wrap" id="custom-opening-row">
+          <span data-i18n="start.customPos">Custom position</span>
+          <select id="start-opening" data-i18n-aria="start.aria" aria-label="Starting opening">
+            <option value="random" selected>RANDOM</option>
+          </select>
+        </label>
+        <label class="skill-wrap">
+          <span data-i18n="hints.layout">Suggested moves</span>
+          <select id="hint-layout" data-i18n-aria="hints.layoutAria" aria-label="Number of suggested moves">
+            <option value="6x1" selected>The 6 best moves</option>
+            <option value="4x1">The 4 best moves</option>
+            <option value="6x2">2 blocks of 6</option>
+            <option value="4x2">2 blocks of 4</option>
+            <option value="4x3">3 blocks of 4</option>
+          </select>
+        </label>
+        <label class="skill-wrap">
+          <span data-i18n="clock.label">Time per move</span>
+          <select id="move-clock-sec" data-i18n-aria="clock.settingAria" aria-label="Time per move">
+            <option value="0" selected>Unlimited</option>
+            <option value="30">30 seconds</option>
+            <option value="45">45 seconds</option>
+            <option value="60">1 minute</option>
+          </select>
+        </label>
+        <p id="opening-line" class="opening-line">Starting from the initial position.</p>
+      </div>
+      <div class="new-game-actions">
+        <button type="button" id="btn-new-cancel" data-i18n="newgame.cancel">Cancel</button>
+        <button type="button" id="btn-new-start" class="is-primary" data-i18n="newgame.start">Start game</button>
+      </div>
+    </div>
+  </div>
 
-  <script type="module" src="js/app.js?v=20260822hidhints"></script>
+  <script type="module" src="js/app.js?v=20260822recalclink"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 /** Libro aperture ECO (Lichess) + descrizioni in italiano. */
-import { getLang, t } from "./i18n.js?v=20260822hidhints";
+import { getLang, t } from "./i18n.js?v=20260822defaults";
 
 function normalizeSan(san) {
   return String(san).replace(/[+#?!]+$/g, "");

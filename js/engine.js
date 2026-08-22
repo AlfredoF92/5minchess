@@ -21,6 +21,7 @@ function parseInfo(line) {
 
 export class Engine {
   #currentAbort = null;
+  #booted = false;
 
   constructor() {
     this.worker = new Worker(new URL("./stockfish.js", import.meta.url));
@@ -73,9 +74,10 @@ export class Engine {
 
   async #boot() {
     await this.#waitFor((line) => line === "uciok", () => this.post("uci"));
-    this.post("setoption name Hash value 32");
+    this.post("setoption name Hash value 64");
     this.post("setoption name Ponder value false");
     await this.#waitFor((line) => line === "readyok", () => this.post("isready"));
+    this.#booted = true;
   }
 
   #enqueue(work) {
@@ -86,70 +88,85 @@ export class Engine {
 
   stop() {
     this.post("stop");
-    this.#currentAbort?.();
+    if (this.#booted) this.#currentAbort?.();
   }
 
   async #flush() {
     this.post("stop");
-    await this.#waitFor((line) => line === "readyok", () => this.post("isready"), 8000);
+    try {
+      await this.#waitFor((line) => line === "readyok", () => this.post("isready"), 4000);
+    } catch (err) {
+      if (err.message === "aborted") throw err;
+    }
   }
 
-  analyze(fen, { depth = 12, multipv = 4 } = {}) {
+  analyze(fen, { depth = 11, multipv = 12, movetime = 3000 } = {}) {
     return this.#enqueue(async () => {
       await this.ready;
       await this.#flush();
+      this.post("setoption name UCI_LimitStrength value false");
       this.post("setoption name Skill Level value 20");
       this.post(`setoption name MultiPV value ${multipv}`);
       this.post(`position fen ${fen}`);
 
       const pvs = new Map();
-      let started = false;
-
-      return this.#waitFor(
-        (line) => {
-          const info = parseInfo(line);
-          if (info) {
-            started = true;
-            pvs.set(info.multipv, info);
-          }
-          if (line.startsWith("bestmove") && started) {
-            return true;
-          }
-          return false;
-        },
-        () => this.post(`go depth ${depth}`),
-        40000
-      ).then(() =>
-        [...pvs.values()].sort((a, b) => a.multipv - b.multipv)
-      );
+      try {
+        await this.#waitFor(
+          (line) => {
+            const info = parseInfo(line);
+            if (info) pvs.set(info.multipv, info);
+            return line.startsWith("bestmove");
+          },
+          () => this.post(movetime ? `go movetime ${movetime}` : `go depth ${depth}`),
+          (movetime || 4000) + 4000
+        );
+      } catch (err) {
+        this.post("stop");
+        if (err.message === "aborted") throw err;
+      }
+      return [...pvs.values()].sort((a, b) => a.multipv - b.multipv);
     });
   }
 
-  play(fen, { skill = 1, movetime = 400 } = {}) {
+  play(fen, { elo = 1200, unlimited = false, movetime = 1200, skill = 0 } = {}) {
     return this.#enqueue(async () => {
       await this.ready;
       await this.#flush();
       this.post("setoption name MultiPV value 1");
-      this.post(`setoption name Skill Level value ${skill}`);
+      if (unlimited) {
+        this.post("setoption name UCI_LimitStrength value false");
+        this.post("setoption name Skill Level value 20");
+      } else if (Number(elo) < 1320) {
+        const weak = Math.max(0, Math.min(3, Number.isFinite(skill) ? skill : 0));
+        this.post("setoption name UCI_LimitStrength value false");
+        this.post(`setoption name Skill Level value ${weak}`);
+      } else {
+        const clamped = Math.max(1320, Math.min(3190, Number(elo) || 1600));
+        this.post("setoption name Skill Level value 20");
+        this.post("setoption name UCI_LimitStrength value true");
+        this.post(`setoption name UCI_Elo value ${clamped}`);
+      }
       this.post(`position fen ${fen}`);
 
       let lastPv = null;
-      let started = false;
+      let bestLine = "";
 
-      const bestLine = await this.#waitFor(
-        (line) => {
-          const info = parseInfo(line);
-          if (info) {
-            started = true;
-            lastPv = info;
-          }
-          return started && line.startsWith("bestmove");
-        },
-        () => this.post(`go movetime ${movetime}`),
-        20000
-      );
+      try {
+        bestLine = await this.#waitFor(
+          (line) => {
+            const info = parseInfo(line);
+            if (info) lastPv = info;
+            return line.startsWith("bestmove");
+          },
+          () => this.post(`go movetime ${movetime}`),
+          (movetime || 1200) + 4000
+        );
+      } catch (err) {
+        this.post("stop");
+        if (err.message === "aborted") throw err;
+      }
 
-      const uci = /^bestmove ([a-h][1-8][a-h][1-8][qrbn]?)/.exec(bestLine);
+      const uci = /^bestmove ([a-h][1-8][a-h][1-8][qrbn]?)/.exec(bestLine || "");
       return {
         uci: uci ? uci[1] : lastPv?.uci,
         info: lastPv,
