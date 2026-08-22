@@ -1,5 +1,5 @@
 /** Libro aperture ECO (Lichess) + descrizioni in italiano. */
-import { getLang, t } from "./i18n.js";
+import { getLang, t } from "./i18n.js?v=20260822hidhints";
 
 function normalizeSan(san) {
   return String(san).replace(/[+#?!]+$/g, "");
@@ -38,6 +38,16 @@ export const START_OPENINGS = [
   { id: "english", name: "Apertura Inglese", sans: ["c4", "e5", "Nc3", "Nf6", "Nf3", "Nc6", "g3", "Bb4", "Bg2", "O-O", "O-O", "Re8"] },
   { id: "london", name: "Sistema Londra", sans: ["d4", "d5", "Nf3", "Nf6", "Bf4", "e6", "e3", "c5", "c3", "Nc6", "Nbd2", "Bd6"] },
   { id: "scotch", name: "Partita Scozzese", sans: ["e4", "e5", "Nf3", "Nc6", "d4", "exd4", "Nxd4", "Nf6", "Nxc6", "bxc6", "e5", "Qe7"] },
+  { id: "center", name: "Partita di Centro", sans: ["e4", "e5", "d4", "exd4", "Qxd4", "Nc6", "Qe3", "Nf6", "Nc3", "Bb4", "Bd2", "O-O", "O-O-O", "Re8", "Bc4", "d6", "Nf3", "Be6", "Bxe6", "Rxe6", "Ng5", "Re8", "f4", "h6"] },
+  { id: "petrov", name: "Partita Russa", sans: ["e4", "e5", "Nf3", "Nf6", "Nxe5", "d6", "Nf3", "Nxe4", "d4", "d5", "Bd3", "Nc6", "O-O", "Be7", "c4", "Nb4", "Be2", "O-O", "Nc3", "Bf5", "a3", "Nxc3", "bxc3", "Nc6"] },
+  { id: "vienna", name: "Partita Viennese", sans: ["e4", "e5", "Nc3", "Nf6", "f4", "d5", "fxe5", "Nxe4", "Nf3", "Be7", "Qe2", "Nxc3", "dxc3", "c5", "Bf4", "Nc6", "O-O-O", "Be6", "Kb1", "Qa5", "a3", "O-O-O", "g3", "h6"] },
+  { id: "kgambit", name: "Gambetto di Re", sans: ["e4", "e5", "f4", "exf4", "Nf3", "g5", "Bc4", "Bg7", "O-O", "d6", "d4", "h6", "c3", "Nc6", "g3", "g4", "Nh4", "f3", "Nd2", "Bf6", "Ndxf3", "gxf3", "Qxf3", "Qe7"] },
+  { id: "scandi", name: "Difesa Scandinava", sans: ["e4", "d5", "exd5", "Qxd5", "Nc3", "Qa5", "d4", "Nf6", "Nf3", "c6", "Bc4", "Bf5", "Bd2", "e6", "Qe2", "Bb4", "O-O-O", "Nbd7", "a3", "Bxc3", "Bxc3", "Qc7", "Nh4", "Bg6"] },
+  { id: "pirc", name: "Difesa Pirc", sans: ["e4", "d6", "d4", "Nf6", "Nc3", "g6", "Nf3", "Bg7", "Be2", "O-O", "O-O", "c6", "a4", "Nbd7", "Be3", "e5", "dxe5", "dxe5", "Qd2", "Qc7", "Rad1", "Re8", "h3", "Nc5"] },
+  { id: "slav", name: "Difesa Slava", sans: ["d4", "d5", "c4", "c6", "Nf3", "Nf6", "Nc3", "dxc4", "a4", "Bf5", "e3", "e6", "Bxc4", "Bb4", "O-O", "Nbd7", "Qe2", "Bg6", "e4", "O-O", "Bd3", "Bh5", "e5", "Nd5"] },
+  { id: "nimzo", name: "Difesa Nimzo-Indiana", sans: ["d4", "Nf6", "c4", "e6", "Nc3", "Bb4", "e3", "O-O", "Bd3", "d5", "Nf3", "c5", "O-O", "Nc6", "a3", "Bxc3", "bxc3", "dxc4", "Bxc4", "Qc7", "Bd3", "e5", "Qc2", "Re8"] },
+  { id: "grunfeld", name: "Difesa Grünfeld", sans: ["d4", "Nf6", "c4", "g6", "Nc3", "d5", "cxd5", "Nxd5", "e4", "Nxc3", "bxc3", "Bg7", "Nf3", "c5", "Rb1", "O-O", "Be2", "cxd4", "cxd4", "Nc6", "d5", "Ne5", "Nxe5", "Bxe5"] },
+  { id: "catalan", name: "Apertura Catalana", sans: ["d4", "Nf6", "c4", "e6", "g3", "d5", "Bg2", "Be7", "Nf3", "O-O", "O-O", "dxc4", "Qc2", "a6", "a4", "Bd7", "Qxc4", "Bc6", "Bg5", "a5", "Nc3", "Nbd7", "Rfd1", "h6"] },
 ];
 
 export async function loadOpenings() {

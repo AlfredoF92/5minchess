@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js";
 import { Board } from "./board.js";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260822hidhints";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINTS_PER_PAGE = 6;
@@ -60,115 +60,792 @@ function isBackRank(color, square) {
   return square[1] === (color === "w" ? "1" : "8");
 }
 
+function hangingSquaresOf(game, color) {
+  return playerPiecesUnderAttack(game, color).filter((square) => {
+    const piece = game.get(square);
+    if (!piece || piece.type === "k") return false;
+    return !isSquareDefended(game, square, color);
+  });
+}
+
+function fileOf(square) {
+  return square.charCodeAt(0) - 97;
+}
+
+function rankOf(square) {
+  return Number(square[1]);
+}
+
+function mkSq(file, rank) {
+  if (file < 0 || file > 7 || rank < 1 || rank > 8) return null;
+  return `${String.fromCharCode(97 + file)}${rank}`;
+}
+
+function withTurn(game, color) {
+  const parts = game.fen().split(" ");
+  parts[1] = color;
+  parts[3] = "-";
+  const clone = new Chess();
+  if (!clone.load(parts.join(" "))) return null;
+  return clone;
+}
+
+function piecesOf(game, color, type) {
+  const out = [];
+  for (const square of SQUARES) {
+    const piece = game.get(square);
+    if (!piece || piece.color !== color) continue;
+    if (type && piece.type !== type) continue;
+    out.push({ square, type: piece.type });
+  }
+  return out;
+}
+
+function isEndgame(game) {
+  return piecesOf(game, "w").concat(piecesOf(game, "b")).filter((p) => p.type !== "p").length <= 10;
+}
+
+function rayBetween(a, b) {
+  const df = fileOf(b) - fileOf(a);
+  const dr = rankOf(b) - rankOf(a);
+  if (!df && !dr) return null;
+  if (df && dr && Math.abs(df) !== Math.abs(dr)) return null;
+  const sf = Math.sign(df);
+  const sr = Math.sign(dr);
+  const out = [];
+  let f = fileOf(a) + sf;
+  let r = rankOf(a) + sr;
+  while (f !== fileOf(b) || r !== rankOf(b)) {
+    const square = mkSq(f, r);
+    if (!square) return null;
+    out.push(square);
+    f += sf;
+    r += sr;
+  }
+  return out;
+}
+
+function rayClear(game, a, b) {
+  const mid = rayBetween(a, b);
+  return Boolean(mid && mid.every((square) => !game.get(square)));
+}
+
+function pieceAttacksSquare(game, from, to) {
+  const piece = game.get(from);
+  if (!piece || from === to) return false;
+  const df = fileOf(to) - fileOf(from);
+  const dr = rankOf(to) - rankOf(from);
+  const adf = Math.abs(df);
+  const adr = Math.abs(dr);
+  if (piece.type === "n") return (adf === 1 && adr === 2) || (adf === 2 && adr === 1);
+  if (piece.type === "k") return adf <= 1 && adr <= 1;
+  if (piece.type === "p") {
+    const dir = piece.color === "w" ? 1 : -1;
+    return adr === 1 && adf === 1 && dr === dir;
+  }
+  const diag = adf === adr && adf > 0;
+  const ortho = Boolean(df) !== Boolean(dr);
+  if (piece.type === "b") return diag && rayClear(game, from, to);
+  if (piece.type === "r") return ortho && rayClear(game, from, to);
+  if (piece.type === "q") return (diag || ortho) && rayClear(game, from, to);
+  return false;
+}
+
+function checkingSquares(game, defenderColor) {
+  const king = kingSquare(game, defenderColor);
+  if (!king) return [];
+  const attacker = defenderColor === "w" ? "b" : "w";
+  return piecesOf(game, attacker).filter((p) => pieceAttacksSquare(game, p.square, king)).map((p) => p.square);
+}
+
+function pieceAttacks(game, from) {
+  const piece = game.get(from);
+  if (!from || !piece) return [];
+  const hits = [];
+  for (const square of SQUARES) {
+    const victim = game.get(square);
+    if (!victim || victim.color === piece.color) continue;
+    if (pieceAttacksSquare(game, from, square)) hits.push({ to: square, captured: victim.type });
+  }
+  return hits;
+}
+
+function pieceBehind(game, from, mid, color) {
+  const ray = rayBetween(from, mid);
+  if (!ray || !rayClear(game, from, mid)) return null;
+  const sf = Math.sign(fileOf(mid) - fileOf(from));
+  const sr = Math.sign(rankOf(mid) - rankOf(from));
+  let f = fileOf(mid) + sf;
+  let r = rankOf(mid) + sr;
+  while (f >= 0 && f <= 7 && r >= 1 && r <= 8) {
+    const square = mkSq(f, r);
+    const hit = game.get(square);
+    if (hit) return hit.color === color ? { square, type: hit.type } : null;
+    f += sf;
+    r += sr;
+  }
+  return null;
+}
+
+function newPinOrSkewer(after, move, us) {
+  if (!"brq".includes(move.piece)) return null;
+  const enemy = us === "w" ? "b" : "w";
+  for (const victim of piecesOf(after, enemy)) {
+    if (victim.square === move.to) continue;
+    if (!rayBetween(move.to, victim.square) || !rayClear(after, move.to, victim.square)) continue;
+    if (!pieceAttacksSquare(after, move.to, victim.square)) continue;
+    const behind = pieceBehind(after, move.to, victim.square, enemy);
+    if (!behind) continue;
+    const frontVal = PIECE_VALUE[victim.type] || 0;
+    const backVal = PIECE_VALUE[behind.type] || 0;
+    if (victim.type === "k" || (behind.type === "k" && frontVal >= 3)) return "pin";
+    if ((victim.type === "q" || victim.type === "k") && backVal >= 3 && backVal < frontVal + 9) return "skewer";
+    if (frontVal >= 5 && behind.type === "k") return "pin";
+  }
+  return null;
+}
+
+function isPassedPawn(game, square, color) {
+  const pawn = game.get(square);
+  if (!pawn || pawn.type !== "p" || pawn.color !== color) return false;
+  const dir = color === "w" ? 1 : -1;
+  const file = fileOf(square);
+  for (let rank = rankOf(square) + dir; rank >= 1 && rank <= 8; rank += dir) {
+    for (let df = -1; df <= 1; df += 1) {
+      const sq = mkSq(file + df, rank);
+      const hit = sq && game.get(sq);
+      if (hit && hit.type === "p" && hit.color !== color) return false;
+    }
+  }
+  return true;
+}
+
+function passedPawns(game, color) {
+  return piecesOf(game, color, "p").filter((p) => isPassedPawn(game, p.square, color));
+}
+
+function squareInFront(square, color) {
+  return mkSq(fileOf(square), rankOf(square) + (color === "w" ? 1 : -1));
+}
+
+function isIsolatedPawn(game, square, color) {
+  const file = fileOf(square);
+  return !piecesOf(game, color, "p").some((p) => Math.abs(fileOf(p.square) - file) === 1);
+}
+
+function undevelopedMinors(game, us) {
+  const homes = us === "w" ? ["b1", "g1", "c1", "f1"] : ["b8", "g8", "c8", "f8"];
+  return homes.filter((square) => {
+    const piece = game.get(square);
+    return piece && piece.color === us && (piece.type === "n" || piece.type === "b");
+  });
+}
+
+function kingHasCastled(game, us) {
+  const king = kingSquare(game, us);
+  return Boolean(king && king[0] !== "e");
+}
+
+function enemyCastledShort(game, enemy) {
+  const king = kingSquare(game, enemy);
+  return Boolean(king && (king[0] === "g" || king[0] === "h"));
+}
+
+function openFiles(game) {
+  return [..."abcdefgh"].filter((file) => fileIsOpen(game, file));
+}
+
+function mobility(game, square, color) {
+  const clone = withTurn(game, color);
+  if (!clone || !clone.get(square)) return 0;
+  return clone.moves({ square, verbose: true }).length;
+}
+
+function slidersSeeing(game, us, target) {
+  if (!target) return [];
+  return piecesOf(game, us).filter((p) => "brq".includes(p.type) && pieceAttacksSquare(game, p.square, target));
+}
+
+function attackersOf(game, square, color) {
+  return piecesOf(game, color).filter((p) => p.square !== square && pieceAttacksSquare(game, p.square, square));
+}
+
+function kingHasLuft(game, color) {
+  const king = kingSquare(game, color);
+  if (!king) return true;
+  const dir = color === "w" ? 1 : -1;
+  const rank = rankOf(king) + dir;
+  return [-1, 0, 1].some((df) => {
+    const sq = mkSq(fileOf(king) + df, rank);
+    return sq && !game.get(sq);
+  });
+}
+
+function touchesEnemyChain(game, square, enemy) {
+  const pawns = [];
+  for (let df = -1; df <= 1; df += 1) {
+    for (let dr = -1; dr <= 1; dr += 1) {
+      if (!df && !dr) continue;
+      const sq = mkSq(fileOf(square) + df, rankOf(square) + dr);
+      const hit = sq && game.get(sq);
+      if (hit && hit.type === "p" && hit.color === enemy) pawns.push(sq);
+    }
+  }
+  for (let i = 0; i < pawns.length; i += 1) {
+    for (let j = i + 1; j < pawns.length; j += 1) {
+      if (Math.abs(fileOf(pawns[i]) - fileOf(pawns[j])) <= 1 && Math.abs(rankOf(pawns[i]) - rankOf(pawns[j])) <= 1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function evalDrop(hint) {
+  if (!hint || hint.synthetic || !Number.isFinite(state.hintBestScore)) return 0;
+  return state.hintBestScore - hintScore(hint);
+}
+
+const FEEDBACK_BAND_KEYS = {
+  best: ["fb.1", "fb.2", "fb.3", "fb.4", "fb.5", "fb.6"],
+  excellent: ["fb.7", "fb.8", "fb.9", "fb.10", "fb.11"],
+  strong: ["fb.12", "fb.13", "fb.14", "fb.15", "fb.16"],
+  good: ["fb.17", "fb.18", "fb.19", "fb.20", "fb.21"],
+  inaccuracy: ["fb.22", "fb.23", "fb.24", "fb.25", "fb.26"],
+  mistake: ["fb.27", "fb.28", "fb.29", "fb.30", "fb.31"],
+  blunder: ["fb.32", "fb.33", "fb.34", "fb.35", "fb.36"],
+  mateMiss: ["fb.37", "fb.38"],
+  mateRisk: ["fb.39", "fb.40"],
+};
+
+const OPPONENT_FEEDBACK_KEYS = {
+  best: ["ofb.1", "ofb.2", "ofb.3", "ofb.4", "ofb.5"],
+  excellent: ["ofb.6", "ofb.7", "ofb.8", "ofb.9"],
+  strong: ["ofb.10", "ofb.11", "ofb.12", "ofb.13"],
+  good: ["ofb.14", "ofb.15", "ofb.16", "ofb.17"],
+  inaccuracy: ["ofb.18", "ofb.19", "ofb.20", "ofb.21"],
+  mistake: ["ofb.22", "ofb.23", "ofb.24", "ofb.25"],
+  blunder: ["ofb.26", "ofb.27", "ofb.28", "ofb.29"],
+  mateMiss: ["ofb.30", "ofb.31"],
+  mateRisk: ["ofb.32", "ofb.33"],
+};
+
+const SEE_REPLY_KEYS = [
+  "wait.1", "wait.2", "wait.3", "wait.4", "wait.5",
+  "wait.6", "wait.7", "wait.8", "wait.9", "wait.10",
+];
+
+function hintForPlayedMove(from, to, promotion, passedHint) {
+  if (passedHint?.uci) return passedHint;
+  const uci = `${from}${to}${promotion || ""}`;
+  return (state.hintPool || []).find((hint) => hint.uci === uci)
+    || (state.hints || []).find((hint) => hint.uci === uci)
+    || null;
+}
+
+function poolHasOurMate(pool) {
+  return (pool || []).some((hint) => !hint.synthetic && hint.scoreType === "mate" && hint.score > 0);
+}
+
+function feedbackBand(hint, bestScore, pool) {
+  if (!hint || hint.synthetic || !Number.isFinite(bestScore)) return "good";
+  if (hint.scoreType === "mate" && hint.score < 0) return "mateRisk";
+  if (poolHasOurMate(pool) && !(hint.scoreType === "mate" && hint.score > 0)) return "mateMiss";
+  const drop = bestScore - hintScore(hint);
+  if (drop <= 0) return "best";
+  if (drop <= 20) return "excellent";
+  if (drop <= 50) return "strong";
+  if (drop <= 90) return "good";
+  if (drop <= 160) return "inaccuracy";
+  if (drop <= 300) return "mistake";
+  return "blunder";
+}
+
+function pickKey(keys, lastProp) {
+  if (!keys?.length) return "";
+  const others = keys.length > 1 ? keys.filter((key) => key !== state[lastProp]) : keys;
+  const pick = others[Math.floor(Math.random() * others.length)];
+  state[lastProp] = pick;
+  return pick;
+}
+
+function pickFeedbackKey(hint, bestScore, pool) {
+  return pickKey(FEEDBACK_BAND_KEYS[feedbackBand(hint, bestScore, pool)] || FEEDBACK_BAND_KEYS.good, "lastFeedbackKey");
+}
+
+function pickOpponentFeedbackKey(hint, bestScore, pool) {
+  if (!hint || hint.synthetic) {
+    return pickKey(OPPONENT_FEEDBACK_KEYS.mistake, "lastOppFeedbackKey");
+  }
+  return pickKey(
+    OPPONENT_FEEDBACK_KEYS[feedbackBand(hint, bestScore, pool)] || OPPONENT_FEEDBACK_KEYS.good,
+    "lastOppFeedbackKey"
+  );
+}
+
+function pickSeeReplyKey() {
+  return pickKey(SEE_REPLY_KEYS, "lastSeeReplyKey");
+}
+
+function playerFeedbackHtml(fbKey, replyKey) {
+  const body = escapeHtml(t(fbKey));
+  if (!replyKey) return body;
+  return `${body}<span class="king-closer">${escapeHtml(t(replyKey))}</span>`;
+}
+
+async function scorePlayedUci(fen, uci) {
+  try {
+    const lines = await state.engine.analyze(fen, { depth: 11, multipv: 12 });
+    const pool = (lines || []).filter((line) => line?.uci);
+    const best = pool.length ? Math.max(...pool.map(hintScore)) : -Infinity;
+    const hint = pool.find((line) => line.uci === uci) || null;
+    return { hint, best, pool };
+  } catch {
+    return { hint: null, best: -Infinity, pool: [] };
+  }
+}
+
+function evalHolds(hint, margin = 80) {
+  if (!hint || hint.synthetic) return false;
+  if (hint.scoreType === "mate" && hint.score > 0) return true;
+  return evalDrop(hint) <= margin;
+}
+
+function isOnlyHoldingHint(hint) {
+  if (!hint?.uci || hint.synthetic) return false;
+  const pool = (state.hintPool || []).filter((line) => line?.uci && !line.synthetic);
+  if (pool.length < 3) return false;
+  const holders = pool.filter((line) => evalHolds(line, 140));
+  return holders.length === 1 && holders[0].uci === hint.uci;
+}
+
+function pvTakesOn(hint, square) {
+  const pv = hint?.pv;
+  if (!square || !Array.isArray(pv) || pv.length < 2) return false;
+  return pv.slice(1).some((uci) => String(uci).slice(2, 4) === square);
+}
+
+function onLongDiagonal(square) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  return file === rank - 1 || file + rank === 8;
+}
+
+function longDiagOpen(game, square) {
+  if (!onLongDiagonal(square)) return false;
+  const a1h8 = fileOf(square) === rankOf(square) - 1;
+  let pawns = 0;
+  for (const sq of SQUARES) {
+    if (a1h8 ? fileOf(sq) !== rankOf(sq) - 1 : fileOf(sq) + rankOf(sq) !== 8) continue;
+    if (game.get(sq)?.type === "p") pawns += 1;
+  }
+  return pawns <= 1;
+}
+
+function pawnSupports(game, square, color) {
+  const file = square.charCodeAt(0) - 97;
+  const rank = Number(square[1]);
+  const behind = rank + (color === "w" ? -1 : 1);
+  if (behind < 1 || behind > 8) return false;
+  return [-1, 1].some((df) => {
+    const f = file + df;
+    if (f < 0 || f > 7) return false;
+    const pawn = game.get(`${String.fromCharCode(97 + f)}${behind}`);
+    return pawn && pawn.color === color && pawn.type === "p";
+  });
+}
+
+function enemyPawnKicks(game, square, color) {
+  const enemy = color === "w" ? "b" : "w";
+  const file = square.charCodeAt(0) - 97;
+  const rank = Number(square[1]);
+  const ahead = rank + (color === "w" ? 1 : -1);
+  if (ahead < 1 || ahead > 8) return false;
+  return [-1, 1].some((df) => {
+    const f = file + df;
+    if (f < 0 || f > 7) return false;
+    const pawn = game.get(`${String.fromCharCode(97 + f)}${ahead}`);
+    return pawn && pawn.color === enemy && pawn.type === "p";
+  });
+}
+
+function fileIsOpen(game, file) {
+  return !SQUARES.some((sq) => sq[0] === file && game.get(sq)?.type === "p");
+}
+
+function opensOwnBishop(before, move, us) {
+  if (move.piece !== "p") return false;
+  const home = us === "w" ? { c: "c1", f: "f1" } : { c: "c8", f: "f8" };
+  const file = move.from[0];
+  if (file !== "c" && file !== "f") return false;
+  const bishop = before.get(home[file]);
+  return Boolean(bishop && bishop.type === "b" && bishop.color === us);
+}
+
+function lastOpponentMove(before) {
+  const history = before.history({ verbose: true });
+  return history[history.length - 1] || null;
+}
+
+function eyesEnemyKingSide(game, from, us) {
+  if (!from || !game.get(from)) return false;
+  const weak = us === "w" ? "f7" : "f2";
+  const king = kingSquare(game, us === "w" ? "b" : "w");
+  return pieceAttacksSquare(game, from, weak) || Boolean(king && pieceAttacksSquare(game, from, king));
+}
+
 function coachLine(before, move, after, hint) {
   const piece = talkPiece(move.piece);
   const square = move.to;
   const target = move.captured ? talkPiece(move.captured) : "";
   const us = before.turn();
-  const backRank = us === "w" ? "1" : "8";
+  const enemy = us === "w" ? "b" : "w";
   const vars = { piece, square, target };
-  const hangs = worstImmediateLoss(after, us);
-  const hangPiece = hangs ? talkPiece(hangs) : "";
-  const careful = hangs && PIECE_VALUE[hangs] >= 3;
+  const say = (key, extra) => t(key, { ...vars, ...extra });
+  const fromBack = isBackRank(us, move.from);
+  const toBack = isBackRank(us, move.to);
+  const hangBefore = new Set(hangingSquaresOf(before, us));
+  const hangAfter = new Set(hangingSquaresOf(after, us));
+  const savedSelf = hangBefore.has(move.from) && !hangAfter.has(move.to);
+  const rescuedSq = [...hangBefore].find((sq) => sq !== move.from && !hangAfter.has(sq));
+  const otherHang = [...hangAfter].find((sq) => sq !== move.to);
+  const movedHangs = hangAfter.has(move.to);
+  const captureVal = PIECE_VALUE[move.captured] || 0;
+  const ourVal = PIECE_VALUE[move.piece] || 0;
+  const riskyTake = movedHangs && captureVal <= ourVal && ourVal >= 3;
+  const hangPiece = talkPiece(after.get(move.to)?.type || move.piece);
+  const last = lastOpponentMove(before);
+  const recapture = Boolean(move.captured && last?.captured && last.to === move.to);
+  const oldTargets = new Set(pieceAttacks(before, move.from).map((hit) => hit.to));
+  const freshHits = pieceAttacks(after, move.to).filter((hit) => !oldTargets.has(hit.to));
+  const freshValuable = freshHits.filter((hit) => (PIECE_VALUE[hit.captured] || 0) >= 3);
+  const bestFresh = [...freshValuable].sort((a, b) => (PIECE_VALUE[b.captured] || 0) - (PIECE_VALUE[a.captured] || 0))[0];
+  const toRank = rankOf(move.to);
+  const fromRank = rankOf(move.from);
+  const onSeventh = us === "w" ? toRank === 7 : toRank === 2;
+  const enemyKing = kingSquare(after, enemy);
+  const ourKing = kingSquare(after, us);
+  const isCheck = move.san.includes("+") || after.in_check();
+  const checkers = isCheck ? checkingSquares(after, enemy) : [];
+  const discovered = isCheck && !checkers.includes(move.to);
+  const doubleCheck = checkers.length >= 2;
+  const replies = after.moves({ verbose: true });
+  const forceKing = isCheck && replies.length > 0 && replies.every((reply) => reply.piece === "k");
+  const hangEnemyBefore = new Set(hangingSquaresOf(before, enemy));
+  const hangEnemyAfter = hangingSquaresOf(after, enemy).filter((sq) => sq !== move.to);
+  const newlyLoose = hangEnemyAfter.filter((sq) => !hangEnemyBefore.has(sq));
+  const drop = evalDrop(hint);
+  const holds = evalHolds(hint, 80);
+  const mateScore = hint?.scoreType === "mate" ? hint.score : 0;
+  const pinKind = newPinOrSkewer(after, move, us);
+  const endgame = isEndgame(after);
+  const ourPassersBefore = passedPawns(before, us).map((p) => p.square);
+  const ourPassersAfter = passedPawns(after, us);
+  const newPasser = ourPassersAfter.find((p) => !ourPassersBefore.includes(p.square));
+  const enemyPassers = passedPawns(before, enemy);
+  const minorsBefore = undevelopedMinors(before, us);
+  const minorsAfter = undevelopedMinors(after, us);
+  const seesKingBefore = slidersSeeing(before, us, kingSquare(before, enemy)).map((p) => p.square);
+  const seesKingAfter = slidersSeeing(after, us, enemyKing).map((p) => p.square);
+  const openedLine = seesKingAfter.some((sq) => sq !== move.to && !seesKingBefore.includes(sq));
+  const linedUp = "brq".includes(move.piece) && enemyKing && rayBetween(move.to, enemyKing)
+    && rayClear(after, move.to, enemyKing) && !isCheck;
+  const homePawnLuft = move.piece === "p" && !move.captured
+    && Math.abs(toRank - fromRank) === 1
+    && "ahgb".includes(move.from[0])
+    && ourKing && isBackRank(us, ourKing)
+    && Math.abs(fileOf(ourKing) - fileOf(move.to)) <= 2;
 
-  if (move.san.includes("#")) return t("talk.mate", vars);
+  if (move.san.includes("#")) return say("talk.mate");
   if (move.san.startsWith("O-O-O")) return t("talk.castleLong");
   if (move.san.startsWith("O-O")) return t("talk.castle");
+  if (move.promotion) return t("talk.promo", { square, promo: talkPiece(move.promotion) });
+  if (String(move.flags).includes("e")) return say("talk.ep");
 
-  if (move.promotion) {
-    return t("talk.promo", { square, promo: talkPiece(move.promotion) });
+  if (before.in_check() && !move.captured) {
+    if (move.piece === "k") return say("talk.kingSafe");
+    return say("talk.block");
   }
 
-  if (String(move.flags).includes("e")) return t("talk.ep", vars);
-
-  const threatenedBefore = new Set(playerPiecesUnderAttack(before, us));
-  const threatenedAfter = new Set(playerPiecesUnderAttack(after, us));
-  if (threatenedBefore.has(move.from) && !threatenedAfter.has(move.to)) {
-    return t("talk.save", vars);
-  }
-  for (const sq of threatenedBefore) {
-    if (sq === move.from || threatenedAfter.has(sq)) continue;
-    const rescued = before.get(sq);
-    if (rescued) return t("talk.guard", { piece, square, target: talkPiece(rescued.type) });
-  }
-
-  if (move.san.includes("+") && move.captured) {
-    return careful ? t("talk.checkTakeCare", { ...vars, hang: hangPiece }) : t("talk.checkTake", vars);
-  }
-  if (move.san.includes("+")) return t("talk.check", vars);
+  if (savedSelf) return say("talk.save");
 
   if (move.captured) {
-    if (careful) return t("talk.takeCare", { ...vars, hang: hangPiece });
-    const ours = PIECE_VALUE[move.piece];
-    const theirs = PIECE_VALUE[move.captured];
-    if (theirs > ours) return t("talk.takeWin", vars);
-    if (theirs === ours && move.piece !== "p") return t("talk.trade", vars);
-    if (move.captured === "p") return t("talk.takePawn", vars);
-    return t("talk.takePiece", vars);
+    const replyOnTo = hint?.pv?.[1] && String(hint.pv[1]).slice(2, 4) === move.to;
+    if (movedHangs && isCheck && holds && replyOnTo) return say("talk.decoy");
+    if (movedHangs && holds && ourVal >= 3 && captureVal < ourVal) return say("talk.sac");
+    if (move.piece === "r" && (move.captured === "n" || move.captured === "b") && holds) return say("talk.exchange");
+    if (riskyTake) return say(isCheck ? "talk.checkTakeCare" : "talk.takeCare", { hang: hangPiece });
+    if (!movedHangs && drop >= 180) return say("talk.poisoned");
+    if (recapture) return say("talk.recapture");
+    if (isCheck) return say("talk.checkTake");
+    if (newlyLoose.length && captureVal <= 5) {
+      const loose = after.get(newlyLoose[0]);
+      if (loose) return say("talk.removeDef", { target: talkPiece(loose.type) });
+    }
+    if (hangEnemyBefore.has(move.to) && captureVal >= 3) return say("talk.takeLoose");
+    if (captureVal === ourVal && move.piece !== "p") {
+      if (typeof hint?.score === "number" && hint.scoreType === "cp" && hint.score >= 150) return say("talk.simplifyWin");
+      if (typeof hint?.score === "number" && hint.scoreType === "cp" && Math.abs(hint.score) <= 40) return say("talk.trade");
+      return say("talk.trade");
+    }
+    if (otherHang) {
+      const hanging = after.get(otherHang);
+      if (hanging && (PIECE_VALUE[hanging.type] || 0) >= 3) {
+        return say("talk.takeOtherCare", { hang: talkPiece(hanging.type) });
+      }
+    }
+    if (enemyCastledShort(before, enemy) && "gh".includes(move.to[0]) && (move.piece === "p" || move.captured === "p")) {
+      return say("talk.breakCastle");
+    }
+    if (captureVal > ourVal) return say("talk.takeWin");
+    if (move.captured === "p") return say("talk.takePawn");
+    if (!movedHangs && !otherHang) return say("talk.takeSolid");
+    return say("talk.takePiece");
   }
 
-  if (before.in_check()) return t("talk.block", vars);
-
-  if (typeof hint?.score === "number" && hint.scoreType === "cp" && hint.score < -80) {
-    return t("talk.defend", vars);
+  if (rescuedSq) {
+    const saved = before.get(rescuedSq);
+    if (saved) return say("talk.guard", { target: talkPiece(saved.type) });
   }
 
-  const attacks = after.moves({ square: move.to, verbose: true }).filter((m) => m.captured);
-  attacks.sort((a, b) => PIECE_VALUE[b.captured] - PIECE_VALUE[a.captured]);
-  const forks = attacks.filter((m) => PIECE_VALUE[m.captured] >= 3);
-  if (forks.length >= 2) return t("talk.fork", vars);
-  const threat = attacks[0];
-  if (threat && PIECE_VALUE[threat.captured] >= 5) {
-    return t("talk.threat", { piece, square, target: talkPiece(threat.captured) });
-  }
-  if (threat && PIECE_VALUE[threat.captured] >= 3) {
-    return t("talk.attack", { piece, square, target: talkPiece(threat.captured) });
+  const extraCover = playerPiecesUnderAttack(before, us).find((sq) => {
+    if (sq === move.from) return false;
+    const beforeDefs = attackersOf(before, sq, us).length;
+    const afterDefs = attackersOf(after, sq, us).length;
+    return beforeDefs >= 1 && afterDefs > beforeDefs;
+  });
+  if (extraCover) return say("talk.overprotect");
+
+  if (last?.captured && last.to !== move.to && isCheck && pvTakesOn(hint, last.to)) {
+    return say("talk.zwischen");
   }
 
-  if (move.piece === "b" && isFianchettoTo(us, move.to)) return t("talk.lookout", vars);
-  if (move.piece === "b" && (isCenterSquare(move.to) || isWideCenter(move.to))) {
-    return t("talk.attackDiag", vars);
+  if (doubleCheck) return say("talk.doubleCheck");
+  if (discovered) return say("talk.discover");
+  if (forceKing) return say("talk.forceKing");
+  if (isCheck && newlyLoose.length) return say("talk.deflect");
+  if (isCheck) return say("talk.check");
+
+  if (freshValuable.length >= 2) return say("talk.fork");
+  if (pinKind === "pin") return say("talk.pin");
+  if (pinKind === "skewer") return say("talk.skewer");
+  if (discovered || (openedLine && bestFresh)) return say("talk.discoverAttack");
+  const overloaded = freshHits.some((hit, i) => {
+    const defs = attackersOf(after, hit.to, enemy);
+    if (defs.length !== 1) return false;
+    return freshHits.some((other, j) => j !== i && attackersOf(after, other.to, enemy).length === 1
+      && attackersOf(after, other.to, enemy)[0].square === defs[0].square);
+  });
+  if (overloaded) return say("talk.overload");
+  if (newlyLoose.length) {
+    const loose = after.get(newlyLoose[0]);
+    if (loose) return say("talk.removeDef", { target: talkPiece(loose.type) });
   }
-  if (move.piece === "n") {
-    const rank = Number(move.to[1]);
-    const outpost = us === "w" ? rank >= 5 : rank <= 4;
-    if (outpost) return t("talk.outpost", vars);
+  if (bestFresh && PIECE_VALUE[bestFresh.captured] >= 5) {
+    return say("talk.threat", { target: talkPiece(bestFresh.captured) });
+  }
+  const trapped = piecesOf(after, enemy).find((p) => {
+    if (p.type === "k" || p.type === "p") return false;
+    const attacked = playerPiecesUnderAttack(after, enemy).includes(p.square);
+    if (!attacked) return false;
+    return after.moves({ square: p.square, verbose: true }).length === 0;
+  });
+  if (trapped) return say("talk.trap");
+
+  if (!isCheck && mateScore >= 2) return say("talk.setupMate");
+  if (mateScore >= 2) return say("talk.threatMate");
+  if ((move.piece === "r" || move.piece === "q") && enemyKing && isBackRank(enemy, move.to) && isBackRank(enemy, enemyKing) && !kingHasLuft(after, enemy)) {
+    return say("talk.backRank");
+  }
+  if ((move.piece === "q" || move.piece === "r") && enemyKing) {
+    const beforeDist = Math.abs(fileOf(move.from) - fileOf(enemyKing)) + Math.abs(fromRank - rankOf(enemyKing));
+    const afterDist = Math.abs(fileOf(move.to) - fileOf(enemyKing)) + Math.abs(toRank - rankOf(enemyKing));
+    if (afterDist < beforeDist - 1) return say("talk.huntKing");
+  }
+  if (openedLine) return say("talk.openHunt");
+  if (linedUp) return say("talk.lineUp");
+
+  if (homePawnLuft) return say("talk.luft");
+  if (move.piece === "p" && !move.captured && (move.to === (us === "w" ? "h3" : "h6") || move.to === (us === "w" ? "a3" : "a6"))) {
+    return say("talk.prophylaxis");
+  }
+
+  const ourKingBefore = kingSquare(before, us);
+  if (slidersSeeing(before, enemy, ourKingBefore).length > slidersSeeing(after, enemy, ourKing).length) {
+    return say(move.piece === "p" ? "talk.closePos" : "talk.closeLines");
+  }
+  if (move.piece !== "k" && ourKing && rayBetween(move.to, ourKing) && attackersOf(after, ourKing, us).length > attackersOf(before, ourKingBefore, us).length) {
+    return say("talk.protectKing");
+  }
+  if (move.piece === "k" && !before.in_check()) {
+    const oldKing = move.from;
+    const wasOnPin = piecesOf(before, enemy).some((a) => {
+      if (!"brq".includes(a.type)) return false;
+      if (!rayBetween(a.square, oldKing) || !rayClear(before, a.square, oldKing)) return false;
+      const mid = rayBetween(a.square, oldKing);
+      return mid && mid.some((sq) => {
+        const hit = before.get(sq);
+        return hit && hit.color === us && hit.type !== "k";
+      });
+    });
+    const stillOnPin = piecesOf(after, enemy).some((a) => (
+      "brq".includes(a.type) && rayBetween(a.square, move.to) && rayClear(after, a.square, move.to)
+    ));
+    if (wasOnPin && !stillOnPin) return say("talk.unpin");
+  }
+
+  if (!fromBack && toBack && move.piece !== "k") return say(move.piece === "r" ? "talk.defendRook" : "talk.defend");
+  if (!move.captured && "qr".includes(move.piece) && Math.abs(toRank - fromRank) >= 2
+    && ((us === "w" && toRank < fromRank) || (us === "b" && toRank > fromRank)) && !bestFresh) {
+    return say("talk.retreat");
+  }
+
+  if (move.piece === "b" && isFianchettoTo(us, move.to) && before.get(us === "w" ? (move.to === "g2" ? "g3" : "b3") : (move.to === "g7" ? "g6" : "b6"))?.type === "p") {
+    return say("talk.fianchetto");
+  }
+  if (move.piece === "b" && isFianchettoTo(us, move.to)) return say("talk.lookout");
+  if (move.piece === "n" && pawnSupports(after, move.to, us) && !enemyPawnKicks(after, move.to, us) && ((us === "w" && toRank >= 4) || (us === "b" && toRank <= 5))) {
+    return say("talk.outpost");
+  }
+  if (move.piece === "n" && pawnSupports(after, move.to, us) && !enemyPawnKicks(after, move.to, us)) {
+    return say("talk.anchor");
+  }
+  if (!enemyPawnKicks(after, move.to, us) && ((us === "w" && toRank >= 5) || (us === "b" && toRank <= 4)) && "nb".includes(move.piece)) {
+    return say("talk.strongSq");
+  }
+  if (move.piece === "b" && eyesEnemyKingSide(after, move.to, us)) return say("talk.attackDiag");
+  if (move.piece === "b" && longDiagOpen(after, move.to)) return say("talk.longDiag");
+  if ((move.piece === "n" || move.piece === "b") && "abgh".includes(move.to[0]) && ((us === "w" && toRank >= 4 && toRank <= 6) || (us === "b" && toRank >= 3 && toRank <= 5))) {
+    return say("talk.lookoutPost");
   }
 
   if (move.piece === "r") {
-    if (isBackRank(us, move.to)) return t("talk.defendRook", vars);
     const file = move.to[0];
-    const pawnsOnFile = SQUARES.some((sq) => sq[0] === file && after.get(sq)?.type === "p");
-    if (!pawnsOnFile) return t("talk.rookOpen", vars);
-    return t("talk.rook", vars);
+    const ourRooks = piecesOf(after, us, "r");
+    const doubled = ourRooks.filter((p) => p.square[0] === file).length >= 2
+      && piecesOf(before, us, "r").filter((p) => p.square[0] === file).length < 2;
+    const battery = piecesOf(after, us).filter((p) => (p.type === "r" || p.type === "q") && p.square[0] === file).length >= 2
+      && piecesOf(before, us).filter((p) => (p.type === "r" || p.type === "q") && p.square[0] === file).length < 2;
+    const liftRank = us === "w" ? (toRank === 3 || toRank === 4) : (toRank === 5 || toRank === 6);
+    const cutRank = us === "w" ? 6 : 3;
+    if (onSeventh) return say("talk.rookSeventh");
+    if (doubled) return say("talk.doubleRooks");
+    if (battery) return say("talk.battery");
+    if (fromBack && liftRank && move.from[0] === file) return say("talk.rookLift");
+    if (toRank === cutRank && enemyKing && isBackRank(enemy, enemyKing)) return say("talk.cutKing");
+    if (fromBack && toBack) return say("talk.rookConnect");
+    if (fileIsOpen(after, file)) {
+      const files = openFiles(after);
+      return say(files.length === 1 ? "talk.onlyFile" : "talk.rookOpen");
+    }
+    if (ourPassersAfter.some((p) => p.square[0] === file && (us === "w" ? toRank < rankOf(p.square) : toRank > rankOf(p.square)))) {
+      return say("talk.rookBehind");
+    }
+    return say("talk.rook");
   }
 
-  if ((move.piece === "n" || move.piece === "b") && move.from[1] === backRank) {
-    if (isCenterSquare(move.to) || isWideCenter(move.to)) return t("talk.devCenter", vars);
-    return t("talk.dev", vars);
+  if (minorsBefore.length === 1 && minorsAfter.length === 0) return say("talk.lastOut");
+  if (minorsAfter.length === 0 && kingHasCastled(after, us) && fromBack) return say("talk.finishDev");
+  if ((move.piece === "n" || move.piece === "b") && fromBack) {
+    if (isCenterSquare(move.to) || isWideCenter(move.to)) return say("talk.devCenter");
+    if ("abgh".includes(move.to[0])) return say("talk.devSide");
+    if (before.history().length >= 12) return say("talk.idle");
+    return say("talk.dev");
   }
 
   if (move.piece === "p") {
-    if (isCenterSquare(move.to)) return t("talk.pawnCenter", vars);
-    if (Math.abs(Number(move.to[1]) - Number(move.from[1])) === 2) return t("talk.pawnTwo", vars);
-    if (move.to[0] === "c" || move.to[0] === "f") return t("talk.pawnDiag", vars);
-    return t("talk.pawn", vars);
+    const blockSq = enemyPassers.map((p) => squareInFront(p.square, enemy)).find((sq) => sq === move.to);
+    const promoSq = enemyPassers.find((p) => {
+      const goal = enemy === "w" ? 8 : 1;
+      return p.square[0] === move.to[0] && toRank === goal;
+    });
+    if (promoSq) return say("talk.stopPromo");
+    if (blockSq) return say("talk.blockPasser");
+    if (newPasser) return say("talk.passed");
+    if (isCenterSquare(move.to)) return say("talk.pawnCenter");
+    const front = squareInFront(move.to, us);
+    const facing = front && after.get(front);
+    if (facing?.type === "p" && facing.color === enemy) return say("talk.fixPawn");
+    if (enemyCastledShort(before, enemy) && "gh".includes(move.from[0]) && (us === "w" ? toRank > fromRank : toRank < fromRank)) {
+      return say(move.captured ? "talk.breakCastle" : "talk.storm");
+    }
+    if (touchesEnemyChain(before, move.to, enemy) && (move.captured || "cf".includes(move.from[0]))) {
+      return say("talk.pawnBreak");
+    }
+    if (opensOwnBishop(before, move, us)) return say("talk.pawnDiag");
+    if (enemyKing && "brq".includes((slidersSeeing(before, enemy, ourKing)[0] || {}).type || "") && !slidersSeeing(after, enemy, ourKing).length) {
+      return say("talk.closePos");
+    }
+    if (Math.abs(toRank - fromRank) === 2) return say("talk.pawnTwo");
+    if ((us === "w" && toRank >= 4) || (us === "b" && toRank <= 5)) return say("talk.pawnSpace");
+    return say("talk.pawn");
   }
 
   if (move.piece === "q") {
-    if (isCenterSquare(move.to) || isWideCenter(move.to)) return t("talk.queenCenter", vars);
-    return t("talk.queen", vars);
+    if (isCenterSquare(move.to) || isWideCenter(move.to)) return say("talk.queenCenter");
+    if (fromBack) return say("talk.dev");
+    return say("talk.queen");
   }
 
-  if (move.piece === "k") return t("talk.king", vars);
-  if (hint?.scoreType === "mate" && hint.score > 0) return t("talk.huntMate", vars);
-  return t("talk.solid", vars);
+  if (move.piece === "k") {
+    if (endgame && ((us === "w" && toRank > fromRank) || (us === "b" && toRank < fromRank))) {
+      const theirKing = kingSquare(after, enemy);
+      if (theirKing) {
+        const sameFile = fileOf(move.to) === fileOf(theirKing);
+        const sameRank = toRank === rankOf(theirKing);
+        const gap = sameFile ? Math.abs(toRank - rankOf(theirKing)) : Math.abs(fileOf(move.to) - fileOf(theirKing));
+        if ((sameFile || sameRank) && gap === 2) return say("talk.opposition");
+        const closer = Math.abs(fileOf(move.to) - fileOf(theirKing)) + Math.abs(toRank - rankOf(theirKing))
+          < Math.abs(fileOf(move.from) - fileOf(theirKing)) + Math.abs(fromRank - rankOf(theirKing));
+        if (closer) return say("talk.shoulder");
+      }
+      return say("talk.activateKing");
+    }
+    return say("talk.kingSafe");
+  }
+
+  const weakHit = freshHits.find((hit) => {
+    const victim = after.get(hit.to);
+    return victim?.type === "p" && isIsolatedPawn(after, hit.to, enemy);
+  });
+  if (weakHit) return say("talk.weakPawn");
+
+  if (bestFresh) return say("talk.attack", { target: talkPiece(bestFresh.captured) });
+  if (mateScore > 0) return say("talk.huntMate");
+  if (isOnlyHoldingHint(hint)) return say("talk.onlyMove");
+  if (endgame && !move.captured && !isCheck && evalHolds(hint, 25)) return say("talk.squeeze");
+  if (!move.captured && !isCheck && evalHolds(hint, 25) && mobility(after, move.to, us) <= mobility(before, move.from, us) + 1) {
+    return say("talk.wait");
+  }
+  if (fromBack) return say("talk.dev");
+  if (mobility(after, move.to, us) > mobility(before, move.from, us) + 1) return say("talk.improve");
+  return say("talk.reposition");
 }
 
 function hintTalk(hint) {
+  if (hint?.talk) return hint.talk;
   const { played, after } = tryHint(hint);
   if (!played || !after) return t("talk.solid", { piece: talkPiece("p"), square: hint?.uci?.slice(2, 4) || "" });
   return coachLine(state.game, played, after, hint);
+}
+
+function prepareHintTalks() {
+  for (const hint of state.hintPool) {
+    try {
+      hint.talk = hintTalk(hint);
+    } catch {
+      hint.talk = t("talk.solid", { piece: talkPiece("p"), square: hint?.uci?.slice(2, 4) || "" });
+    }
+  }
+}
+
+async function computeHintPool(game) {
+  if (game.game_over()) return [];
+  const lines = await state.engine.analyze(game.fen(), {
+    depth: 11,
+    multipv: 12,
+  });
+  return fillHintPool(lines, game);
 }
 
 function explainMove(before, move, after, hint) {
@@ -424,7 +1101,7 @@ function syncHintNav() {
   const hidden = waitingForHints();
   els.hints?.classList.toggle("is-waiting", hidden);
   els.hintNav?.classList.toggle("is-waiting", hidden);
-  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && !state.kingSpeaking && !hidden;
+  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && !hidden;
   const lastPage = hintPageCount() - 1;
   const canLoadMore = canUse && state.hintPool.length > HINTS_PER_PAGE && state.hintsUnlocked < lastPage;
   if (els.moreHints) {
@@ -636,9 +1313,9 @@ function opponentLead(move) {
   return t("king.play", { mover: pieceOnSquare(move.piece, move.to) });
 }
 
-function narrateOpponentMove(before, move, after) {
+function narrateOpponentMove(before, move, after, feedbackKey) {
   if (move.san.includes("#")) {
-    return t("king.mateOpp");
+    return escapeHtml(t("king.mateOpp"));
   }
   const hits = threatsFromMove(after, move, state.playerColor).slice(0, 3);
   const labels = ourHitsPhrase(hits);
@@ -653,10 +1330,13 @@ function narrateOpponentMove(before, move, after) {
   if (move.san.includes("+")) lead += ` ${t("king.check")}`;
 
   const hanging = hits.filter((hit) => !isSquareDefended(after, hit.to, state.playerColor));
-  const parts = [lead];
   const warning = hangingAdvice(hanging);
-  if (warning) parts.push(warning);
-  return `${joinTalk(parts)}<br><span class="king-closer">${t("king.closer")}</span>`;
+  const bits = [];
+  if (feedbackKey) bits.push(escapeHtml(t(feedbackKey)));
+  bits.push(escapeHtml(lead));
+  if (warning) bits.push(`<span class="king-hang">${escapeHtml(warning)}</span>`);
+  bits.push(`<span class="king-closer">${escapeHtml(t("king.closer"))}</span>`);
+  return bits.join(" ");
 }
 
 function narratePlayerMove(before, move, after) {
@@ -854,6 +1534,7 @@ const els = {
   prevHints: document.getElementById("btn-prev-hints"),
   nextHints: document.getElementById("btn-next-hints"),
   hintNav: document.getElementById("hint-nav"),
+  hintPanel: document.getElementById("hint-panel"),
   aidMoves: document.getElementById("btn-aid-moves"),
   aidThreats: document.getElementById("btn-aid-threats"),
 };
@@ -885,6 +1566,9 @@ const state = {
   pendingHintReveal: false,
   gameId: 0,
   kingReplay: null,
+  lastFeedbackKey: "",
+  lastOppFeedbackKey: "",
+  lastSeeReplyKey: "",
   pendingPromo: null,
 };
 
@@ -1001,7 +1685,7 @@ function clearKingTalk() {
 }
 
 function waitingForHints() {
-  return playerIsSideToMove() && !state.game.game_over() && (state.kingSpeaking || !state.hintPool.length);
+  return playerIsSideToMove() && !state.game.game_over() && !state.hintPool.length;
 }
 
 function loadingHintCard(rank) {
@@ -1028,33 +1712,42 @@ function loadingHintCard(rank) {
     </button>`;
 }
 
+function hideHintPanel() {
+  els.hintPanel?.classList.add("is-waiting");
+  els.hints?.classList.remove("is-reveal");
+  els.hints?.classList.add("is-waiting");
+  els.hintNav?.classList.add("is-waiting");
+  if (state.board) state.board.setArrows([]);
+}
+
+function showHintPanel() {
+  els.hintPanel?.classList.remove("is-waiting");
+  els.hints?.classList.remove("is-waiting");
+  els.hintNav?.classList.remove("is-waiting");
+}
+
 function revealHintsIfReady() {
-  if (state.kingSpeaking || waitingForHints()) {
-    renderHints();
+  const canShow = playerIsSideToMove() && !state.game.game_over() && state.hintPool.length && !state.kingSpeaking;
+  if (!canShow) {
+    hideHintPanel();
+    if (waitingForHints()) renderHints();
     return;
   }
-  const shouldFade = state.pendingHintReveal && state.hintPool.length && playerIsSideToMove();
+  if (!state.pendingHintReveal) return;
+  showHintPanel();
   renderHints();
-  if (shouldFade) {
-    els.hints.classList.remove("is-reveal");
-    void els.hints.offsetWidth;
-    els.hints.classList.add("is-reveal");
-    state.pendingHintReveal = false;
-    if (state.aids.moves) showHintArrows(null, { reveal: true });
-  } else if (!state.hintPool.length) {
-    els.hints.classList.remove("is-reveal");
-    state.board?.setArrows([]);
-  }
+  els.hints.classList.remove("is-reveal");
+  void els.hints.offsetWidth;
+  els.hints.classList.add("is-reveal");
+  state.pendingHintReveal = false;
+  if (state.aids.moves) showHintArrows(null, { reveal: true });
 }
 
 async function speakKing(note, { calculating = false, html = false } = {}) {
   const token = (state.speakToken += 1);
   const text = note || "";
   state.kingSpeaking = Boolean(text);
-  state.pendingHintReveal = Boolean(text);
-  els.hints.classList.remove("is-reveal");
-  els.hints.classList.add("is-waiting");
-  els.hintNav?.classList.add("is-waiting");
+  hideHintPanel();
   els.kingNote?.classList.remove("is-typing");
   if (!text) {
     if (els.kingNote) els.kingNote.innerHTML = "";
@@ -1062,7 +1755,9 @@ async function speakKing(note, { calculating = false, html = false } = {}) {
     revealHintsIfReady();
     return;
   }
-  renderHints();
+  const hintsReady = Boolean(state.hintPool.length) && playerIsSideToMove() && !state.game.game_over();
+  if (hintsReady) state.pendingHintReveal = true;
+  else renderHints();
   const duration = paintKingNote(text, html);
   await sleep(duration);
   if (token !== state.speakToken) return;
@@ -1070,11 +1765,11 @@ async function speakKing(note, { calculating = false, html = false } = {}) {
   revealHintsIfReady();
 }
 
-function kingComment(beforeFen, played, asOpponent) {
+function kingComment(beforeFen, played, asOpponent, feedbackKey) {
   const before = new Chess(beforeFen);
   const after = new Chess(state.game.fen());
   return asOpponent
-    ? narrateOpponentMove(before, played, after)
+    ? narrateOpponentMove(before, played, after, feedbackKey)
     : narratePlayerMove(before, played, after);
 }
 
@@ -1137,7 +1832,7 @@ function renderHints() {
     const danger = hintDanger(hint);
     const talk = (() => {
       try {
-        return hintTalk(hint) || `Move to ${played?.to || ""}.`;
+        return hint.talk || hintTalk(hint) || `Move to ${played?.to || ""}.`;
       } catch {
         return played ? `Move to ${played.to}.` : "";
       }
@@ -1192,7 +1887,7 @@ function youLabel() {
   return state.playerColor === "w" ? t("you.white") : t("you.black");
 }
 
-async function refreshHints() {
+async function refreshHints({ reveal = true } = {}) {
   const gameId = state.gameId;
   if (state.game.game_over() || !playerIsSideToMove()) {
     clearHints();
@@ -1205,15 +1900,16 @@ async function refreshHints() {
   renderHints();
   setStatus(t("turn.you"), `${youLabel()}.`, "think");
   try {
-    const lines = await state.engine.analyze(fen, {
-      depth: 11,
-      multipv: 12,
-    });
+    const pool = await computeHintPool(state.game);
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
-    state.hintPool = fillHintPool(lines, state.game);
+    state.hintPool = pool;
     state.hintPage = 0;
     state.hintsUnlocked = 0;
-    revealHintsIfReady();
+    prepareHintTalks();
+    if (reveal) {
+      state.pendingHintReveal = true;
+      revealHintsIfReady();
+    }
     setStatus(t("turn.you"), `${youLabel()}. ${t("turn.make")}`, "play");
   } catch (err) {
     if (err.message === "aborted") return;
@@ -1259,7 +1955,7 @@ function waitAtLeast(ms, startedAt = Date.now()) {
   return new Promise((resolve) => setTimeout(resolve, left));
 }
 
-async function computerMove() {
+async function computerMove({ silentWait = false, afterTalk } = {}) {
   const gameId = state.gameId;
   if (state.game.game_over()) {
     finishGame();
@@ -1272,10 +1968,11 @@ async function computerMove() {
   state.busy = true;
   clearHints();
   renderHints();
-  syncBoard();
   setStatus(t("turn.opp"), t("king.waiting"), "think");
-  state.kingReplay = { type: "waiting" };
-  if (!state.kingSpeaking) speakKing(t("king.waiting"));
+  if (!silentWait) {
+    state.kingReplay = { type: "waiting" };
+    if (!state.kingSpeaking) speakKing(t("king.waiting"));
+  }
   const fen = state.game.fen();
   const startedAt = Date.now();
   try {
@@ -1284,30 +1981,62 @@ async function computerMove() {
       skill,
       movetime: 250 + skill * 90,
     });
-    await waitAtLeast(6000, startedAt);
-    if (gameId !== state.gameId) return;
-    if (state.game.fen() !== fen) return;
+    if (gameId !== state.gameId || state.game.fen() !== fen) return;
     if (!uci) throw new Error("Nessuna mossa dal motore");
+    const oppScore = await scorePlayedUci(fen, uci);
+    if (gameId !== state.gameId || state.game.fen() !== fen) return;
+    const oppKey = pickOpponentFeedbackKey(oppScore.hint, oppScore.best, oppScore.pool);
+    const preview = new Chess(fen);
     const move = uciToMove(uci);
+    const previewPlayed = preview.move({
+      from: move.from,
+      to: move.to,
+      promotion: move.promotion || "q",
+    });
+    if (!previewPlayed) throw new Error("Mossa motore illegale");
+
+    let pool = [];
+    if (!preview.game_over()) {
+      pool = await computeHintPool(preview);
+      if (gameId !== state.gameId || state.game.fen() !== fen) return;
+    }
+
+    await waitAtLeast(6000, startedAt);
+    if (afterTalk) await afterTalk;
+    if (gameId !== state.gameId || state.game.fen() !== fen) return;
+
     const played = state.game.move({
       from: move.from,
       to: move.to,
       promotion: move.promotion || "q",
     });
-    if (played) {
-      state.board.setLastMove(played.from, played.to);
-      await state.board.animateMove(played.from, played.to);
-      if (gameId !== state.gameId) return;
-      state.board.setPosition(state.game.fen());
-      flashThreatenedPieces(played);
-      const talk = kingComment(fen, played, true);
-      state.lastKingTalk = talk;
-      state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played } };
-      renderHints();
-      await sleep(1500);
-      if (gameId !== state.gameId) return;
-      speakKing(talk, { calculating: true, html: true });
+    if (!played) throw new Error("Mossa motore illegale");
+
+    state.board.setLastMove(played.from, played.to);
+    await state.board.animateMove(played.from, played.to);
+    if (gameId !== state.gameId) return;
+    state.board.setPosition(state.game.fen());
+    flashThreatenedPieces(played);
+    renderHistory();
+
+    if (state.game.game_over()) {
+      state.busy = false;
+      finishGame();
+      return;
     }
+
+    state.hintPool = pool;
+    state.hintPage = 0;
+    state.hintsUnlocked = 0;
+    prepareHintTalks();
+    state.pendingHintReveal = true;
+    state.busy = false;
+    const talk = kingComment(fen, played, true, oppKey);
+    state.lastKingTalk = talk;
+    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey };
+    setStatus(t("turn.you"), `${youLabel()}. ${t("turn.make")}`, "play");
+    speakKing(talk, { calculating: true, html: true });
+    syncBoard({ keepArrows: true });
   } catch (err) {
     if (err.message === "aborted" || gameId !== state.gameId) return;
     console.error(err);
@@ -1316,18 +2045,9 @@ async function computerMove() {
     syncBoard();
     return;
   }
-  if (gameId !== state.gameId) return;
-  state.busy = false;
-  renderHistory();
-  if (state.game.game_over()) {
-    finishGame();
-    return;
-  }
-  syncBoard();
-  await refreshHints();
 }
 
-async function applyUserMove(from, to, promotion) {
+async function applyUserMove(from, to, promotion, chosenHint) {
   if (state.busy || !playerIsSideToMove() || state.game.game_over()) {
     syncBoard();
     return;
@@ -1336,6 +2056,11 @@ async function applyUserMove(from, to, promotion) {
     openPromo(from, to);
     return;
   }
+  const chosen = hintForPlayedMove(from, to, promotion, chosenHint);
+  const bestScore = state.hintBestScore;
+  const poolSnap = (state.hintPool || []).slice();
+  const fbKey = pickFeedbackKey(chosen, bestScore, poolSnap);
+  state.lastFeedbackKey = fbKey;
   state.busy = true;
   const fen = state.game.fen();
   const played = state.game.move({ from, to, promotion: promotion || undefined });
@@ -1346,30 +2071,35 @@ async function applyUserMove(from, to, promotion) {
   }
   state.engine.stop();
   clearHints();
+  hideHintPanel();
   renderHints();
   state.board.setLastMove(played.from, played.to);
   await state.board.animateMove(played.from, played.to);
   state.board.setPosition(state.game.fen());
   flashThreatenedPieces(played);
   renderHistory();
+  const replyKey = state.game.game_over() ? "" : pickSeeReplyKey();
+  state.kingReplay = { type: "feedback", key: fbKey, replyKey };
+  const feedbackTalk = speakKing(playerFeedbackHtml(fbKey, replyKey), { html: true });
   if (state.game.game_over()) {
+    await feedbackTalk;
     finishGame();
     return;
   }
   if (isLocalVsHuman()) {
+    await feedbackTalk;
     syncCoach();
-    const talk = kingComment(fen, played, true);
+    const oppKey = pickOpponentFeedbackKey(chosen, bestScore, poolSnap);
+    const talk = kingComment(fen, played, true, oppKey);
     state.lastKingTalk = talk;
-    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played } };
+    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey };
     state.busy = false;
+    await refreshHints({ reveal: false });
+    state.pendingHintReveal = true;
     speakKing(talk, { calculating: true, html: true });
-    await refreshHints();
     return;
   }
-  state.kingReplay = { type: "waiting" };
-  speakKing(t("king.waiting"));
-  state.busy = false;
-  await computerMove();
+  await computerMove({ silentWait: true, afterTalk: feedbackTalk });
 }
 
 function openPromo(from, to) {
@@ -1387,7 +2117,7 @@ function openPromo(from, to) {
 }
 
 function hintsArePlayable() {
-  return playerIsSideToMove() && !state.busy && !state.game.game_over() && !state.kingSpeaking && state.hints.length;
+  return playerIsSideToMove() && !state.busy && !state.game.game_over() && state.hints.length;
 }
 
 function playHintAt(index) {
@@ -1395,7 +2125,7 @@ function playHintAt(index) {
   const hint = state.hints[index];
   if (!hint) return false;
   const move = uciToMove(hint.uci);
-  applyUserMove(move.from, move.to, move.promotion);
+  applyUserMove(move.from, move.to, move.promotion, hint);
   return true;
 }
 
@@ -1492,10 +2222,14 @@ function replayKingTalk() {
     speakKing(t("king.waiting"));
     return;
   }
+  if (replay.type === "feedback" && replay.key) {
+    speakKing(playerFeedbackHtml(replay.key, replay.replyKey), { html: true });
+    return;
+  }
   if (replay.type === "opponent" && replay.move && replay.beforeFen) {
     const before = new Chess(replay.beforeFen);
     const after = new Chess(replay.afterFen || state.game.fen());
-    speakKing(narrateOpponentMove(before, replay.move, after), { calculating: true, html: true });
+    speakKing(narrateOpponentMove(before, replay.move, after, replay.feedbackKey), { calculating: true, html: true });
     return;
   }
   if (replay.type === "resign") {

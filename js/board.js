@@ -1,4 +1,4 @@
-import { t } from "./i18n.js";
+import { t } from "./i18n.js?v=20260822hidhints";
 
 const FILES = "abcdefgh";
 const PIECE_SRC = {

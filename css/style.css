@@ -321,11 +321,34 @@ button, select { font: inherit; }
   display: block;
   margin-top: 0.55em;
 }
+#king-note .king-hang {
+  display: block;
+  margin-top: 0.5em;
+  font-weight: 800;
+  color: #7a1a12;
+  background: #ffd7cc;
+  border-left: 4px solid #c4452c;
+  padding: 0.42em 0.58em;
+  border-radius: 6px;
+}
+.hint-panel {
+  margin-top: 12px;
+  transition: opacity 0.4s ease;
+}
+.hint-panel.is-waiting {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  max-height: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+}
 .aid-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 .aid-bar button {
   flex: 1;
@@ -354,22 +377,20 @@ button, select { font: inherit; }
   gap: 8px;
   min-height: 340px;
   margin-top: 12px;
-}
-.hints.is-waiting {
-  opacity: 0;
-  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.4s ease;
 }
 .hints.is-reveal .hint-btn:not(.empty) {
   animation: hint-reveal 0.55s ease both;
 }
-.hints.is-reveal .hint-btn:nth-child(1) { animation-delay: 0.04s; }
-.hints.is-reveal .hint-btn:nth-child(2) { animation-delay: 0.1s; }
-.hints.is-reveal .hint-btn:nth-child(3) { animation-delay: 0.16s; }
-.hints.is-reveal .hint-btn:nth-child(4) { animation-delay: 0.22s; }
-.hints.is-reveal .hint-btn:nth-child(5) { animation-delay: 0.28s; }
-.hints.is-reveal .hint-btn:nth-child(6) { animation-delay: 0.34s; }
+.hints.is-reveal .hint-btn:nth-child(1) { animation-delay: 0s; }
+.hints.is-reveal .hint-btn:nth-child(2) { animation-delay: 0.04s; }
+.hints.is-reveal .hint-btn:nth-child(3) { animation-delay: 0.08s; }
+.hints.is-reveal .hint-btn:nth-child(4) { animation-delay: 0.12s; }
+.hints.is-reveal .hint-btn:nth-child(5) { animation-delay: 0.16s; }
+.hints.is-reveal .hint-btn:nth-child(6) { animation-delay: 0.2s; }
 @keyframes hint-reveal {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
 
