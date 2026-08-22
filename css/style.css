@@ -129,25 +129,6 @@ button, select { font: inherit; }
   pointer-events: none;
   animation: danger-pulse 1.3s ease-in-out infinite;
 }
-.shield-pip {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 15px;
-  height: 15px;
-  z-index: 4;
-  pointer-events: none;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
-}
-.shield-pip svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  fill: #2f7ae5;
-  stroke: #fff;
-  stroke-width: 1.35;
-  stroke-linejoin: round;
-}
 @keyframes danger-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.18); opacity: 0.75; }
@@ -169,6 +150,8 @@ button, select { font: inherit; }
 }
 
 .piece {
+  position: relative;
+  z-index: 3;
   width: 92%;
   height: 92%;
   object-fit: contain;
@@ -181,10 +164,15 @@ button, select { font: inherit; }
   position: fixed;
   z-index: 50;
   pointer-events: none;
-  transition: transform 0.22s ease;
-  filter: drop-shadow(2px 6px 4px rgba(0,0,0,0.35));
+  will-change: transform;
+  transition: transform 0.42s cubic-bezier(0.22, 0.72, 0.28, 1);
+  filter: drop-shadow(2px 8px 6px rgba(0, 0, 0, 0.32));
 }
 .piece-ghost.dragging { transition: none; }
+.piece.is-captured {
+  transition: opacity 0.38s ease;
+  opacity: 0;
+}
 
 .board-arrows {
   position: absolute;
@@ -193,6 +181,7 @@ button, select { font: inherit; }
   height: 100%;
   pointer-events: none;
   overflow: visible;
+  z-index: 1;
 }
 
 .coords-ranks {
@@ -266,16 +255,52 @@ button, select { font: inherit; }
   font-size: 15px;
   line-height: 1.5;
   color: #333;
+  min-height: 1.5em;
 }
-.king-calc {
-  margin: 10px 0 0;
+#king-note .king-word {
+  display: inline;
+  opacity: 0;
+  animation: king-word-in 0.9s ease forwards;
+}
+@keyframes king-word-in {
+  from { opacity: 0; filter: blur(2px); transform: translateY(3px); }
+  to { opacity: 1; filter: blur(0); transform: none; }
+}
+#king-note strong {
+  font-weight: 800;
+  color: #1a1a1a;
+}
+#king-note .king-closer {
+  display: block;
+  margin-top: 0.55em;
+}
+.aid-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.aid-bar button {
+  flex: 1;
+  min-width: 140px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
   font-size: 13px;
-  font-style: italic;
   font-weight: 700;
-  color: #8a5a00;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
-.king-calc[hidden] { display: none; }
-
+.aid-bar button:hover {
+  border-color: var(--green);
+  background: #f7fff0;
+}
+.aid-bar button.is-on {
+  border-color: #2f7ae5;
+  background: #eef5ff;
+  color: #1d4f91;
+}
 .hints {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -283,9 +308,16 @@ button, select { font: inherit; }
   min-height: 118px;
   margin-top: 12px;
 }
-.hints.loading .hint-btn {
-  opacity: 0.55;
-  pointer-events: none;
+.hints.is-reveal .hint-btn:not(.empty):not(.is-loading) {
+  animation: hint-reveal 0.55s ease both;
+}
+.hints.is-reveal .hint-btn:nth-child(1) { animation-delay: 0.04s; }
+.hints.is-reveal .hint-btn:nth-child(2) { animation-delay: 0.12s; }
+.hints.is-reveal .hint-btn:nth-child(3) { animation-delay: 0.2s; }
+.hints.is-reveal .hint-btn:nth-child(4) { animation-delay: 0.28s; }
+@keyframes hint-reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
 }
 
 .hint-btn {
@@ -310,6 +342,35 @@ button, select { font: inherit; }
 }
 .hint-btn.best { border-color: #b7d48a; background: linear-gradient(#f7fff0, #fff); }
 .hint-btn.empty { cursor: default; opacity: 0.7; }
+.hint-btn.is-loading {
+  cursor: default;
+  pointer-events: none;
+  box-shadow: none;
+}
+.hint-btn.is-loading .hint-rank,
+.hint-btn.is-loading .hint-main,
+.hint-btn.is-loading .hint-piece,
+.hint-btn.is-loading .hint-eval {
+  opacity: 0.12;
+}
+.hint-btn.is-loading .hint-icon {
+  opacity: 0.1;
+  filter: none;
+  animation: hint-ghost 1.8s ease-in-out infinite;
+}
+.hint-calc {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1.3;
+  color: #8a5a00;
+  opacity: 0.42;
+}
+@keyframes hint-ghost {
+  0%, 100% { opacity: 0.08; }
+  50% { opacity: 0.2; }
+}
 .hint-btn:disabled { cursor: default; }
 .hint-rank {
   font-size: 10px;

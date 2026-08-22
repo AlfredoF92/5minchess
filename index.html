@@ -29,13 +29,13 @@
             <div class="player opponent">
               <span class="dot"></span>
               <div>
-                <div id="engine-label" class="name">Stockfish livello 3 · amichevole · 1550 Elo</div>
+                <div id="engine-label" class="name">Stockfish livello 1 · principiante · 1350 Elo</div>
                 <label class="skill-wrap">
                   Difficoltà
                   <select id="skill" aria-label="Livello Stockfish">
-                    <option value="1">1 — Principiante · 1350 Elo</option>
+                    <option value="1" selected>1 — Principiante · 1350 Elo</option>
                     <option value="2">2 — Facile · 1450 Elo</option>
-                    <option value="3" selected>3 — Amichevole · 1550 Elo</option>
+                    <option value="3">3 — Amichevole · 1550 Elo</option>
                     <option value="4">4 — Intermedio · 1650 Elo</option>
                     <option value="5">5 — Medio · 1750 Elo</option>
                     <option value="6">6 — Impegnativo · 1850 Elo</option>
@@ -51,16 +51,16 @@
                 Inizio partita
                 <select id="start-opening" aria-label="Apertura iniziale">
                   <option value="start" selected>Posizione iniziale</option>
-                  <option value="italian">Partita Italiana (6 mosse)</option>
-                  <option value="spanish">Partita Spagnola (6 mosse)</option>
-                  <option value="sicilian">Difesa Siciliana (6 mosse)</option>
-                  <option value="french">Difesa Francese (6 mosse)</option>
-                  <option value="caro">Difesa Caro-Kann (6 mosse)</option>
-                  <option value="qgd">Gambetto di Donna (6 mosse)</option>
-                  <option value="kid">Difesa Est-Indiana (6 mosse)</option>
-                  <option value="english">Apertura Inglese (6 mosse)</option>
-                  <option value="london">Sistema Londra (6 mosse)</option>
-                  <option value="scotch">Partita Scozzese (6 mosse)</option>
+                  <option value="italian">Partita Italiana (12 mosse)</option>
+                  <option value="spanish">Partita Spagnola (12 mosse)</option>
+                  <option value="sicilian">Difesa Siciliana (12 mosse)</option>
+                  <option value="french">Difesa Francese (12 mosse)</option>
+                  <option value="caro">Difesa Caro-Kann (12 mosse)</option>
+                  <option value="qgd">Gambetto di Donna (12 mosse)</option>
+                  <option value="kid">Difesa Est-Indiana (12 mosse)</option>
+                  <option value="english">Apertura Inglese (12 mosse)</option>
+                  <option value="london">Sistema Londra (12 mosse)</option>
+                  <option value="scotch">Partita Scozzese (12 mosse)</option>
                 </select>
               </label>
               <p id="opening-line" class="opening-line">Si parte dalla posizione iniziale.</p>
@@ -114,8 +114,11 @@
           </div>
           <blockquote class="speech" aria-live="polite">
             <p id="king-note">Buona fortuna!</p>
-            <p id="king-calc" class="king-calc" hidden>Calcolo delle mosse consigliate dal Re…</p>
           </blockquote>
+        </div>
+        <div class="aid-bar">
+          <button id="btn-aid-moves" class="is-on" type="button">Evidenzia le mosse</button>
+          <button id="btn-aid-threats" type="button">Evidenzia i minacciati</button>
         </div>
         <div id="hints" class="hints" aria-label="Suggerimenti del Re"></div>
         <div class="hint-nav">

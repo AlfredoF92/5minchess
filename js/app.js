@@ -25,6 +25,15 @@ function namedPiece(type) {
   }[type] || "il pezzo";
 }
 
+function ourPieceName(type) {
+  if (type === "q") return "La nostra Donna";
+  if (type === "r") return "La nostra Torre";
+  if (type === "b") return "Il nostro Alfiere";
+  if (type === "n") return "Il nostro Cavallo";
+  if (type === "k") return "Il nostro Re";
+  return "Il nostro pedone";
+}
+
 function joinTalk(parts) {
   return parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
 }
@@ -156,7 +165,7 @@ function explainMove(before, move, after, hint) {
   return "Mossa solida: migliora la posizione.";
 }
 
-const ARROW_COLORS = ["#5ea02e", "#3d8c4a", "#2b7a78", "#c9a227"];
+const ARROW_GREEN = "#8ec85a";
 
 const SKILL_ELO = {
   1: 1350,
@@ -324,7 +333,7 @@ function visibleHints() {
 }
 
 function syncHintNav() {
-  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over();
+  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && !state.kingSpeaking;
   const lastPage = hintPageCount() - 1;
   const canLoadMore = canUse && state.hintPool.length > 4 && state.hintsUnlocked < lastPage;
   if (els.moreHints) {
@@ -346,7 +355,7 @@ function showHintPage(page) {
   const cap = Math.min(state.hintsUnlocked, lastPage);
   state.hintPage = Math.max(0, Math.min(page, cap));
   renderHints();
-  showHintArrows();
+  if (state.aids.moves) showHintArrows(null, { reveal: true });
 }
 
 function clearHints() {
@@ -439,75 +448,151 @@ function hintDanger(hint) {
   return null;
 }
 
-function describeCreatedThreats(before, after, move, defenderColor) {
-  const attackerColor = defenderColor === "w" ? "b" : "w";
-  const hits = capturesFromSquare(after, move.to, attackerColor)
-    .map((hit) => ({ square: hit.to, type: hit.captured, value: PIECE_VALUE[hit.captured] || 0 }))
-    .filter((hit) => after.get(hit.square)?.color === defenderColor && hit.type !== "k")
-    .sort((a, b) => b.value - a.value);
+function plainPiece(type) {
+  return {
+    p: "il pedone",
+    n: "il cavallo",
+    b: "l'alfiere",
+    r: "la torre",
+    q: "la donna",
+    k: "il re",
+  }[type] || "il pezzo";
+}
 
-  const lines = [];
+function pieceOnSquare(type, square) {
+  return `${plainPiece(type)} in <strong>${square}</strong>`;
+}
+
+function joinIt(items) {
+  if (!items.length) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} e ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}`;
+}
+
+function hitsFromSquare(game, square, attackerColor, defenderColor) {
+  return capturesFromSquare(game, square, attackerColor)
+    .filter((hit) => {
+      const victim = game.get(hit.to);
+      return victim && victim.color === defenderColor && hit.captured !== "k";
+    })
+    .sort((a, b) => (PIECE_VALUE[b.captured] || 0) - (PIECE_VALUE[a.captured] || 0));
+}
+
+function threatsFromMove(after, move, defenderColor) {
+  const attacker = move.color;
+  const hits = hitsFromSquare(after, move.to, attacker, defenderColor);
+  if (move.san.startsWith("O-O-O")) {
+    hits.push(...hitsFromSquare(after, move.color === "w" ? "d1" : "d8", attacker, defenderColor));
+  } else if (move.san.startsWith("O-O")) {
+    hits.push(...hitsFromSquare(after, move.color === "w" ? "f1" : "f8", attacker, defenderColor));
+  }
   const seen = new Set();
-  for (const hit of hits.slice(0, 2)) {
-    const key = `${hit.type}${hit.square}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const guarded = isSquareDefended(after, hit.square, defenderColor);
-    if (hit.type === "q") {
-      lines.push(guarded
-        ? "Stai attento alla Donna: ora è sotto attacco."
-        : "Attenzione: la tua Donna è in presa!");
-    } else if (!guarded) {
-      lines.push(`Minaccia ${namedPiece(hit.type)} in ${hit.square}: è indifeso.`);
-    } else {
-      lines.push(`Minaccia ${namedPiece(hit.type)} in ${hit.square}.`);
-    }
-  }
+  return hits.filter((hit) => {
+    if (seen.has(hit.to)) return false;
+    seen.add(hit.to);
+    return true;
+  });
+}
 
-  const beforeAttacked = new Set(playerPiecesUnderAttack(before, defenderColor));
-  for (const square of playerPiecesUnderAttack(after, defenderColor)) {
-    if (lines.length >= 3) break;
-    if (beforeAttacked.has(square) || hits.some((hit) => hit.square === square)) continue;
-    const piece = after.get(square);
-    if (!piece || piece.type === "k") continue;
-    const guarded = isSquareDefended(after, square, defenderColor);
-    if (piece.type === "q") {
-      lines.push(guarded
-        ? "Stai attento alla Donna."
-        : "La tua Donna è rimasta scoperta.");
-    } else if (!guarded) {
-      lines.push(`Anche ${namedPiece(piece.type)} in ${square} è in pericolo.`);
-    }
+function yourPiece(type) {
+  return {
+    p: "il tuo pedone",
+    n: "il tuo cavallo",
+    b: "il tuo alfiere",
+    r: "la tua torre",
+    q: "la tua donna",
+    k: "il tuo re",
+  }[type] || "il tuo pezzo";
+}
+
+function ourSingular(type) {
+  return {
+    p: "il nostro pedone",
+    n: "il nostro cavallo",
+    b: "il nostro alfiere",
+    r: "la nostra torre",
+    q: "la nostra donna",
+    k: "il nostro re",
+  }[type] || "il nostro pezzo";
+}
+
+function ourPlural(type) {
+  return {
+    p: "i nostri pedoni",
+    n: "i nostri cavalli",
+    b: "i nostri alfieri",
+    r: "le nostre torri",
+    q: "le nostre donne",
+    k: "i nostri re",
+  }[type] || "i nostri pezzi";
+}
+
+function squareList(squares) {
+  return joinIt(squares.map((square) => `in <strong>${square}</strong>`));
+}
+
+function ourHitsPhrase(hits) {
+  const order = ["q", "r", "b", "n", "p", "k"];
+  const groups = new Map();
+  hits.forEach((hit) => {
+    const type = hit.captured;
+    if (!groups.has(type)) groups.set(type, []);
+    groups.get(type).push(hit.to);
+  });
+  const parts = [];
+  for (const type of order) {
+    const squares = groups.get(type);
+    if (!squares?.length) continue;
+    parts.push(
+      squares.length === 1
+        ? `${ourSingular(type)} ${squareList(squares)}`
+        : `${ourPlural(type)} ${squareList(squares)}`
+    );
   }
-  return lines.slice(0, 3);
+  return joinIt(parts);
+}
+
+function hangingAdvice(hits) {
+  if (!hits.length) return "";
+  const phrase = ourHitsPhrase(hits);
+  if (hits.length === 1) return `Attenzione che ${phrase} non è protetto.`;
+  return `Attenzione che ${phrase} non sono protetti.`;
+}
+
+function capturedOn(move) {
+  if (String(move.flags || "").includes("e")) return move.to[0] + move.from[1];
+  return move.to;
+}
+
+function opponentLead(move) {
+  if (move.san.startsWith("O-O-O")) return "L'avversario fa arrocco lungo";
+  if (move.san.startsWith("O-O")) return "L'avversario arrocca";
+  if (move.captured) {
+    return `L'avversario muove ${pieceOnSquare(move.piece, move.to)} e mangia ${ourSingular(move.captured)} ${squareList([capturedOn(move)])}`;
+  }
+  return `L'avversario gioca ${pieceOnSquare(move.piece, move.to)}`;
 }
 
 function narrateOpponentMove(before, move, after) {
-  const san = italianSan(move.san);
-  const piece = namedPiece(move.piece);
-  const parts = [];
   if (move.san.includes("#")) {
-    return `L'avversario dà scacco matto con ${san}. La partita è finita.`;
+    return "L'avversario dà scacco matto. La partita è finita.";
   }
-  if (move.san.startsWith("O-O-O")) {
-    parts.push("L'avversario fa arrocco lungo: re al sicuro, torre verso il centro.");
-  } else if (move.san.startsWith("O-O")) {
-    parts.push("L'avversario arrocca: mette il re al sicuro e attiva la torre.");
-  } else if (move.captured) {
-    parts.push(`L'avversario gioca ${san}: ${piece} prende ${namedPiece(move.captured)} in ${move.to}.`);
-  } else if (move.piece === "p") {
-    parts.push(`L'avversario avanza il pedone in ${move.to} (${san}).`);
+  const hits = threatsFromMove(after, move, state.playerColor).slice(0, 3);
+  const labels = ourHitsPhrase(hits);
+  let lead = opponentLead(move);
+  if (labels) {
+    lead += move.captured ? `. Ora minaccia ${labels}.` : ` e minaccia ${labels}.`;
   } else {
-    parts.push(`L'avversario gioca ${piece} in ${move.to} (${san}).`);
+    lead += ".";
   }
-  if (move.san.includes("+")) {
-    parts.push("È scacco: il tuo Re è sotto attacco.");
-  }
-  parts.push(...describeCreatedThreats(before, after, move, state.playerColor));
-  const opening = openingAside();
-  if (opening) parts.push(opening.trim());
-  parts.push("Ora ti consiglio queste mosse.");
-  return joinTalk(parts);
+  if (move.san.includes("+")) lead += " È scacco.";
+
+  const hanging = hits.filter((hit) => !isSquareDefended(after, hit.to, state.playerColor));
+  const parts = [lead];
+  const warning = hangingAdvice(hanging);
+  if (warning) parts.push(warning);
+  return `${joinTalk(parts)}<br><span class="king-closer">Calcolo le nuove mosse, buona fortuna.</span>`;
 }
 
 function narratePlayerMove(before, move, after) {
@@ -523,22 +608,135 @@ function narratePlayerMove(before, move, after) {
   else if (loss === "n") parts.push("Attenzione: perdi il Cavallo.");
   else if (loss === "b") parts.push("Attenzione: perdi l'Alfiere.");
   else parts.push(explainMove(before, move, after, null));
-  const opening = openingAside();
-  if (opening) parts.push(opening.trim());
   parts.push("Vediamo come risponde l'avversario.");
   return joinTalk(parts);
 }
 
-function markDanger(paint = true) {
-  const opponent = state.playerColor === "w" ? "b" : "w";
-  const ours = playerPiecesUnderAttack(state.game, state.playerColor);
-  const theirs = playerPiecesUnderAttack(state.game, opponent);
-  const threatened = [...ours, ...theirs];
-  const protectedSquares = threatened.filter((square) => {
-    const piece = state.game.get(square);
-    return Boolean(piece && isSquareDefended(state.game, square, piece.color));
+function hangingSquares(game, color) {
+  return playerPiecesUnderAttack(game, color).filter((square) => {
+    const piece = game.get(square);
+    if (!piece || piece.type === "k") return false;
+    return !isSquareDefended(game, square, color);
   });
-  state.board.setDanger(threatened, paint, protectedSquares);
+}
+
+function allThreatenedSquares() {
+  const opponent = state.playerColor === "w" ? "b" : "w";
+  return [
+    ...playerPiecesUnderAttack(state.game, state.playerColor),
+    ...playerPiecesUnderAttack(state.game, opponent),
+  ];
+}
+
+function pieceSquareLabel(square) {
+  const piece = state.game.get(square);
+  if (!piece) return square;
+  return `${namedPiece(piece.type)} in ${square}`;
+}
+
+function boldItems(items) {
+  return items.map((item) => `<strong>${escapeHtml(item)}</strong>`).join(", ");
+}
+
+function kingTurnAdvice() {
+  const opponent = state.playerColor === "w" ? "b" : "w";
+  const ours = hangingSquares(state.game, state.playerColor).map(pieceSquareLabel);
+  const theirs = hangingSquares(state.game, opponent).map(pieceSquareLabel);
+  const parts = [];
+  if (ours.length) {
+    parts.push(`I tuoi pezzi minacciati e non protetti: ${boldItems(ours)}.`);
+  }
+  if (theirs.length) {
+    parts.push(`Pezzi dell'avversario minacciati e non protetti: ${boldItems(theirs)}.`);
+  }
+  if (!ours.length && !theirs.length) {
+    parts.push("Nessun pezzo scoperto in questo momento.");
+  }
+  parts.push("Fai la mossa giusta.");
+  return parts.join(" ");
+}
+
+function clearBoardAids() {
+  state.aids.moves = true;
+  state.aids.threats = false;
+  if (state.board) {
+    state.board.setArrows([]);
+    if (Date.now() >= state.pipUntil) state.board.setDanger([]);
+  }
+  syncAidButtons();
+}
+
+function syncAidButtons() {
+  els.aidMoves?.classList.toggle("is-on", state.aids.moves);
+  els.aidThreats?.classList.toggle("is-on", state.aids.threats);
+}
+
+function paintThreatPips() {
+  state.board.setDanger(allThreatenedSquares());
+}
+
+function squaresAttackedByMovedPiece(move) {
+  if (!move) return [];
+  const attacker = move.color;
+  const seen = new Set();
+  const addFrom = (from) => {
+    capturesFromSquare(state.game, from, attacker).forEach((hit) => {
+      const victim = state.game.get(hit.to);
+      if (!victim || victim.color === attacker) return;
+      seen.add(hit.to);
+    });
+  };
+  addFrom(move.to);
+  if (move.san.startsWith("O-O-O")) addFrom(move.color === "w" ? "d1" : "d8");
+  else if (move.san.startsWith("O-O")) addFrom(move.color === "w" ? "f1" : "f8");
+  return [...seen];
+}
+
+function paintActiveThreats() {
+  if (state.aids.threats) {
+    paintThreatPips();
+    return;
+  }
+  if (Date.now() < state.pipUntil) {
+    state.board.setDanger(state.flashSquares);
+    return;
+  }
+  state.board.setDanger([]);
+}
+
+function showAid(kind) {
+  if (kind === "moves") {
+    state.aids.moves = !state.aids.moves;
+    if (state.aids.moves) showHintArrows(null, { reveal: true });
+    else state.board.setArrows([]);
+    syncAidButtons();
+    return;
+  }
+  clearTimeout(state.aidTimer);
+  state.aids.threats = true;
+  paintThreatPips();
+  if (state.aids.moves) showHintArrows(null, { reveal: true });
+  syncAidButtons();
+  const token = (state.aidToken += 1);
+  state.aidTimer = setTimeout(() => {
+    if (state.aidToken !== token) return;
+    state.aids.threats = false;
+    paintActiveThreats();
+    syncAidButtons();
+  }, 5000);
+}
+
+function flashThreatenedPieces(move) {
+  const token = (state.flashToken += 1);
+  state.flashSquares = squaresAttackedByMovedPiece(move);
+  state.pipUntil = Date.now() + 3000;
+  paintActiveThreats();
+  setTimeout(() => {
+    if (state.flashToken !== token) return;
+    state.pipUntil = 0;
+    state.flashSquares = [];
+    paintActiveThreats();
+  }, 3000);
 }
 
 function destsFromGame(game) {
@@ -581,10 +779,11 @@ const els = {
   overlayText: document.getElementById("overlay-text"),
   promo: document.getElementById("promo"),
   kingNote: document.getElementById("king-note"),
-  kingCalc: document.getElementById("king-calc"),
   moreHints: document.getElementById("btn-more-hints"),
   prevHints: document.getElementById("btn-prev-hints"),
   nextHints: document.getElementById("btn-next-hints"),
+  aidMoves: document.getElementById("btn-aid-moves"),
+  aidThreats: document.getElementById("btn-aid-threats"),
 };
 
 const state = {
@@ -592,7 +791,7 @@ const state = {
   engine: new Engine(),
   board: null,
   playerColor: "w",
-  skill: 3,
+  skill: 1,
   busy: false,
   hints: [],
   hintPool: [],
@@ -601,6 +800,16 @@ const state = {
   hintBestScore: -Infinity,
   openingPly: 0,
   startOpening: START_OPENINGS[0],
+  aids: { moves: true, threats: false },
+  aidTimer: null,
+  aidToken: 0,
+  flashToken: 0,
+  pipUntil: 0,
+  flashSquares: [],
+  lastKingTalk: "",
+  speakToken: 0,
+  kingSpeaking: false,
+  pendingHintReveal: false,
   gameId: 0,
   pendingPromo: null,
 };
@@ -623,9 +832,119 @@ function openingAside() {
   return ` Siamo nella ${info.title}.`;
 }
 
-function speakKing(note, { calculating = false } = {}) {
-  if (els.kingNote) els.kingNote.textContent = note;
-  if (els.kingCalc) els.kingCalc.hidden = !calculating;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function wrapKingWords(root) {
+  [...root.childNodes].forEach((node) => {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      wrapKingWords(node);
+      return;
+    }
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    const parts = (node.textContent || "").split(/(\s+)/);
+    if (parts.length === 1 && !parts[0].trim()) return;
+    const frag = document.createDocumentFragment();
+    parts.forEach((part) => {
+      if (!part) return;
+      if (/^\s+$/.test(part)) {
+        frag.appendChild(document.createTextNode(part));
+        return;
+      }
+      const word = document.createElement("span");
+      word.className = "king-word";
+      word.textContent = part;
+      frag.appendChild(word);
+    });
+    node.replaceWith(frag);
+  });
+}
+
+function paintKingNote(note, html) {
+  if (!els.kingNote) return 0;
+  const source = document.createElement("div");
+  if (html) source.innerHTML = note;
+  else source.textContent = note;
+  wrapKingWords(source);
+  els.kingNote.innerHTML = source.innerHTML;
+  const words = [...els.kingNote.querySelectorAll(".king-word")];
+  let delay = 0;
+  words.forEach((word) => {
+    word.style.animationDelay = `${delay}ms`;
+    delay += /[.!?…]$/.test(word.textContent.trim()) ? 520 : 175;
+  });
+  return delay + 900;
+}
+
+function clearKingTalk() {
+  state.speakToken += 1;
+  state.kingSpeaking = false;
+  state.lastKingTalk = "";
+  els.kingNote?.classList.remove("is-typing");
+  if (els.kingNote) els.kingNote.innerHTML = "";
+}
+
+function waitingForHints() {
+  return playerIsSideToMove() && !state.game.game_over() && (state.kingSpeaking || !state.hintPool.length);
+}
+
+function loadingHintCard(rank) {
+  const color = state.playerColor === "w" ? "w" : "b";
+  const ghosts = [
+    { piece: "N", san: "Cd4", caption: "Cavallo muove in d4", eval: "+0.24" },
+    { piece: "P", san: "d5", caption: "Pedone muove in d5", eval: "+0.12" },
+    { piece: "B", san: "Af5", caption: "Alfiere muove in f5", eval: "0.00" },
+    { piece: "Q", san: "Dd2", caption: "Donna muove in d2", eval: "-0.08" },
+  ];
+  const ghost = ghosts[rank - 1];
+  return `
+    <button class="hint-btn is-loading" disabled>
+      <span class="hint-rank">${rank}</span>
+      <span class="hint-move-row">
+        <img class="hint-icon" src="pieces/${color}${ghost.piece}.svg" alt="">
+        <span class="hint-main">${ghost.san}</span>
+      </span>
+      <span class="hint-piece">${ghost.caption}</span>
+      <span class="hint-eval">${ghost.eval}</span>
+      <span class="hint-calc">Calcolo delle mosse consigliate</span>
+    </button>`;
+}
+
+function revealHintsIfReady() {
+  if (state.kingSpeaking) return;
+  renderHints();
+  if (state.pendingHintReveal && state.hintPool.length && playerIsSideToMove()) {
+    els.hints.classList.remove("is-reveal");
+    void els.hints.offsetWidth;
+    els.hints.classList.add("is-reveal");
+    state.pendingHintReveal = false;
+    if (state.aids.moves) showHintArrows(null, { reveal: true });
+  } else if (!state.hintPool.length) {
+    els.hints.classList.remove("is-reveal");
+    state.board?.setArrows([]);
+  }
+}
+
+async function speakKing(note, { calculating = false, html = false } = {}) {
+  const token = (state.speakToken += 1);
+  const text = note || "";
+  state.kingSpeaking = Boolean(text);
+  state.pendingHintReveal = Boolean(text);
+  els.hints.classList.remove("is-reveal");
+  els.kingNote?.classList.remove("is-typing");
+  if (!text) {
+    if (els.kingNote) els.kingNote.innerHTML = "";
+    state.kingSpeaking = false;
+    revealHintsIfReady();
+    return;
+  }
+  renderHints();
+  const duration = paintKingNote(text, html);
+  await sleep(duration);
+  if (token !== state.speakToken) return;
+  state.kingSpeaking = false;
+  revealHintsIfReady();
 }
 
 function kingComment(beforeFen, played, asOpponent) {
@@ -651,16 +970,30 @@ function renderHistory() {
 
 function syncBoard(options = {}) {
   const fen = state.game.fen();
-  markDanger(false);
   state.board.setPosition(fen);
   state.board.setTurn(state.game.turn(), state.playerColor);
   state.board.setDests({});
   state.board.setInteractive(false);
   state.board.setCheck(state.game.in_check() ? kingSquare(state.game, state.game.turn()) : null);
-  if (!options.keepArrows) showHintArrows();
+  if (state.aids.moves) showHintArrows(null, { reveal: true });
+  else if (!options.keepArrows) state.board.setArrows([]);
+  if (state.aids.threats) {
+    paintThreatPips();
+  } else if (Date.now() < state.pipUntil) {
+    state.board.setDanger(state.flashSquares);
+  } else {
+    state.board.setDanger([]);
+  }
 }
 
 function renderHints() {
+  if (waitingForHints()) {
+    state.hints = [];
+    els.hints.innerHTML = [1, 2, 3, 4].map((rank) => loadingHintCard(rank)).join("");
+    syncHintNav();
+    state.board?.setArrows([]);
+    return;
+  }
   state.hints = visibleHints();
   const buttons = [];
   for (let i = 0; i < 4; i += 1) {
@@ -695,24 +1028,32 @@ function renderHints() {
   syncHintNav();
 }
 
-function showHintArrows(index = null) {
+function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
+  if (!reveal && !state.aids.moves) {
+    state.board.setArrows([]);
+    return;
+  }
   if (!state.hints.length) {
     state.board.setArrows([]);
     return;
   }
   state.board.setArrows(
-    state.hints.map((hint, i) => {
-      const active = index !== null && i === index;
-      const danger = Boolean(hintDanger(hint));
-      return {
-        from: hint.uci.slice(0, 2),
-        to: hint.uci.slice(2, 4),
-        color: danger ? "#c4473d" : ARROW_COLORS[i],
-        opacity: active ? 0.95 : 0.28,
-        width: active ? "0.22" : "0.14",
-        label: hintSan(hint),
-      };
-    })
+    state.hints
+      .map((hint, i) => {
+        const active = index !== null && i === index;
+        if (onlyActive && !active) return null;
+        const to = hint.uci.slice(2, 4);
+        return {
+          from: hint.uci.slice(0, 2),
+          to,
+          color: ARROW_GREEN,
+          opacity: active || onlyActive ? 0.9 : 0.64,
+          width: active || onlyActive ? "0.2" : "0.15",
+          label: active ? hintSan(hint) : "",
+          labelColor: "#1f1f1f",
+        };
+      })
+      .filter(Boolean)
   );
 }
 
@@ -731,12 +1072,7 @@ async function refreshHints() {
   const fen = state.game.fen();
   clearHints();
   renderHints();
-  els.hints.classList.add("loading");
-  const waiting = els.kingNote?.textContent?.includes("consiglio queste mosse")
-    ? els.kingNote.textContent
-    : "Ora ti consiglio queste mosse.";
-  speakKing(waiting, { calculating: true });
-  setStatus("Tocca a te!", "Calcolo delle mosse consigliate dal Re…", "think");
+  setStatus("Tocca a te!", `${youLabel()}.`, "think");
   try {
     const lines = await state.engine.analyze(fen, {
       depth: 11,
@@ -746,12 +1082,8 @@ async function refreshHints() {
     state.hintPool = fillHintPool(lines, state.game);
     state.hintPage = 0;
     state.hintsUnlocked = 0;
-    renderHints();
-    showHintArrows();
-    speakKing(waiting.replace(/\s*Ora ti consiglio queste mosse\.?$/, "") + " Scegli una delle mosse qui sotto.", {
-      calculating: false,
-    });
-    setStatus("Tocca a te!", `${youLabel()}. Scegli una delle mosse consigliate.`, "play");
+    revealHintsIfReady();
+    setStatus("Tocca a te!", `${youLabel()}. Fai la mossa giusta.`, "play");
   } catch (err) {
     if (err.message === "aborted") return;
     console.error(err);
@@ -760,10 +1092,6 @@ async function refreshHints() {
     renderHints();
     speakKing("Il calcolo si è interrotto. Attendi i nuovi suggerimenti.", { calculating: false });
     setStatus("Tocca a te!", "Motore occupato: attendi i nuovi suggerimenti.", "info");
-  } finally {
-    if (gameId === state.gameId && state.game.fen() === fen) {
-      els.hints.classList.remove("loading");
-    }
   }
 }
 
@@ -789,6 +1117,12 @@ function finishGame() {
   speakKing(`${title} ${text}`.trim(), { calculating: false });
 }
 
+function waitAtLeast(ms, startedAt = Date.now()) {
+  const left = ms - (Date.now() - startedAt);
+  if (left <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, left));
+}
+
 async function computerMove() {
   const gameId = state.gameId;
   if (state.game.game_over()) {
@@ -803,14 +1137,17 @@ async function computerMove() {
   clearHints();
   renderHints();
   syncBoard();
-  setStatus("Tocca al computer", "Stockfish sta pensando…", "think");
+  setStatus("Tocca al computer", "In attesa dell'avversario...", "think");
+  if (!state.kingSpeaking) speakKing("In attesa dell'avversario...");
   const fen = state.game.fen();
+  const startedAt = Date.now();
   try {
     const skill = Number(state.skill);
     const { uci } = await state.engine.play(fen, {
       skill,
       movetime: 250 + skill * 90,
     });
+    await waitAtLeast(6000, startedAt);
     if (gameId !== state.gameId) return;
     if (state.game.fen() !== fen) return;
     if (!uci) throw new Error("Nessuna mossa dal motore");
@@ -824,9 +1161,14 @@ async function computerMove() {
       state.board.setLastMove(played.from, played.to);
       await state.board.animateMove(played.from, played.to);
       if (gameId !== state.gameId) return;
-      markDanger(false);
       state.board.setPosition(state.game.fen());
-      speakKing(kingComment(fen, played, true), { calculating: true });
+      flashThreatenedPieces(played);
+      const talk = kingComment(fen, played, true);
+      state.lastKingTalk = talk;
+      renderHints();
+      await sleep(1500);
+      if (gameId !== state.gameId) return;
+      speakKing(talk, { calculating: true, html: true });
     }
   } catch (err) {
     if (err.message === "aborted" || gameId !== state.gameId) return;
@@ -857,7 +1199,6 @@ async function applyUserMove(from, to, promotion) {
     return;
   }
   state.busy = true;
-  const beforeFen = state.game.fen();
   const played = state.game.move({ from, to, promotion: promotion || undefined });
   if (!played) {
     state.busy = false;
@@ -867,16 +1208,16 @@ async function applyUserMove(from, to, promotion) {
   state.engine.stop();
   clearHints();
   renderHints();
-  speakKing(kingComment(beforeFen, played, false), { calculating: false });
   state.board.setLastMove(played.from, played.to);
   await state.board.animateMove(played.from, played.to);
-  markDanger(false);
   state.board.setPosition(state.game.fen());
+  flashThreatenedPieces(played);
   renderHistory();
   if (state.game.game_over()) {
     finishGame();
     return;
   }
+  speakKing("In attesa dell'avversario...");
   state.busy = false;
   await computerMove();
 }
@@ -916,12 +1257,15 @@ els.hints.addEventListener("click", (event) => {
 els.hints.addEventListener("pointerover", (event) => {
   const btn = event.target.closest(".hint-btn");
   if (!btn || btn.disabled) return;
-  showHintArrows(Number(btn.dataset.index));
+  const index = Number(btn.dataset.index);
+  if (state.aids.moves) showHintArrows(index, { reveal: true });
+  else showHintArrows(index, { reveal: true, onlyActive: true });
 });
 
 els.hints.addEventListener("pointerout", (event) => {
   if (event.relatedTarget && els.hints.contains(event.relatedTarget)) return;
-  showHintArrows();
+  if (state.aids.moves) showHintArrows(null, { reveal: true });
+  else state.board.setArrows([]);
 });
 
 els.moreHints.addEventListener("click", () => {
@@ -994,27 +1338,54 @@ function applyStartOpening() {
 
 function startOpeningTalk() {
   const opening = state.startOpening;
-  if (!opening?.sans?.length) {
-    return playerIsSideToMove()
-      ? "Buona fortuna! Ora ti consiglio queste mosse."
-      : "Buona fortuna! L'avversario muove per primo.";
-  }
   const info = describePosition(state.game.history(), state.game);
-  const title = info?.title && info.title !== "Scegli un'apertura" ? info.title : opening.name;
-  if (playerIsSideToMove()) {
-    return `Partiamo da: ${title}. Buona fortuna! Ora ti consiglio queste mosse.`;
-  }
-  return `Partiamo da: ${title}. Buona fortuna! L'avversario muove per primo.`;
+  const title =
+    info?.title && info.title !== "Scegli un'apertura"
+      ? info.title
+      : opening?.sans?.length
+        ? opening.name
+        : "";
+  const start = title
+    ? `Buona fortuna. Iniziamo la partita con l'apertura ${title}.`
+    : "Buona fortuna. Iniziamo la partita.";
+  const next = playerIsSideToMove()
+    ? "Fai la tua mossa."
+    : "Aspetta il turno dell'avversario.";
+  return `${start} ${next}`;
+}
+
+function pickRandomStartOpening() {
+  const playable = START_OPENINGS.filter((opening) => opening.sans.length);
+  return playable[Math.floor(Math.random() * playable.length)] || START_OPENINGS[0];
+}
+
+function startFirstVisitGame() {
+  const opening = pickRandomStartOpening();
+  const color = Math.random() < 0.5 ? "w" : "b";
+  if (els.skill) els.skill.value = "1";
+  state.skill = 1;
+  if (els.startOpening && opening) els.startOpening.value = opening.id;
+  startGame(color);
 }
 
 function startGame(playerColor = state.playerColor) {
   state.gameId += 1;
+  state.speakToken += 1;
+  state.kingSpeaking = false;
   state.engine.stop();
   state.game.reset();
   state.playerColor = playerColor;
   state.skill = Number(els.skill.value);
   state.busy = false;
   clearHints();
+  clearTimeout(state.aidTimer);
+  state.aidToken += 1;
+  state.flashToken += 1;
+  state.board.setFlash([]);
+  state.pipUntil = 0;
+  state.flashSquares = [];
+  state.lastKingTalk = "";
+  clearBoardAids();
   state.pendingPromo = null;
   els.promo.hidden = true;
   els.engineLabel.textContent = engineLabelText(state.skill);
@@ -1028,7 +1399,9 @@ function startGame(playerColor = state.playerColor) {
     youLabel(),
     "play"
   );
-  speakKing(startOpeningTalk(), { calculating: playerIsSideToMove() });
+  const talk = startOpeningTalk();
+  state.lastKingTalk = talk;
+  speakKing(talk, { calculating: playerIsSideToMove() });
   computerMove();
 }
 
@@ -1075,6 +1448,8 @@ els.skill.addEventListener("change", () => {
   els.engineLabel.textContent = engineLabelText(state.skill);
 });
 els.startOpening.addEventListener("change", () => startGame(state.playerColor));
+els.aidMoves.addEventListener("click", () => showAid("moves"));
+els.aidThreats.addEventListener("click", () => showAid("threats"));
 
 state.board = new Board(els.boardRoot, {
   onMove: (from, to) => applyUserMove(from, to),
@@ -1090,7 +1465,7 @@ Promise.all([
   state.engine.ready,
   loadOpenings().catch((err) => console.error("Libro aperture:", err)),
 ])
-  .then(() => startGame("w"))
+  .then(() => startFirstVisitGame())
   .catch((err) => {
     console.error(err);
     setStatus("Errore", "Impossibile avviare Stockfish. Apri il sito da XAMPP (http://localhost/5minchess/).", "lose");

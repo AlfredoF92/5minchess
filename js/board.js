@@ -58,7 +58,7 @@ export class Board {
     this.lastMove = null;
     this.check = null;
     this.danger = new Set();
-    this.protected = new Set();
+    this.flash = new Set();
     this.arrows = [];
     this.interactive = false;
     this.turnColor = "w";
@@ -155,10 +155,14 @@ export class Board {
     this.#paintSquares();
   }
 
-  setDanger(squares, paint = true, protectedSquares = []) {
+  setDanger(squares, paint = true) {
     this.danger = new Set(squares || []);
-    this.protected = new Set(protectedSquares || []);
     if (paint) this.#paintDanger();
+  }
+
+  setFlash(squares) {
+    this.flash = new Set(squares || []);
+    this.#paintFlash();
   }
 
   setArrows(arrows) {
@@ -200,15 +204,21 @@ export class Board {
     });
     this.#paintSquares();
     this.#paintDanger();
+    this.#paintFlash();
     this.#drawArrows();
+  }
+
+  #paintFlash() {
+    Object.entries(this.squareEls).forEach(([square, el]) => {
+      el.classList.toggle("threat-flash", this.flash.has(square));
+    });
   }
 
   #paintDanger() {
     Object.entries(this.squareEls).forEach(([square, el]) => {
       let pip = el.querySelector(".danger-pip");
-      let shield = el.querySelector(".shield-pip");
+      el.querySelector(".shield-pip")?.remove();
       const threatened = this.danger.has(square);
-      const guarded = threatened && this.protected.has(square);
       if (threatened && !pip) {
         pip = document.createElement("span");
         pip.className = "danger-pip";
@@ -217,16 +227,6 @@ export class Board {
         el.appendChild(pip);
       } else if (!threatened && pip) {
         pip.remove();
-      }
-      if (guarded && !shield) {
-        shield = document.createElement("span");
-        shield.className = "shield-pip";
-        shield.title = "Protetto da un altro pezzo";
-        shield.setAttribute("aria-label", "Pezzo protetto");
-        shield.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.1 14.2 3.5v4.3c0 3.8-2.5 7.1-6.2 8.1-3.7-1-6.2-4.3-6.2-8.1V3.5L8 1.1z"/></svg>`;
-        el.appendChild(shield);
-      } else if (!guarded && shield) {
-        shield.remove();
       }
     });
   }
@@ -253,8 +253,10 @@ export class Board {
   #drawArrows() {
     this.arrowGroup.innerHTML = "";
     const ns = "http://www.w3.org/2000/svg";
-    const badges = [];
-    for (const arrow of this.arrows) {
+    const drawn = [...this.arrows].sort(
+      (left, right) => Number(left.opacity ?? 0) - Number(right.opacity ?? 0)
+    );
+    for (const arrow of drawn) {
       const a = this.#squareCenter(arrow.from);
       const b = this.#squareCenter(arrow.to);
       const dx = b.x - a.x;
@@ -262,50 +264,65 @@ export class Board {
       const len = Math.hypot(dx, dy) || 1;
       const ux = dx / len;
       const uy = dy / len;
+      const px = -uy;
+      const py = ux;
       const color = arrow.color || "#6aa329";
       const opacity = String(arrow.opacity ?? 0.85);
-      const line = document.createElementNS(ns, "line");
-      line.setAttribute("x1", String(a.x + ux * 0.18));
-      line.setAttribute("y1", String(a.y + uy * 0.18));
-      line.setAttribute("x2", String(b.x - ux * 0.32));
-      line.setAttribute("y2", String(b.y - uy * 0.32));
-      line.setAttribute("stroke", color);
-      line.setAttribute("stroke-width", arrow.width || "0.18");
-      line.setAttribute("stroke-opacity", opacity);
-      line.setAttribute("stroke-linecap", "round");
-      const head = document.createElementNS(ns, "polygon");
-      const hx = b.x - ux * 0.12;
-      const hy = b.y - uy * 0.12;
-      const px = -uy * 0.16;
-      const py = ux * 0.16;
-      head.setAttribute(
+      const shaftHalf = (Number(arrow.width) || 0.15) / 2;
+      const startPad = 0.3;
+      const tipPad = 0.08;
+      const usable = Math.max(0.42, len - startPad - tipPad);
+      const headLen = Math.min(0.42, usable * 0.52);
+      const headHalf = Math.max(shaftHalf * 2.35, 0.2);
+
+      const sx = a.x + ux * startPad;
+      const sy = a.y + uy * startPad;
+      const tx = b.x - ux * tipPad;
+      const ty = b.y - uy * tipPad;
+      const hx = tx - ux * headLen;
+      const hy = ty - uy * headLen;
+      const path = document.createElementNS(ns, "polygon");
+      path.setAttribute(
         "points",
-        `${b.x - ux * 0.04},${b.y - uy * 0.04} ${hx + px},${hy + py} ${hx - px},${hy - py}`
+        [
+          [sx + px * shaftHalf, sy + py * shaftHalf],
+          [sx - px * shaftHalf, sy - py * shaftHalf],
+          [hx - px * shaftHalf, hy - py * shaftHalf],
+          [hx - px * headHalf, hy - py * headHalf],
+          [tx, ty],
+          [hx + px * headHalf, hy + py * headHalf],
+          [hx + px * shaftHalf, hy + py * shaftHalf],
+        ]
+          .map((point) => point.join(","))
+          .join(" ")
       );
-      head.setAttribute("fill", color);
-      head.setAttribute("fill-opacity", opacity);
-      this.arrowGroup.appendChild(line);
-      this.arrowGroup.appendChild(head);
+      path.setAttribute("fill", color);
+      path.setAttribute("fill-opacity", opacity);
+      path.setAttribute("stroke", color);
+      path.setAttribute("stroke-opacity", opacity);
+      path.setAttribute("stroke-width", "0.018");
+      path.setAttribute("stroke-linejoin", "miter");
+      path.setAttribute("stroke-miterlimit", "8");
+      this.arrowGroup.appendChild(path);
+
       if (!arrow.label) continue;
-      badges.push({ arrow, b, ux, uy, color, opacity });
-    }
-    badges.sort((left, right) => Number(left.opacity) - Number(right.opacity));
-    for (const { arrow, b, ux, uy, color, opacity } of badges) {
-      const emphasized = Number(opacity) >= 0.6;
       const label = String(arrow.label);
-      const labelX = b.x + ux * 0.18;
-      const labelY = b.y + uy * 0.18;
-      const fontSize = label.length <= 2 ? 0.42 : label.length <= 3 ? 0.38 : label.length <= 4 ? 0.34 : 0.28;
+      const back = this.pieces[arrow.to] ? headLen + 0.16 : 0.02;
+      const fontSize = label.length <= 2 ? 0.36 : label.length <= 3 ? 0.32 : label.length <= 4 ? 0.28 : 0.24;
       const text = document.createElementNS(ns, "text");
-      text.setAttribute("x", String(labelX));
-      text.setAttribute("y", String(labelY));
+      text.setAttribute("x", String(tx - ux * back));
+      text.setAttribute("y", String(ty - uy * back));
       text.setAttribute("text-anchor", "middle");
       text.setAttribute("dominant-baseline", "middle");
-      text.setAttribute("dy", "0.12");
-      text.setAttribute("fill", color);
-      text.setAttribute("fill-opacity", emphasized ? "0.92" : "0.55");
+      text.setAttribute("dy", "0.08");
+      text.setAttribute("fill", arrow.labelColor || "#1f1f1f");
+      text.setAttribute("fill-opacity", "0.92");
+      text.setAttribute("stroke", "#fff8e8");
+      text.setAttribute("stroke-width", "0.07");
+      text.setAttribute("stroke-linejoin", "round");
+      text.setAttribute("paint-order", "stroke");
       text.setAttribute("font-size", String(fontSize));
-      text.setAttribute("font-weight", "800");
+      text.setAttribute("font-weight", "700");
       text.setAttribute("font-family", '"Segoe UI", "Trebuchet MS", Arial, sans-serif');
       text.setAttribute("style", "pointer-events:none;user-select:none;");
       text.textContent = label;
@@ -322,21 +339,34 @@ export class Board {
     }
     const fromRect = fromEl.getBoundingClientRect();
     const toRect = toSquare.getBoundingClientRect();
+    const destLeft = toRect.left + (toRect.width - fromRect.width) / 2;
+    const destTop = toRect.top + (toRect.height - fromRect.height) / 2;
     const ghost = fromEl.cloneNode(true);
     ghost.classList.add("piece-ghost");
     ghost.style.width = `${fromRect.width}px`;
     ghost.style.height = `${fromRect.height}px`;
     ghost.style.left = `${fromRect.left}px`;
     ghost.style.top = `${fromRect.top}px`;
+    ghost.style.transform = "translate3d(0,0,0)";
+    ghost.style.transition = "none";
     document.body.appendChild(ghost);
     fromEl.style.opacity = "0";
     const captured = toSquare.querySelector(".piece");
-    if (captured) captured.style.opacity = "0.35";
-    await new Promise((r) => requestAnimationFrame(r));
-    ghost.style.transform = `translate(${toRect.left - fromRect.left}px, ${toRect.top - fromRect.top}px)`;
+    if (captured) captured.classList.add("is-captured");
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    ghost.style.transition = "transform 0.42s cubic-bezier(0.22, 0.72, 0.28, 1)";
+    ghost.style.transform = `translate3d(${destLeft - fromRect.left}px, ${destTop - fromRect.top}px, 0)`;
     await new Promise((resolve) => {
-      ghost.addEventListener("transitionend", resolve, { once: true });
-      setTimeout(resolve, 280);
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      ghost.addEventListener("transitionend", (event) => {
+        if (event.propertyName === "transform") done();
+      });
+      setTimeout(done, 480);
     });
     ghost.remove();
   }

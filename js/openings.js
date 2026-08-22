@@ -27,16 +27,16 @@ function insertLine(eco, name, sans) {
 
 export const START_OPENINGS = [
   { id: "start", name: "Posizione iniziale", sans: [] },
-  { id: "italian", name: "Partita Italiana", sans: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5"] },
-  { id: "spanish", name: "Partita Spagnola", sans: ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"] },
-  { id: "sicilian", name: "Difesa Siciliana", sans: ["e4", "c5", "Nf3", "d6", "d4", "cxd4"] },
-  { id: "french", name: "Difesa Francese", sans: ["e4", "e6", "d4", "d5", "Nc3", "Nf6"] },
-  { id: "caro", name: "Difesa Caro-Kann", sans: ["e4", "c6", "d4", "d5", "Nc3", "dxe4"] },
-  { id: "qgd", name: "Gambetto di Donna", sans: ["d4", "d5", "c4", "e6", "Nc3", "Nf6"] },
-  { id: "kid", name: "Difesa Est-Indiana", sans: ["d4", "Nf6", "c4", "g6", "Nc3", "Bg7"] },
-  { id: "english", name: "Apertura Inglese", sans: ["c4", "e5", "Nc3", "Nf6", "Nf3", "Nc6"] },
-  { id: "london", name: "Sistema Londra", sans: ["d4", "d5", "Nf3", "Nf6", "Bf4", "e6"] },
-  { id: "scotch", name: "Partita Scozzese", sans: ["e4", "e5", "Nf3", "Nc6", "d4", "exd4"] },
+  { id: "italian", name: "Partita Italiana", sans: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "c3", "Nf6", "d4", "exd4", "cxd4", "Bb4+"] },
+  { id: "spanish", name: "Partita Spagnola", sans: ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5"] },
+  { id: "sicilian", name: "Difesa Siciliana", sans: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6", "Be3", "e5"] },
+  { id: "french", name: "Difesa Francese", sans: ["e4", "e6", "d4", "d5", "Nc3", "Nf6", "Bg5", "Be7", "e5", "Nfd7", "Bxe7", "Qxe7"] },
+  { id: "caro", name: "Difesa Caro-Kann", sans: ["e4", "c6", "d4", "d5", "Nc3", "dxe4", "Nxe4", "Bf5", "Ng3", "Bg6", "h4", "h6"] },
+  { id: "qgd", name: "Gambetto di Donna", sans: ["d4", "d5", "c4", "e6", "Nc3", "Nf6", "Bg5", "Be7", "Nf3", "O-O", "e3", "Nbd7"] },
+  { id: "kid", name: "Difesa Est-Indiana", sans: ["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "Nf3", "O-O", "Be2", "e5"] },
+  { id: "english", name: "Apertura Inglese", sans: ["c4", "e5", "Nc3", "Nf6", "Nf3", "Nc6", "g3", "Bb4", "Bg2", "O-O", "O-O", "Re8"] },
+  { id: "london", name: "Sistema Londra", sans: ["d4", "d5", "Nf3", "Nf6", "Bf4", "e6", "e3", "c5", "c3", "Nc6", "Nbd2", "Bd6"] },
+  { id: "scotch", name: "Partita Scozzese", sans: ["e4", "e5", "Nf3", "Nc6", "d4", "exd4", "Nxd4", "Nf6", "Nxc6", "bxc6", "e5", "Qe7"] },
 ];
 
 export async function loadOpenings() {
