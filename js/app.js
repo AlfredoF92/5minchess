@@ -14,6 +14,31 @@ const PIECE_IT = {
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
+function namedPiece(type) {
+  return {
+    p: "il pedone",
+    n: "il Cavallo",
+    b: "l'Alfiere",
+    r: "la Torre",
+    q: "la Donna",
+    k: "il Re",
+  }[type] || "il pezzo";
+}
+
+function joinTalk(parts) {
+  return parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+}
+
+function lossPhrase(type) {
+  if (type === "q") return "Perdi la donna";
+  if (type === "r") return "Perdi la torre";
+  if (type === "n") return "Perdi il cavallo";
+  if (type === "b") return "Perdi l'alfiere";
+  if (type === "p") return "Perdi un pedone";
+  if (type === "k") return "Prendi matto";
+  return "Mossa molto inferiore";
+}
+
 function thePiece(type) {
   if (type === "b") return "l'alfiere";
   if (type === "r") return "la torre";
@@ -133,6 +158,17 @@ function explainMove(before, move, after, hint) {
 
 const ARROW_COLORS = ["#5ea02e", "#3d8c4a", "#2b7a78", "#c9a227"];
 
+const SKILL_ELO = {
+  1: 1350,
+  2: 1450,
+  3: 1550,
+  4: 1650,
+  5: 1750,
+  6: 1850,
+  7: 2000,
+  8: 2150,
+};
+
 const SKILL_LABELS = {
   1: "livello 1 · principiante",
   2: "livello 2 · facile",
@@ -144,10 +180,35 @@ const SKILL_LABELS = {
   8: "livello 8 · esperto",
 };
 
+function engineLabelText(skill) {
+  return `Stockfish ${SKILL_LABELS[skill]} · ${SKILL_ELO[skill]} Elo`;
+}
+
 function italianSan(san) {
   if (san.startsWith("O-O-O")) return `0-0-0${san.slice(5)}`;
   if (san.startsWith("O-O")) return `0-0${san.slice(3)}`;
   return san.replace(/^[NBRQK]/, (letter) => ({ N: "C", B: "A", R: "T", Q: "D", K: "R" }[letter]));
+}
+
+function tryHint(hint) {
+  if (!hint?.uci) return { played: null, after: null };
+  const move = uciToMove(hint.uci);
+  const after = new Chess(state.game.fen());
+  const played = after.move({
+    from: move.from,
+    to: move.to,
+    promotion: move.promotion || "q",
+  });
+  return { played: played || null, after: played ? after : null };
+}
+
+function playedFromHint(hint) {
+  return tryHint(hint).played;
+}
+
+function hintSan(hint) {
+  const played = playedFromHint(hint);
+  return played ? italianSan(played.san) : hint?.uci || "";
 }
 
 function uciToMove(uci) {
@@ -196,11 +257,27 @@ function moveHeadline(move) {
     return `${piece} diventa ${PIECE_IT[move.promotion]} in ${move.to}`;
   }
   if (move.captured) return `${piece} mangia in ${move.to}`;
-  return piece;
+  return `${piece} muove in ${move.to}`;
+}
+
+function pieceIcon(move, color) {
+  if (!move) return "";
+  if (move.san.startsWith("O-O")) return `pieces/${color}K.svg`;
+  const type = (move.piece || "p").toUpperCase();
+  return `pieces/${color}${type}.svg`;
 }
 
 function uciFromVerbose(move) {
   return move.from + move.to + (move.promotion || "");
+}
+
+function shuffle(list) {
+  const items = [...list];
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
 }
 
 function fillHintPool(engineLines, game) {
@@ -214,7 +291,7 @@ function fillHintPool(engineLines, game) {
       seen.add(line.uci);
       pool.push(line);
     });
-  if (pool.length < 4) {
+  if (pool.length < 12) {
     game.moves({ verbose: true }).forEach((move) => {
       const uci = uciFromVerbose(move);
       if (seen.has(uci)) return;
@@ -228,7 +305,17 @@ function fillHintPool(engineLines, game) {
       });
     });
   }
-  return pool.slice(0, 12);
+  const ranked = pool.slice(0, 12);
+  state.hintBestScore = ranked.length ? hintScore(ranked[0]) : -Infinity;
+  const pages = [];
+  for (let i = 0; i < ranked.length; i += 4) {
+    pages.push(...shuffle(ranked.slice(i, i + 4)));
+  }
+  return pages;
+}
+
+function hintPageCount() {
+  return Math.max(1, Math.ceil(state.hintPool.length / 4));
 }
 
 function visibleHints() {
@@ -236,17 +323,38 @@ function visibleHints() {
   return state.hintPool.slice(start, start + 4);
 }
 
-function syncMoreHintsButton() {
-  const btn = els.moreHints;
-  if (!btn) return;
-  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && state.hintPool.length > 4;
-  btn.disabled = !canUse;
+function syncHintNav() {
+  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over();
+  const lastPage = hintPageCount() - 1;
+  const canLoadMore = canUse && state.hintPool.length > 4 && state.hintsUnlocked < lastPage;
+  if (els.moreHints) {
+    els.moreHints.textContent = canLoadMore
+      ? "Carica altre 4 mosse"
+      : `Mosse ${state.hintPage * 4 + 1}–${Math.min((state.hintPage + 1) * 4, state.hintPool.length) || 4}`;
+    els.moreHints.disabled = !canLoadMore;
+  }
+  if (els.prevHints) {
+    els.prevHints.disabled = !canUse || state.hintPage === 0;
+  }
+  if (els.nextHints) {
+    els.nextHints.disabled = !canUse || state.hintPage >= state.hintsUnlocked || state.hintPage >= lastPage;
+  }
+}
+
+function showHintPage(page) {
+  const lastPage = hintPageCount() - 1;
+  const cap = Math.min(state.hintsUnlocked, lastPage);
+  state.hintPage = Math.max(0, Math.min(page, cap));
+  renderHints();
+  showHintArrows();
 }
 
 function clearHints() {
   state.hints = [];
   state.hintPool = [];
   state.hintPage = 0;
+  state.hintsUnlocked = 0;
+  state.hintBestScore = -Infinity;
 }
 
 function playerPiecesUnderAttack(game, playerColor) {
@@ -270,8 +378,163 @@ function playerPiecesUnderAttack(game, playerColor) {
   return [...threatened];
 }
 
+function isSquareDefended(game, square, byColor) {
+  const piece = game.get(square);
+  if (!piece || piece.color !== byColor) return false;
+  const clone = new Chess();
+  if (!clone.load(game.fen())) return false;
+  clone.remove(square);
+  const enemy = byColor === "w" ? "b" : "w";
+  if (!clone.put({ type: "q", color: enemy }, square)) return false;
+  const parts = clone.fen().split(" ");
+  parts[1] = byColor;
+  parts[3] = "-";
+  if (!clone.load(parts.join(" "))) return false;
+  return clone.moves({ verbose: true, legal: false }).some(
+    (move) => move.to === square && move.captured && move.from !== square
+  );
+}
+
+function capturesFromSquare(game, fromSquare, attackerColor) {
+  const parts = game.fen().split(" ");
+  parts[1] = attackerColor;
+  parts[3] = "-";
+  const clone = new Chess();
+  if (!clone.load(parts.join(" "))) return [];
+  return clone.moves({ square: fromSquare, verbose: true, legal: false }).filter((move) => move.captured);
+}
+
+function worstImmediateLoss(game, defenderColor) {
+  if (game.in_checkmate() && game.turn() === defenderColor) return "k";
+  const attacker = defenderColor === "w" ? "b" : "w";
+  const parts = game.fen().split(" ");
+  parts[1] = attacker;
+  const clone = new Chess();
+  if (!clone.load(parts.join(" "))) return null;
+  let worstType = null;
+  let worstVal = 0;
+  clone.moves({ verbose: true }).forEach((move) => {
+    if (!move.captured) return;
+    const val = PIECE_VALUE[move.captured] || 0;
+    const cheaper = val > (PIECE_VALUE[move.piece] || 0);
+    const hanging = !isSquareDefended(game, move.to, defenderColor);
+    if ((hanging || cheaper) && val > worstVal) {
+      worstVal = val;
+      worstType = move.captured;
+    }
+  });
+  return worstType;
+}
+
+function hintDanger(hint) {
+  if (state.hintPage === 0) return null;
+  const { played, after } = tryHint(hint);
+  if (!played || !after) return null;
+  if (after.in_checkmate()) return lossPhrase("k");
+  const drop = Number.isFinite(state.hintBestScore) ? state.hintBestScore - hintScore(hint) : 0;
+  const loss = worstImmediateLoss(after, state.playerColor);
+  const tooWeak = drop >= 150 || (hint.scoreType === "mate" && hint.score < 0);
+  if (loss && (tooWeak || PIECE_VALUE[loss] >= 3 || drop >= 80)) return lossPhrase(loss);
+  if (tooWeak) return "Mossa molto inferiore";
+  return null;
+}
+
+function describeCreatedThreats(before, after, move, defenderColor) {
+  const attackerColor = defenderColor === "w" ? "b" : "w";
+  const hits = capturesFromSquare(after, move.to, attackerColor)
+    .map((hit) => ({ square: hit.to, type: hit.captured, value: PIECE_VALUE[hit.captured] || 0 }))
+    .filter((hit) => after.get(hit.square)?.color === defenderColor && hit.type !== "k")
+    .sort((a, b) => b.value - a.value);
+
+  const lines = [];
+  const seen = new Set();
+  for (const hit of hits.slice(0, 2)) {
+    const key = `${hit.type}${hit.square}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const guarded = isSquareDefended(after, hit.square, defenderColor);
+    if (hit.type === "q") {
+      lines.push(guarded
+        ? "Stai attento alla Donna: ora è sotto attacco."
+        : "Attenzione: la tua Donna è in presa!");
+    } else if (!guarded) {
+      lines.push(`Minaccia ${namedPiece(hit.type)} in ${hit.square}: è indifeso.`);
+    } else {
+      lines.push(`Minaccia ${namedPiece(hit.type)} in ${hit.square}.`);
+    }
+  }
+
+  const beforeAttacked = new Set(playerPiecesUnderAttack(before, defenderColor));
+  for (const square of playerPiecesUnderAttack(after, defenderColor)) {
+    if (lines.length >= 3) break;
+    if (beforeAttacked.has(square) || hits.some((hit) => hit.square === square)) continue;
+    const piece = after.get(square);
+    if (!piece || piece.type === "k") continue;
+    const guarded = isSquareDefended(after, square, defenderColor);
+    if (piece.type === "q") {
+      lines.push(guarded
+        ? "Stai attento alla Donna."
+        : "La tua Donna è rimasta scoperta.");
+    } else if (!guarded) {
+      lines.push(`Anche ${namedPiece(piece.type)} in ${square} è in pericolo.`);
+    }
+  }
+  return lines.slice(0, 3);
+}
+
+function narrateOpponentMove(before, move, after) {
+  const san = italianSan(move.san);
+  const piece = namedPiece(move.piece);
+  const parts = [];
+  if (move.san.includes("#")) {
+    return `L'avversario dà scacco matto con ${san}. La partita è finita.`;
+  }
+  if (move.san.startsWith("O-O-O")) {
+    parts.push("L'avversario fa arrocco lungo: re al sicuro, torre verso il centro.");
+  } else if (move.san.startsWith("O-O")) {
+    parts.push("L'avversario arrocca: mette il re al sicuro e attiva la torre.");
+  } else if (move.captured) {
+    parts.push(`L'avversario gioca ${san}: ${piece} prende ${namedPiece(move.captured)} in ${move.to}.`);
+  } else if (move.piece === "p") {
+    parts.push(`L'avversario avanza il pedone in ${move.to} (${san}).`);
+  } else {
+    parts.push(`L'avversario gioca ${piece} in ${move.to} (${san}).`);
+  }
+  if (move.san.includes("+")) {
+    parts.push("È scacco: il tuo Re è sotto attacco.");
+  }
+  parts.push(...describeCreatedThreats(before, after, move, state.playerColor));
+  const opening = openingAside();
+  if (opening) parts.push(opening.trim());
+  parts.push("Ora ti consiglio queste mosse.");
+  return joinTalk(parts);
+}
+
+function narratePlayerMove(before, move, after) {
+  const san = italianSan(move.san);
+  const parts = [`Hai scelto ${san}.`];
+  if (after.in_checkmate()) {
+    parts.push("Scacco matto! Hai vinto.");
+    return joinTalk(parts);
+  }
+  const loss = worstImmediateLoss(after, state.playerColor);
+  if (loss === "q") parts.push("Attenzione: la Donna resta in presa, l'avversario può prenderla.");
+  else if (loss === "r") parts.push("Attenzione: perdi la Torre.");
+  else if (loss === "n") parts.push("Attenzione: perdi il Cavallo.");
+  else if (loss === "b") parts.push("Attenzione: perdi l'Alfiere.");
+  else parts.push(explainMove(before, move, after, null));
+  const opening = openingAside();
+  if (opening) parts.push(opening.trim());
+  parts.push("Vediamo come risponde l'avversario.");
+  return joinTalk(parts);
+}
+
 function markDanger(paint = true) {
-  state.board.setDanger(playerPiecesUnderAttack(state.game, state.playerColor), paint);
+  const threatened = playerPiecesUnderAttack(state.game, state.playerColor);
+  const protectedSquares = threatened.filter((square) => (
+    isSquareDefended(state.game, square, state.playerColor)
+  ));
+  state.board.setDanger(threatened, paint, protectedSquares);
 }
 
 function destsFromGame(game) {
@@ -311,14 +574,11 @@ const els = {
   overlayTitle: document.getElementById("overlay-title"),
   overlayText: document.getElementById("overlay-text"),
   promo: document.getElementById("promo"),
-  theoryPhase: document.getElementById("theory-phase"),
-  theoryKind: document.getElementById("theory-kind"),
-  theoryStructure: document.getElementById("theory-structure"),
-  theoryEco: document.getElementById("theory-eco"),
-  theoryTitle: document.getElementById("theory-title"),
-  theoryVariant: document.getElementById("theory-variant"),
-  theoryBlurb: document.getElementById("theory-blurb"),
+  kingNote: document.getElementById("king-note"),
+  kingCalc: document.getElementById("king-calc"),
   moreHints: document.getElementById("btn-more-hints"),
+  prevHints: document.getElementById("btn-prev-hints"),
+  nextHints: document.getElementById("btn-next-hints"),
 };
 
 const state = {
@@ -326,11 +586,13 @@ const state = {
   engine: new Engine(),
   board: null,
   playerColor: "w",
-  skill: 5,
+  skill: 3,
   busy: false,
   hints: [],
   hintPool: [],
   hintPage: 0,
+  hintsUnlocked: 0,
+  hintBestScore: -Infinity,
   gameId: 0,
   pendingPromo: null,
 };
@@ -346,17 +608,24 @@ function setStatus(title, text, kind = "info") {
   els.turnBanner.textContent = title;
 }
 
-function renderTheory() {
-  const sans = state.game.history();
-  const info = describePosition(sans, state.game);
-  els.theoryPhase.textContent = info.phase;
-  els.theoryKind.textContent = info.kindLabel;
-  els.theoryKind.dataset.kind = info.kind;
-  els.theoryStructure.textContent = info.structure;
-  els.theoryEco.textContent = info.eco || "";
-  els.theoryTitle.textContent = info.title;
-  els.theoryVariant.textContent = info.variant || "";
-  els.theoryBlurb.textContent = info.blurb;
+function openingAside() {
+  const info = describePosition(state.game.history(), state.game);
+  if (!info?.title || info.title === "Scegli un'apertura") return "";
+  if (info.variant) return ` Siamo nella ${info.title} (${info.variant}).`;
+  return ` Siamo nella ${info.title}.`;
+}
+
+function speakKing(note, { calculating = false } = {}) {
+  if (els.kingNote) els.kingNote.textContent = note;
+  if (els.kingCalc) els.kingCalc.hidden = !calculating;
+}
+
+function kingComment(beforeFen, played, asOpponent) {
+  const before = new Chess(beforeFen);
+  const after = new Chess(state.game.fen());
+  return asOpponent
+    ? narrateOpponentMove(before, played, after)
+    : narratePlayerMove(before, played, after);
 }
 
 function renderHistory() {
@@ -370,7 +639,6 @@ function renderHistory() {
   }
   els.moves.innerHTML = html || `<div class="moves-empty">Nessuna mossa ancora.</div>`;
   els.moves.scrollTop = els.moves.scrollHeight;
-  renderTheory();
 }
 
 function syncBoard(options = {}) {
@@ -378,8 +646,8 @@ function syncBoard(options = {}) {
   markDanger(false);
   state.board.setPosition(fen);
   state.board.setTurn(state.game.turn(), state.playerColor);
-  state.board.setDests(playerIsSideToMove() && !state.busy ? destsFromGame(state.game) : {});
-  state.board.setInteractive(!state.busy && playerIsSideToMove() && !state.game.game_over());
+  state.board.setDests({});
+  state.board.setInteractive(false);
   state.board.setCheck(state.game.in_check() ? kingSquare(state.game, state.game.turn()) : null);
   if (!options.keepArrows) showHintArrows();
 }
@@ -387,41 +655,36 @@ function syncBoard(options = {}) {
 function renderHints() {
   state.hints = visibleHints();
   const buttons = [];
-  const rankOffset = state.hintPage * 4;
   for (let i = 0; i < 4; i += 1) {
     const hint = state.hints[i];
-    const rank = rankOffset + i + 1;
+    const rank = i + 1;
     if (!hint) {
       buttons.push(`
         <button class="hint-btn empty" disabled>
           <span class="hint-rank">${rank}</span>
-          <span class="hint-piece">—</span>
           <span class="hint-main">—</span>
         </button>`);
       continue;
     }
-    const move = uciToMove(hint.uci);
-    const probe = new Chess(state.game.fen());
-    const played = probe.move({
-      from: move.from,
-      to: move.to,
-      promotion: move.promotion || "q",
-    });
+    const played = playedFromHint(hint);
     const san = played ? italianSan(played.san) : hint.uci;
-    const headline = played ? moveHeadline(played) : "Mossa";
-    const why = played ? explainMove(state.game, played, probe, hint) : "";
-    const best = rank === 1 ? " migliore" : "";
+    const caption = played ? moveHeadline(played) : "Mossa";
+    const icon = played ? pieceIcon(played, state.game.turn()) : "";
+    const danger = hintDanger(hint);
     buttons.push(`
-      <button class="hint-btn${rank === 1 ? " best" : ""}" data-index="${i}" type="button">
-        <span class="hint-rank">${rank}${best}</span>
-        <span class="hint-piece">${escapeHtml(headline)}</span>
-        <span class="hint-main">${san}</span>
-        <span class="hint-eval${evalClass(hint)}">${formatHintEval(hint)}</span>
-        <span class="hint-why">${escapeHtml(why)}</span>
+      <button class="hint-btn${danger ? " is-danger" : ""}" data-index="${i}" type="button">
+        <span class="hint-rank">${rank}</span>
+        <span class="hint-move-row">
+          ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
+          <span class="hint-main">${san}</span>
+        </span>
+        <span class="hint-piece">${escapeHtml(caption)}</span>
+        <span class="hint-eval${evalClass(hint)}${danger ? " is-neg" : ""}">${formatHintEval(hint)}</span>
+        ${danger ? `<span class="hint-warn">${escapeHtml(danger)}</span>` : ""}
       </button>`);
   }
   els.hints.innerHTML = buttons.join("");
-  syncMoreHintsButton();
+  syncHintNav();
 }
 
 function showHintArrows(index = null) {
@@ -432,12 +695,14 @@ function showHintArrows(index = null) {
   state.board.setArrows(
     state.hints.map((hint, i) => {
       const active = index !== null && i === index;
+      const danger = Boolean(hintDanger(hint));
       return {
         from: hint.uci.slice(0, 2),
         to: hint.uci.slice(2, 4),
-        color: ARROW_COLORS[i],
+        color: danger ? "#c4473d" : ARROW_COLORS[i],
         opacity: active ? 0.95 : 0.28,
         width: active ? "0.22" : "0.14",
+        label: hintSan(hint),
       };
     })
   );
@@ -450,16 +715,20 @@ function youLabel() {
 async function refreshHints() {
   const gameId = state.gameId;
   if (state.game.game_over() || !playerIsSideToMove()) {
-    state.hints = [];
-    state.hintPool = [];
-    state.hintPage = 0;
+    clearHints();
     renderHints();
     state.board.setArrows([]);
     return;
   }
   const fen = state.game.fen();
+  clearHints();
+  renderHints();
   els.hints.classList.add("loading");
-  setStatus("Tocca a te!", "Calcolo le 4 mosse migliori…", "think");
+  const waiting = els.kingNote?.textContent?.includes("consiglio queste mosse")
+    ? els.kingNote.textContent
+    : "Ora ti consiglio queste mosse.";
+  speakKing(waiting, { calculating: true });
+  setStatus("Tocca a te!", "Calcolo delle mosse consigliate dal Re…", "think");
   try {
     const lines = await state.engine.analyze(fen, {
       depth: 11,
@@ -468,18 +737,21 @@ async function refreshHints() {
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
     state.hintPool = fillHintPool(lines, state.game);
     state.hintPage = 0;
+    state.hintsUnlocked = 0;
     renderHints();
     showHintArrows();
-    setStatus("Tocca a te!", `${youLabel()}. Clicca un pulsante o muovi un pezzo.`, "play");
+    speakKing(waiting.replace(/\s*Ora ti consiglio queste mosse\.?$/, "") + " Scegli una delle mosse qui sotto.", {
+      calculating: false,
+    });
+    setStatus("Tocca a te!", `${youLabel()}. Scegli una delle mosse consigliate.`, "play");
   } catch (err) {
     if (err.message === "aborted") return;
     console.error(err);
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
-    state.hints = [];
-    state.hintPool = [];
-    state.hintPage = 0;
+    clearHints();
     renderHints();
-    setStatus("Tocca a te!", "Motore occupato: puoi comunque muovere i pezzi.", "info");
+    speakKing("Il calcolo si è interrotto. Attendi i nuovi suggerimenti.", { calculating: false });
+    setStatus("Tocca a te!", "Motore occupato: attendi i nuovi suggerimenti.", "info");
   } finally {
     if (gameId === state.gameId && state.game.fen() === fen) {
       els.hints.classList.remove("loading");
@@ -506,6 +778,7 @@ function finishGame() {
   syncBoard();
   const [title, text, kind] = endMessage();
   setStatus(title, text, kind);
+  speakKing(`${title} ${text}`.trim(), { calculating: false });
 }
 
 async function computerMove() {
@@ -545,6 +818,7 @@ async function computerMove() {
       if (gameId !== state.gameId) return;
       markDanger(false);
       state.board.setPosition(state.game.fen());
+      speakKing(kingComment(fen, played, true), { calculating: true });
     }
   } catch (err) {
     if (err.message === "aborted" || gameId !== state.gameId) return;
@@ -575,6 +849,7 @@ async function applyUserMove(from, to, promotion) {
     return;
   }
   state.busy = true;
+  const beforeFen = state.game.fen();
   const played = state.game.move({ from, to, promotion: promotion || undefined });
   if (!played) {
     state.busy = false;
@@ -584,6 +859,7 @@ async function applyUserMove(from, to, promotion) {
   state.engine.stop();
   clearHints();
   renderHints();
+  speakKing(kingComment(beforeFen, played, false), { calculating: false });
   state.board.setLastMove(played.from, played.to);
   await state.board.animateMove(played.from, played.to);
   markDanger(false);
@@ -622,7 +898,7 @@ els.promo.addEventListener("click", (event) => {
 
 els.hints.addEventListener("click", (event) => {
   const btn = event.target.closest(".hint-btn");
-  if (!btn || btn.disabled) return;
+  if (!btn || btn.disabled || state.busy || els.hints.classList.contains("loading")) return;
   const hint = state.hints[Number(btn.dataset.index)];
   if (!hint) return;
   const move = uciToMove(hint.uci);
@@ -641,11 +917,21 @@ els.hints.addEventListener("pointerout", (event) => {
 });
 
 els.moreHints.addEventListener("click", () => {
-  if (els.moreHints.disabled || state.hintPool.length <= 4) return;
-  const pages = Math.ceil(state.hintPool.length / 4);
-  state.hintPage = (state.hintPage + 1) % pages;
-  renderHints();
-  showHintArrows();
+  if (els.moreHints.disabled) return;
+  const lastPage = hintPageCount() - 1;
+  if (state.hintsUnlocked >= lastPage) return;
+  state.hintsUnlocked += 1;
+  showHintPage(state.hintsUnlocked);
+});
+
+els.prevHints.addEventListener("click", () => {
+  if (els.prevHints.disabled) return;
+  showHintPage(state.hintPage - 1);
+});
+
+els.nextHints.addEventListener("click", () => {
+  if (els.nextHints.disabled) return;
+  showHintPage(state.hintPage + 1);
 });
 
 function startGame(playerColor = state.playerColor) {
@@ -658,7 +944,7 @@ function startGame(playerColor = state.playerColor) {
   clearHints();
   state.pendingPromo = null;
   els.promo.hidden = true;
-  els.engineLabel.textContent = `Stockfish ${SKILL_LABELS[state.skill]}`;
+  els.engineLabel.textContent = engineLabelText(state.skill);
   state.board.setOrientation(playerColor === "w" ? "white" : "black");
   state.board.setLastMove(null, null);
   renderHints();
@@ -668,6 +954,12 @@ function startGame(playerColor = state.playerColor) {
     playerIsSideToMove() ? "Tocca a te!" : "Tocca al computer",
     youLabel(),
     "play"
+  );
+  speakKing(
+    playerIsSideToMove()
+      ? "Buona fortuna! Ora ti consiglio queste mosse."
+      : "Buona fortuna! L'avversario muove per primo.",
+    { calculating: playerIsSideToMove() }
   );
   computerMove();
 }
@@ -707,11 +999,12 @@ document.getElementById("btn-resign").addEventListener("click", () => {
   clearHints();
   renderHints();
   setStatus("Hai abbandonato", "Nuova partita quando vuoi.", "lose");
+  speakKing("Hai abbandonato. Quando vuoi, ricominciamo.", { calculating: false });
   state.board.setInteractive(false);
 });
 els.skill.addEventListener("change", () => {
   state.skill = Number(els.skill.value);
-  els.engineLabel.textContent = `Stockfish ${SKILL_LABELS[state.skill]}`;
+  els.engineLabel.textContent = engineLabelText(state.skill);
 });
 
 state.board = new Board(els.boardRoot, {
@@ -719,6 +1012,7 @@ state.board = new Board(els.boardRoot, {
 });
 
 setStatus("Caricamento", "Avvio del motore e del libro aperture…", "think");
+speakKing("Buona fortuna! Sto preparando la scacchiera…", { calculating: true });
 els.hints.innerHTML = "";
 renderHints();
 

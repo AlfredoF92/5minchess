@@ -104,6 +104,7 @@ button, select { font: inherit; }
 }
 .board:not(.frozen) { cursor: grab; }
 .board:not(.frozen):active { cursor: grabbing; }
+.board.frozen { cursor: default; }
 
 .square {
   position: relative;
@@ -127,6 +128,25 @@ button, select { font: inherit; }
   z-index: 4;
   pointer-events: none;
   animation: danger-pulse 1.3s ease-in-out infinite;
+}
+.shield-pip {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  z-index: 4;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+}
+.shield-pip svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: #2f7ae5;
+  stroke: #fff;
+  stroke-width: 1.35;
+  stroke-linejoin: round;
 }
 @keyframes danger-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
@@ -200,89 +220,87 @@ button, select { font: inherit; }
   font-weight: 600;
 }
 
-.theory {
-  margin-top: 0;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  padding: 12px 14px 14px;
-  border: 1px solid #ececec;
-}
-.theory-top {
+.king-talk {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  margin-bottom: 6px;
+  gap: 10px;
+  align-items: flex-start;
 }
-.theory-chip {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: #eef6e4;
-  color: #4a7a1f;
-  border-radius: 999px;
-  padding: 3px 8px;
+.king-side {
+  width: 76px;
+  flex-shrink: 0;
+  text-align: center;
 }
-.theory-chip.kind[data-kind="apertura"] { background: #eef6e4; color: #4a7a1f; }
-.theory-chip.kind[data-kind="difesa"] { background: #e7f0fb; color: #1e4e8c; }
-.theory-chip.kind[data-kind="gambetto"] { background: #fff3d6; color: #8a5a00; }
-.theory-chip.kind[data-kind="attacco"] { background: #fde8e6; color: #a33b32; }
-.theory-chip.kind[data-kind="sistema"] { background: #f0e7fb; color: #5b2d91; }
-.theory-chip.ghost { background: #f3f3f3; color: #666; }
-.theory-eco {
-  margin-left: auto;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+.king-side img {
+  width: 68px;
+  height: 68px;
+  filter: drop-shadow(1px 3px 2px rgba(0,0,0,0.25));
 }
-.theory-title {
+.king-side strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+}
+.speech {
+  position: relative;
+  flex: 1;
   margin: 0;
-  font-size: 18px;
-  line-height: 1.2;
+  background: #fff;
+  border-radius: 18px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
 }
-.theory-variant {
-  margin: 4px 0 0;
+.speech::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 22px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 12px solid #fff;
+  filter: drop-shadow(-2px 1px 1px rgba(0,0,0,0.06));
+}
+#king-note {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+}
+.king-calc {
+  margin: 10px 0 0;
   font-size: 13px;
-  color: #555;
-  min-height: 1.2em;
+  font-style: italic;
+  font-weight: 700;
+  color: #8a5a00;
 }
-.theory-variant:empty { display: none; }
-.theory-blurb {
-  margin: 8px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: #444;
-}
+.king-calc[hidden] { display: none; }
 
-.hints-label {
-  margin: 14px 0 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
 .hints {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  min-height: 128px;
+  min-height: 118px;
+  margin-top: 12px;
 }
-.hints.loading .hint-btn { opacity: 0.55; }
+.hints.loading .hint-btn {
+  opacity: 0.55;
+  pointer-events: none;
+}
 
 .hint-btn {
   appearance: none;
   border: 1px solid #ddd;
   background: #fff;
   border-radius: 8px;
-  padding: 10px 8px 12px;
+  padding: 10px 10px 12px;
   text-align: left;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-height: 128px;
+  min-height: 118px;
   transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
 .hint-btn:hover:not(:disabled) {
@@ -301,17 +319,32 @@ button, select { font: inherit; }
   font-weight: 700;
 }
 .hint-btn.best .hint-rank { color: var(--green); }
-.hint-piece {
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1.15;
-  margin: 2px 0 2px;
+.hint-move-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.hint-icon {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
 }
 .hint-main {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.1;
-  color: #444;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: #1a1a1a;
+  letter-spacing: 0.01em;
+}
+.hint-piece {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #666;
+  margin: 0 0 2px;
 }
 .hint-eval {
   font-size: 13px;
@@ -319,16 +352,24 @@ button, select { font: inherit; }
   font-variant-numeric: tabular-nums;
 }
 .hint-eval.is-neg { color: #b5473d; }
-.hint-why {
+.hint-btn.is-danger {
+  border-color: #e2a09a;
+  background: linear-gradient(#fff4f2, #fff);
+}
+.hint-btn.is-danger:hover:not(:disabled) {
+  border-color: #c4473d;
+  box-shadow: 0 8px 16px rgba(196, 71, 61, 0.14);
+}
+.hint-warn {
   margin-top: 4px;
   font-size: 12px;
+  font-weight: 800;
+  color: #b5473d;
   line-height: 1.3;
-  color: #3d5a1f;
-  font-weight: 600;
 }
 .more-hints {
-  margin-top: 8px;
-  width: 100%;
+  margin-top: 0;
+  flex: 1;
   border: 1px solid #ddd;
   background: #fff;
   border-radius: 8px;
@@ -337,10 +378,30 @@ button, select { font: inherit; }
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
+.hint-nav {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.hint-nav-btn {
+  width: 44px;
+  flex-shrink: 0;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+.hint-nav-btn:hover:not(:disabled),
 .more-hints:hover:not(:disabled) {
   border-color: var(--green);
   background: #f7fff0;
 }
+.hint-nav-btn:disabled,
 .more-hints:disabled {
   opacity: 0.55;
   cursor: default;

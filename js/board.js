@@ -58,8 +58,9 @@ export class Board {
     this.lastMove = null;
     this.check = null;
     this.danger = new Set();
+    this.protected = new Set();
     this.arrows = [];
-    this.interactive = true;
+    this.interactive = false;
     this.turnColor = "w";
     this.playerColor = "w";
     this.drag = null;
@@ -67,7 +68,7 @@ export class Board {
     this.root.innerHTML = `
       <div class="board-frame">
         <div class="board-stack">
-          <div class="board" tabindex="0" aria-label="Scacchiera"></div>
+          <div class="board frozen" tabindex="0" aria-label="Scacchiera"></div>
           <svg class="board-arrows" viewBox="0 0 8 8" preserveAspectRatio="none">
             <g class="arrow-lines"></g>
           </svg>
@@ -154,8 +155,9 @@ export class Board {
     this.#paintSquares();
   }
 
-  setDanger(squares, paint = true) {
+  setDanger(squares, paint = true, protectedSquares = []) {
     this.danger = new Set(squares || []);
+    this.protected = new Set(protectedSquares || []);
     if (paint) this.#paintDanger();
   }
 
@@ -204,7 +206,9 @@ export class Board {
   #paintDanger() {
     Object.entries(this.squareEls).forEach(([square, el]) => {
       let pip = el.querySelector(".danger-pip");
+      let shield = el.querySelector(".shield-pip");
       const threatened = this.danger.has(square);
+      const guarded = threatened && this.protected.has(square);
       if (threatened && !pip) {
         pip = document.createElement("span");
         pip.className = "danger-pip";
@@ -213,6 +217,16 @@ export class Board {
         el.appendChild(pip);
       } else if (!threatened && pip) {
         pip.remove();
+      }
+      if (guarded && !shield) {
+        shield = document.createElement("span");
+        shield.className = "shield-pip";
+        shield.title = "Protetto da un altro pezzo";
+        shield.setAttribute("aria-label", "Pezzo protetto");
+        shield.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.1 14.2 3.5v4.3c0 3.8-2.5 7.1-6.2 8.1-3.7-1-6.2-4.3-6.2-8.1V3.5L8 1.1z"/></svg>`;
+        el.appendChild(shield);
+      } else if (!guarded && shield) {
+        shield.remove();
       }
     });
   }
@@ -238,7 +252,9 @@ export class Board {
 
   #drawArrows() {
     this.arrowGroup.innerHTML = "";
-    this.arrows.forEach((arrow) => {
+    const ns = "http://www.w3.org/2000/svg";
+    const badges = [];
+    for (const arrow of this.arrows) {
       const a = this.#squareCenter(arrow.from);
       const b = this.#squareCenter(arrow.to);
       const dx = b.x - a.x;
@@ -248,7 +264,7 @@ export class Board {
       const uy = dy / len;
       const color = arrow.color || "#6aa329";
       const opacity = String(arrow.opacity ?? 0.85);
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      const line = document.createElementNS(ns, "line");
       line.setAttribute("x1", String(a.x + ux * 0.18));
       line.setAttribute("y1", String(a.y + uy * 0.18));
       line.setAttribute("x2", String(b.x - ux * 0.32));
@@ -257,7 +273,6 @@ export class Board {
       line.setAttribute("stroke-width", arrow.width || "0.18");
       line.setAttribute("stroke-opacity", opacity);
       line.setAttribute("stroke-linecap", "round");
-      const ns = "http://www.w3.org/2000/svg";
       const head = document.createElementNS(ns, "polygon");
       const hx = b.x - ux * 0.12;
       const hy = b.y - uy * 0.12;
@@ -271,7 +286,31 @@ export class Board {
       head.setAttribute("fill-opacity", opacity);
       this.arrowGroup.appendChild(line);
       this.arrowGroup.appendChild(head);
-    });
+      if (!arrow.label) continue;
+      badges.push({ arrow, b, ux, uy, color, opacity });
+    }
+    badges.sort((left, right) => Number(left.opacity) - Number(right.opacity));
+    for (const { arrow, b, ux, uy, color, opacity } of badges) {
+      const emphasized = Number(opacity) >= 0.6;
+      const label = String(arrow.label);
+      const labelX = b.x + ux * 0.18;
+      const labelY = b.y + uy * 0.18;
+      const fontSize = label.length <= 2 ? 0.42 : label.length <= 3 ? 0.38 : label.length <= 4 ? 0.34 : 0.28;
+      const text = document.createElementNS(ns, "text");
+      text.setAttribute("x", String(labelX));
+      text.setAttribute("y", String(labelY));
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("dominant-baseline", "middle");
+      text.setAttribute("dy", "0.12");
+      text.setAttribute("fill", color);
+      text.setAttribute("fill-opacity", emphasized ? "0.92" : "0.55");
+      text.setAttribute("font-size", String(fontSize));
+      text.setAttribute("font-weight", "800");
+      text.setAttribute("font-family", '"Segoe UI", "Trebuchet MS", Arial, sans-serif');
+      text.setAttribute("style", "pointer-events:none;user-select:none;");
+      text.textContent = label;
+      this.arrowGroup.appendChild(text);
+    }
   }
 
   async animateMove(from, to) {

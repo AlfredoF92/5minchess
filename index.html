@@ -29,18 +29,18 @@
             <div class="player opponent">
               <span class="dot"></span>
               <div>
-                <div id="engine-label" class="name">Stockfish livello 5 · medio</div>
+                <div id="engine-label" class="name">Stockfish livello 3 · amichevole · 1550 Elo</div>
                 <label class="skill-wrap">
                   Difficoltà
                   <select id="skill" aria-label="Livello Stockfish">
-                    <option value="1">1 — Principiante</option>
-                    <option value="2">2 — Facile</option>
-                    <option value="3">3 — Amichevole</option>
-                    <option value="4">4 — Intermedio</option>
-                    <option value="5" selected>5 — Medio</option>
-                    <option value="6">6 — Impegnativo</option>
-                    <option value="7">7 — Difficile</option>
-                    <option value="8">8 — Esperto</option>
+                    <option value="1">1 — Principiante · 1350 Elo</option>
+                    <option value="2">2 — Facile · 1450 Elo</option>
+                    <option value="3" selected>3 — Amichevole · 1550 Elo</option>
+                    <option value="4">4 — Intermedio · 1650 Elo</option>
+                    <option value="5">5 — Medio · 1750 Elo</option>
+                    <option value="6">6 — Impegnativo · 1850 Elo</option>
+                    <option value="7">7 — Difficile · 2000 Elo</option>
+                    <option value="8">8 — Esperto · 2150 Elo</option>
                   </select>
                 </label>
               </div>
@@ -79,7 +79,7 @@
               <span class="dot"></span>
               <div>
                 <div id="player-name" class="name">Tu</div>
-                <div class="rating">allievo</div>
+                <div class="rating">giocatore</div>
               </div>
             </div>
           </div>
@@ -87,20 +87,22 @@
       </section>
 
       <section class="coach-col">
-        <article id="theory" class="theory" aria-live="polite">
-          <div class="theory-top">
-            <span id="theory-phase" class="theory-chip">Apertura</span>
-            <span id="theory-kind" class="theory-chip kind">Apertura</span>
-            <span id="theory-structure" class="theory-chip ghost">In attesa</span>
-            <span id="theory-eco" class="theory-eco"></span>
+        <div class="king-talk">
+          <div class="king-side">
+            <img src="pieces/wK.svg" alt="">
+            <strong>Il Re</strong>
           </div>
-          <h3 id="theory-title" class="theory-title">Scegli un'apertura</h3>
-          <p id="theory-variant" class="theory-variant"></p>
-          <p id="theory-blurb" class="theory-blurb">Scegli la prima mossa: 1.e4 (partita aperta), 1.d4 (partita chiusa) o 1.c4 (Inglese).</p>
-        </article>
-        <p class="hints-label">Le 4 mosse migliori — clicca per giocarne una</p>
-        <div id="hints" class="hints" aria-label="Suggerimenti del motore"></div>
-        <button id="btn-more-hints" class="more-hints" type="button" disabled>Carica altre 4 mosse</button>
+          <blockquote class="speech" aria-live="polite">
+            <p id="king-note">Buona fortuna!</p>
+            <p id="king-calc" class="king-calc" hidden>Calcolo delle mosse consigliate dal Re…</p>
+          </blockquote>
+        </div>
+        <div id="hints" class="hints" aria-label="Suggerimenti del Re"></div>
+        <div class="hint-nav">
+          <button id="btn-prev-hints" class="hint-nav-btn" type="button" disabled title="4 mosse precedenti" aria-label="4 mosse precedenti">◀</button>
+          <button id="btn-more-hints" class="more-hints" type="button" disabled>Carica altre 4 mosse</button>
+          <button id="btn-next-hints" class="hint-nav-btn" type="button" disabled title="4 mosse successive" aria-label="4 mosse successive">▶</button>
+        </div>
       </section>
     </main>
   </div>
