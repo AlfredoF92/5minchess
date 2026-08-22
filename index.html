@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>5 Min Chess — learn the 6 best moves</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260822talk2">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -63,11 +63,18 @@
 
         <aside class="panel">
           <div class="card">
-            <div class="player opponent">
+            <div class="player opponent" id="player-top">
               <span class="dot"></span>
               <div>
                 <div id="engine-label" class="name">Stockfish level 1 · beginner · 1350 Elo</div>
                 <label class="skill-wrap">
+                  <span data-i18n="mode.label">Opponent</span>
+                  <select id="play-mode" data-i18n-aria="mode.aria" aria-label="Opponent type">
+                    <option value="engine" selected>Stockfish</option>
+                    <option value="local">Play against an opponent on my PC</option>
+                  </select>
+                </label>
+                <label class="skill-wrap" id="skill-row">
                   <span data-i18n="difficulty">Difficulty</span>
                   <select id="skill" data-i18n-aria="skill.aria" aria-label="Stockfish level">
                     <option value="1" selected>1 — Beginner · 1350 Elo</option>
@@ -100,8 +107,8 @@
               <button id="btn-undo" type="button" data-i18n-title="toolbar.undo" title="Undo the last move">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 18l-6-6 6-6v4h8v4h-8v4z"/></svg>
               </button>
-              <button id="btn-white" type="button" data-i18n-title="toolbar.white" title="New game as White">♔</button>
-              <button id="btn-black" type="button" data-i18n-title="toolbar.black" title="New game as Black">♚</button>
+              <button id="btn-white" class="vs-engine" type="button" data-i18n-title="toolbar.white" title="New game as White">♔</button>
+              <button id="btn-black" class="vs-engine" type="button" data-i18n-title="toolbar.black" title="New game as Black">♚</button>
               <button id="btn-new" type="button" data-i18n-title="toolbar.new" title="New game">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 6v2.5l3.5-3.5L12 1.5V4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6z"/></svg>
               </button>
@@ -122,11 +129,11 @@
               </button>
             </div>
 
-            <div class="player you">
+            <div class="player you" id="player-you">
               <span class="dot"></span>
               <div>
                 <div id="player-name" class="name" data-i18n="you">You</div>
-                <div class="rating" data-i18n="you.rating">player</div>
+                <div id="player-rating" class="rating" data-i18n="you.rating">player</div>
               </div>
             </div>
           </div>
@@ -136,8 +143,8 @@
       <section class="coach-col">
         <div class="king-talk">
           <div class="king-side">
-            <img src="pieces/wK.svg" alt="">
-            <strong data-i18n="king">The King</strong>
+            <img id="king-piece" src="pieces/wK.svg" alt="">
+            <strong id="king-title" data-i18n="king">The King</strong>
           </div>
           <blockquote class="speech" aria-live="polite">
             <p id="king-note">Good luck!</p>
@@ -147,8 +154,8 @@
           <button id="btn-aid-moves" class="is-on" type="button" data-i18n="aid.moves">Highlight moves</button>
           <button id="btn-aid-threats" type="button" data-i18n="aid.threats">Highlight threatened</button>
         </div>
-        <div id="hints" class="hints" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
-        <div class="hint-nav">
+        <div id="hints" class="hints is-waiting" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
+        <div id="hint-nav" class="hint-nav is-waiting">
           <button id="btn-prev-hints" class="hint-nav-btn" type="button" disabled data-i18n-title="hints.prev" data-i18n-aria="hints.prev" title="Previous 6 moves" aria-label="Previous 6 moves">◀</button>
           <button id="btn-more-hints" class="more-hints" type="button" disabled data-i18n="hints.more">Load 6 more moves</button>
           <button id="btn-next-hints" class="hint-nav-btn" type="button" disabled data-i18n-title="hints.next" data-i18n-aria="hints.next" title="Next 6 moves" aria-label="Next 6 moves">▶</button>
@@ -165,6 +172,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260822k"></script>
+  <script type="module" src="js/app.js?v=20260822talk2"></script>
 </body>
 </html>

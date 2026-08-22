@@ -352,10 +352,14 @@ button, select { font: inherit; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  min-height: 78px;
+  min-height: 340px;
   margin-top: 12px;
 }
-.hints.is-reveal .hint-btn:not(.empty):not(.is-loading) {
+.hints.is-waiting {
+  opacity: 0;
+  pointer-events: none;
+}
+.hints.is-reveal .hint-btn:not(.empty) {
   animation: hint-reveal 0.55s ease both;
 }
 .hints.is-reveal .hint-btn:nth-child(1) { animation-delay: 0.04s; }
@@ -374,15 +378,23 @@ button, select { font: inherit; }
   border: 1px solid #ddd;
   background: #fff;
   border-radius: 8px;
-  padding: 10px 10px 12px;
+  padding: 10px 12px 12px;
   text-align: left;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  min-height: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.hint-body {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 2px;
-  min-height: 78px;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  width: 100%;
 }
 .hint-btn:hover:not(:disabled) {
   transform: translateY(-2px);
@@ -447,6 +459,20 @@ button, select { font: inherit; }
   color: #1a1a1a;
   letter-spacing: 0.01em;
 }
+.hint-talk {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #3a3a3a;
+  white-space: normal;
+  overflow: visible;
+  visibility: visible;
+  opacity: 1;
+}
+.hint-btn.is-danger .hint-talk { color: #8a3d38; }
 .hint-btn.is-danger {
   border-color: #e2a09a;
   background: linear-gradient(#fff4f2, #fff);
@@ -478,6 +504,11 @@ button, select { font: inherit; }
   display: flex;
   gap: 8px;
   align-items: stretch;
+  transition: opacity 0.45s ease;
+}
+.hint-nav.is-waiting {
+  opacity: 0;
+  pointer-events: none;
 }
 .hint-nav-btn {
   width: 44px;
@@ -527,6 +558,11 @@ button, select { font: inherit; }
   padding: 14px 16px;
 }
 .player.you { border-top: 1px solid var(--line); }
+.player.is-turn {
+  background: linear-gradient(#f7fff0, #fff);
+}
+.player.is-turn .name { color: #2f6b14; }
+body.is-local .vs-engine { display: none; }
 .dot {
   width: 10px;
   height: 10px;
@@ -543,6 +579,7 @@ button, select { font: inherit; }
   gap: 4px;
   margin-top: 6px;
 }
+.skill-wrap[hidden] { display: none; }
 .skill-wrap select {
   border: 1px solid #e2e2e2;
   border-radius: 4px;

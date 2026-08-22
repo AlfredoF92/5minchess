@@ -48,6 +48,129 @@ function escapeHtml(text) {
   ));
 }
 
+function talkPiece(type) {
+  return getLang() === "en" ? t(`piece.${type || "p"}`).toLowerCase() : t(`plain.${type || "p"}`);
+}
+
+function isFianchettoTo(color, square) {
+  return color === "w" ? square === "g2" || square === "b2" : square === "g7" || square === "b7";
+}
+
+function isBackRank(color, square) {
+  return square[1] === (color === "w" ? "1" : "8");
+}
+
+function coachLine(before, move, after, hint) {
+  const piece = talkPiece(move.piece);
+  const square = move.to;
+  const target = move.captured ? talkPiece(move.captured) : "";
+  const us = before.turn();
+  const backRank = us === "w" ? "1" : "8";
+  const vars = { piece, square, target };
+  const hangs = worstImmediateLoss(after, us);
+  const hangPiece = hangs ? talkPiece(hangs) : "";
+  const careful = hangs && PIECE_VALUE[hangs] >= 3;
+
+  if (move.san.includes("#")) return t("talk.mate", vars);
+  if (move.san.startsWith("O-O-O")) return t("talk.castleLong");
+  if (move.san.startsWith("O-O")) return t("talk.castle");
+
+  if (move.promotion) {
+    return t("talk.promo", { square, promo: talkPiece(move.promotion) });
+  }
+
+  if (String(move.flags).includes("e")) return t("talk.ep", vars);
+
+  const threatenedBefore = new Set(playerPiecesUnderAttack(before, us));
+  const threatenedAfter = new Set(playerPiecesUnderAttack(after, us));
+  if (threatenedBefore.has(move.from) && !threatenedAfter.has(move.to)) {
+    return t("talk.save", vars);
+  }
+  for (const sq of threatenedBefore) {
+    if (sq === move.from || threatenedAfter.has(sq)) continue;
+    const rescued = before.get(sq);
+    if (rescued) return t("talk.guard", { piece, square, target: talkPiece(rescued.type) });
+  }
+
+  if (move.san.includes("+") && move.captured) {
+    return careful ? t("talk.checkTakeCare", { ...vars, hang: hangPiece }) : t("talk.checkTake", vars);
+  }
+  if (move.san.includes("+")) return t("talk.check", vars);
+
+  if (move.captured) {
+    if (careful) return t("talk.takeCare", { ...vars, hang: hangPiece });
+    const ours = PIECE_VALUE[move.piece];
+    const theirs = PIECE_VALUE[move.captured];
+    if (theirs > ours) return t("talk.takeWin", vars);
+    if (theirs === ours && move.piece !== "p") return t("talk.trade", vars);
+    if (move.captured === "p") return t("talk.takePawn", vars);
+    return t("talk.takePiece", vars);
+  }
+
+  if (before.in_check()) return t("talk.block", vars);
+
+  if (typeof hint?.score === "number" && hint.scoreType === "cp" && hint.score < -80) {
+    return t("talk.defend", vars);
+  }
+
+  const attacks = after.moves({ square: move.to, verbose: true }).filter((m) => m.captured);
+  attacks.sort((a, b) => PIECE_VALUE[b.captured] - PIECE_VALUE[a.captured]);
+  const forks = attacks.filter((m) => PIECE_VALUE[m.captured] >= 3);
+  if (forks.length >= 2) return t("talk.fork", vars);
+  const threat = attacks[0];
+  if (threat && PIECE_VALUE[threat.captured] >= 5) {
+    return t("talk.threat", { piece, square, target: talkPiece(threat.captured) });
+  }
+  if (threat && PIECE_VALUE[threat.captured] >= 3) {
+    return t("talk.attack", { piece, square, target: talkPiece(threat.captured) });
+  }
+
+  if (move.piece === "b" && isFianchettoTo(us, move.to)) return t("talk.lookout", vars);
+  if (move.piece === "b" && (isCenterSquare(move.to) || isWideCenter(move.to))) {
+    return t("talk.attackDiag", vars);
+  }
+  if (move.piece === "n") {
+    const rank = Number(move.to[1]);
+    const outpost = us === "w" ? rank >= 5 : rank <= 4;
+    if (outpost) return t("talk.outpost", vars);
+  }
+
+  if (move.piece === "r") {
+    if (isBackRank(us, move.to)) return t("talk.defendRook", vars);
+    const file = move.to[0];
+    const pawnsOnFile = SQUARES.some((sq) => sq[0] === file && after.get(sq)?.type === "p");
+    if (!pawnsOnFile) return t("talk.rookOpen", vars);
+    return t("talk.rook", vars);
+  }
+
+  if ((move.piece === "n" || move.piece === "b") && move.from[1] === backRank) {
+    if (isCenterSquare(move.to) || isWideCenter(move.to)) return t("talk.devCenter", vars);
+    return t("talk.dev", vars);
+  }
+
+  if (move.piece === "p") {
+    if (isCenterSquare(move.to)) return t("talk.pawnCenter", vars);
+    if (Math.abs(Number(move.to[1]) - Number(move.from[1])) === 2) return t("talk.pawnTwo", vars);
+    if (move.to[0] === "c" || move.to[0] === "f") return t("talk.pawnDiag", vars);
+    return t("talk.pawn", vars);
+  }
+
+  if (move.piece === "q") {
+    if (isCenterSquare(move.to) || isWideCenter(move.to)) return t("talk.queenCenter", vars);
+    return t("talk.queen", vars);
+  }
+
+  if (move.piece === "k") return t("talk.king", vars);
+  if (hint?.scoreType === "mate" && hint.score > 0) return t("talk.huntMate", vars);
+  return t("talk.solid", vars);
+}
+
+function hintTalk(hint) {
+  const { played, after } = tryHint(hint);
+  if (!played || !after) return t("talk.solid", { piece: talkPiece("p"), square: hint?.uci?.slice(2, 4) || "" });
+  return coachLine(state.game, played, after, hint);
+}
+
 function explainMove(before, move, after, hint) {
   const us = before.turn();
   const backRank = us === "w" ? "1" : "8";
@@ -298,7 +421,10 @@ function visibleHints() {
 }
 
 function syncHintNav() {
-  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && !state.kingSpeaking;
+  const hidden = waitingForHints();
+  els.hints?.classList.toggle("is-waiting", hidden);
+  els.hintNav?.classList.toggle("is-waiting", hidden);
+  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && !state.kingSpeaking && !hidden;
   const lastPage = hintPageCount() - 1;
   const canLoadMore = canUse && state.hintPool.length > HINTS_PER_PAGE && state.hintsUnlocked < lastPage;
   if (els.moreHints) {
@@ -707,10 +833,17 @@ const els = {
   statusIcon: document.getElementById("status-icon"),
   engineLabel: document.getElementById("engine-label"),
   skill: document.getElementById("skill"),
+  skillRow: document.getElementById("skill-row"),
+  playMode: document.getElementById("play-mode"),
   startOpening: document.getElementById("start-opening"),
   openingLine: document.getElementById("opening-line"),
   moves: document.getElementById("moves"),
+  playerTop: document.getElementById("player-top"),
+  playerYou: document.getElementById("player-you"),
   playerName: document.getElementById("player-name"),
+  playerRating: document.getElementById("player-rating"),
+  kingPiece: document.getElementById("king-piece"),
+  kingTitle: document.getElementById("king-title"),
   turnBanner: document.getElementById("turn-banner"),
   overlay: document.getElementById("overlay"),
   overlayTitle: document.getElementById("overlay-title"),
@@ -720,6 +853,7 @@ const els = {
   moreHints: document.getElementById("btn-more-hints"),
   prevHints: document.getElementById("btn-prev-hints"),
   nextHints: document.getElementById("btn-next-hints"),
+  hintNav: document.getElementById("hint-nav"),
   aidMoves: document.getElementById("btn-aid-moves"),
   aidThreats: document.getElementById("btn-aid-threats"),
 };
@@ -729,6 +863,7 @@ const state = {
   engine: new Engine(),
   board: null,
   playerColor: "w",
+  mode: "engine",
   skill: 1,
   busy: false,
   hints: [],
@@ -753,8 +888,49 @@ const state = {
   pendingPromo: null,
 };
 
+function isLocalVsHuman() {
+  return state.mode === "local";
+}
+
 function playerIsSideToMove() {
+  if (state.game.game_over()) return false;
+  if (isLocalVsHuman()) return true;
   return state.game.turn() === state.playerColor;
+}
+
+function sideName(color = state.game.turn()) {
+  return t(color === "w" ? "player.white" : "player.black");
+}
+
+function syncCoach() {
+  if (isLocalVsHuman() && !state.game.game_over()) {
+    state.playerColor = state.game.turn();
+  }
+  const color = isLocalVsHuman() ? state.game.turn() : state.playerColor;
+  if (els.kingPiece) els.kingPiece.src = color === "b" ? "pieces/bK.svg" : "pieces/wK.svg";
+  if (els.kingTitle) {
+    els.kingTitle.textContent = isLocalVsHuman()
+      ? t(color === "b" ? "king.black" : "king.white")
+      : t("king");
+  }
+  document.body.classList.toggle("is-local", isLocalVsHuman());
+  if (els.skillRow) els.skillRow.hidden = isLocalVsHuman();
+  const whiteBottom = state.board?.orientation !== "black";
+  if (isLocalVsHuman()) {
+    const topColor = whiteBottom ? "b" : "w";
+    const botColor = whiteBottom ? "w" : "b";
+    if (els.engineLabel) els.engineLabel.textContent = t(topColor === "w" ? "player.white" : "player.black");
+    if (els.playerName) els.playerName.textContent = t(botColor === "w" ? "player.white" : "player.black");
+    if (els.playerRating) els.playerRating.textContent = t("player.local");
+    els.playerTop?.classList.toggle("is-turn", state.game.turn() === topColor);
+    els.playerYou?.classList.toggle("is-turn", state.game.turn() === botColor);
+  } else {
+    if (els.engineLabel) els.engineLabel.textContent = engineLabelText(state.skill);
+    if (els.playerName) els.playerName.textContent = t("you");
+    if (els.playerRating) els.playerRating.textContent = t("you.rating");
+    els.playerTop?.classList.remove("is-turn");
+    els.playerYou?.classList.toggle("is-turn", playerIsSideToMove());
+  }
 }
 
 function setStatus(title, text, kind = "info") {
@@ -853,9 +1029,13 @@ function loadingHintCard(rank) {
 }
 
 function revealHintsIfReady() {
-  if (state.kingSpeaking) return;
+  if (state.kingSpeaking || waitingForHints()) {
+    renderHints();
+    return;
+  }
+  const shouldFade = state.pendingHintReveal && state.hintPool.length && playerIsSideToMove();
   renderHints();
-  if (state.pendingHintReveal && state.hintPool.length && playerIsSideToMove()) {
+  if (shouldFade) {
     els.hints.classList.remove("is-reveal");
     void els.hints.offsetWidth;
     els.hints.classList.add("is-reveal");
@@ -873,6 +1053,8 @@ async function speakKing(note, { calculating = false, html = false } = {}) {
   state.kingSpeaking = Boolean(text);
   state.pendingHintReveal = Boolean(text);
   els.hints.classList.remove("is-reveal");
+  els.hints.classList.add("is-waiting");
+  els.hintNav?.classList.add("is-waiting");
   els.kingNote?.classList.remove("is-typing");
   if (!text) {
     if (els.kingNote) els.kingNote.innerHTML = "";
@@ -916,7 +1098,7 @@ function syncBoard(options = {}) {
   state.board.setDests({});
   state.board.setInteractive(false);
   state.board.setCheck(state.game.in_check() ? kingSquare(state.game, state.game.turn()) : null);
-  if (state.aids.moves) showHintArrows(null, { reveal: true });
+  if (state.aids.moves && !waitingForHints()) showHintArrows(null, { reveal: true });
   else if (!options.keepArrows) state.board.setArrows([]);
   if (state.aids.threats) {
     paintThreatPips();
@@ -925,12 +1107,13 @@ function syncBoard(options = {}) {
   } else {
     state.board.setDanger([]);
   }
+  syncCoach();
 }
 
 function renderHints() {
   if (waitingForHints()) {
     state.hints = [];
-    els.hints.innerHTML = Array.from({ length: HINTS_PER_PAGE }, (_, i) => loadingHintCard(i + 1)).join("");
+    els.hints.innerHTML = "";
     syncHintNav();
     state.board?.setArrows([]);
     return;
@@ -952,14 +1135,23 @@ function renderHints() {
     const san = played ? localizeSan(played.san) : hint.uci;
     const icon = played ? pieceIcon(played, state.game.turn()) : "";
     const danger = hintDanger(hint);
+    const talk = (() => {
+      try {
+        return hintTalk(hint) || `Move to ${played?.to || ""}.`;
+      } catch {
+        return played ? `Move to ${played.to}.` : "";
+      }
+    })();
     buttons.push(`
       <button class="hint-btn${danger ? " is-danger" : ""}" data-index="${i}" type="button">
-        <span class="hint-rank">${rank}</span>
-        <span class="hint-move-row">
-          ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
-          <span class="hint-main">${san}</span>
+        <span class="hint-body">
+          <span class="hint-rank">${rank}</span>
+          <span class="hint-move-row">
+            ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
+            <span class="hint-main">${san}</span>
+          </span>
+          <span class="hint-talk">${escapeHtml(talk)}</span>
         </span>
-        ${danger ? `<span class="hint-warn">${escapeHtml(danger)}</span>` : ""}
       </button>`);
   }
   els.hints.innerHTML = buttons.join("");
@@ -996,6 +1188,7 @@ function showHintArrows(index = null, { reveal = false, onlyActive = false } = {
 }
 
 function youLabel() {
+  if (isLocalVsHuman()) return t(state.game.turn() === "w" ? "turn.white" : "turn.black");
   return state.playerColor === "w" ? t("you.white") : t("you.black");
 }
 
@@ -1035,6 +1228,10 @@ async function refreshHints() {
 
 function endMessage() {
   if (state.game.in_checkmate()) {
+    if (isLocalVsHuman()) {
+      const winner = state.game.turn() === "w" ? "black" : "white";
+      return [t("end.mateWinTitle"), t("end.mateLocal", { color: t(`player.${winner}`) }), "win"];
+    }
     const userWon = state.game.turn() !== state.playerColor;
     return userWon
       ? [t("end.mateWinTitle"), t("end.mateWin"), "win"]
@@ -1140,6 +1337,7 @@ async function applyUserMove(from, to, promotion) {
     return;
   }
   state.busy = true;
+  const fen = state.game.fen();
   const played = state.game.move({ from, to, promotion: promotion || undefined });
   if (!played) {
     state.busy = false;
@@ -1158,6 +1356,16 @@ async function applyUserMove(from, to, promotion) {
     finishGame();
     return;
   }
+  if (isLocalVsHuman()) {
+    syncCoach();
+    const talk = kingComment(fen, played, true);
+    state.lastKingTalk = talk;
+    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played } };
+    state.busy = false;
+    speakKing(talk, { calculating: true, html: true });
+    await refreshHints();
+    return;
+  }
   state.kingReplay = { type: "waiting" };
   speakKing(t("king.waiting"));
   state.busy = false;
@@ -1166,7 +1374,7 @@ async function applyUserMove(from, to, promotion) {
 
 function openPromo(from, to) {
   state.pendingPromo = { from, to };
-  const color = state.playerColor === "w" ? "w" : "b";
+  const color = state.game.turn() === "b" ? "b" : "w";
   els.promo.innerHTML = ["q", "r", "b", "n"]
     .map(
       (p) =>
@@ -1176,6 +1384,19 @@ function openPromo(from, to) {
     )
     .join("");
   els.promo.hidden = false;
+}
+
+function hintsArePlayable() {
+  return playerIsSideToMove() && !state.busy && !state.game.game_over() && !state.kingSpeaking && state.hints.length;
+}
+
+function playHintAt(index) {
+  if (!hintsArePlayable()) return false;
+  const hint = state.hints[index];
+  if (!hint) return false;
+  const move = uciToMove(hint.uci);
+  applyUserMove(move.from, move.to, move.promotion);
+  return true;
 }
 
 els.promo.addEventListener("click", (event) => {
@@ -1189,11 +1410,18 @@ els.promo.addEventListener("click", (event) => {
 
 els.hints.addEventListener("click", (event) => {
   const btn = event.target.closest(".hint-btn");
-  if (!btn || btn.disabled || state.busy || els.hints.classList.contains("loading")) return;
-  const hint = state.hints[Number(btn.dataset.index)];
-  if (!hint) return;
-  const move = uciToMove(hint.uci);
-  applyUserMove(move.from, move.to, move.promotion);
+  if (!btn || btn.disabled) return;
+  playHintAt(Number(btn.dataset.index));
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+  const target = event.target;
+  if (target && (target.closest("input, select, textarea") || target.isContentEditable)) return;
+  if (event.key < "1" || event.key > String(HINTS_PER_PAGE)) return;
+  if (!hintsArePlayable()) return;
+  event.preventDefault();
+  playHintAt(Number(event.key) - 1);
 });
 
 els.hints.addEventListener("pointerover", (event) => {
@@ -1235,6 +1463,15 @@ function openingOptionLabel(opening) {
   return t("opening.moves", { name, n });
 }
 
+function fillModeSelect() {
+  const select = els.playMode;
+  if (!select) return;
+  const current = select.value || "engine";
+  select.innerHTML = ["engine", "local"]
+    .map((mode) => `<option value="${mode}"${mode === current ? " selected" : ""}>${t(`mode.${mode}`)}</option>`)
+    .join("");
+}
+
 function fillSkillSelect() {
   const select = els.skill;
   if (!select) return;
@@ -1262,7 +1499,7 @@ function replayKingTalk() {
     return;
   }
   if (replay.type === "resign") {
-    speakKing(t("king.resign"));
+    speakKing(isLocalVsHuman() ? t("king.resignLocal", { color: sideName() }) : t("king.resign"));
     return;
   }
   if (replay.type === "end") {
@@ -1275,9 +1512,10 @@ function replayKingTalk() {
 
 function applyLanguage() {
   applyStaticI18n();
+  fillModeSelect();
   fillSkillSelect();
   fillStartOpeningSelect();
-  if (els.engineLabel) els.engineLabel.textContent = engineLabelText(state.skill);
+  syncCoach();
   if (els.openingLine) {
     els.openingLine.textContent = state.startOpening?.sans?.length
       ? formatOpeningLine(state.game)
@@ -1338,7 +1576,9 @@ function startOpeningTalk() {
     ? t(`opening.${opening.id}`)
     : "";
   const start = title ? t("king.startNamed", { title }) : t("king.start");
-  const next = playerIsSideToMove() ? t("king.yourMove") : t("king.waitTurn");
+  const next = isLocalVsHuman()
+    ? t("king.yourMoveNamed", { color: sideName() })
+    : playerIsSideToMove() ? t("king.yourMove") : t("king.waitTurn");
   return `${start} ${next}`;
 }
 
@@ -1362,8 +1602,8 @@ function startGame(playerColor = state.playerColor) {
   state.kingSpeaking = false;
   state.engine.stop();
   state.game.reset();
-  state.playerColor = playerColor;
-  state.skill = Number(els.skill.value);
+  state.mode = els.playMode?.value === "local" ? "local" : "engine";
+  state.skill = Number(els.skill?.value || state.skill || 1);
   state.busy = false;
   clearHints();
   clearTimeout(state.aidTimer);
@@ -1376,14 +1616,18 @@ function startGame(playerColor = state.playerColor) {
   clearBoardAids();
   state.pendingPromo = null;
   els.promo.hidden = true;
-  els.engineLabel.textContent = engineLabelText(state.skill);
-  state.board.setOrientation(playerColor === "w" ? "white" : "black");
+  if (!isLocalVsHuman()) {
+    state.playerColor = playerColor;
+    state.board.setOrientation(playerColor === "w" ? "white" : "black");
+  }
   applyStartOpening();
+  if (isLocalVsHuman()) state.playerColor = state.game.turn();
+  syncCoach();
   renderHints();
   renderHistory();
   syncBoard({ keepArrows: true });
   setStatus(
-    playerIsSideToMove() ? t("turn.you") : t("turn.opp"),
+    isLocalVsHuman() || playerIsSideToMove() ? t("turn.you") : t("turn.opp"),
     youLabel(),
     "play"
   );
@@ -1399,7 +1643,7 @@ function undoFullTurn() {
   state.gameId += 1;
   state.engine.stop();
   state.game.undo();
-  if (state.game.turn() !== state.playerColor && state.game.history().length > state.openingPly) {
+  if (!isLocalVsHuman() && state.game.turn() !== state.playerColor && state.game.history().length > state.openingPly) {
     state.game.undo();
   }
   const hist = state.game.history({ verbose: true });
@@ -1407,6 +1651,7 @@ function undoFullTurn() {
   state.board.setLastMove(last ? last.from : null, last ? last.to : null);
   clearHints();
   renderHistory();
+  syncCoach();
   syncBoard();
   computerMove();
 }
@@ -1417,6 +1662,7 @@ document.getElementById("btn-black").addEventListener("click", () => startGame("
 document.getElementById("btn-flip").addEventListener("click", () => {
   const next = state.board.orientation === "white" ? "black" : "white";
   state.board.setOrientation(next);
+  syncCoach();
 });
 document.getElementById("btn-undo").addEventListener("click", undoFullTurn);
 document.getElementById("btn-resign").addEventListener("click", () => {
@@ -1428,14 +1674,25 @@ document.getElementById("btn-resign").addEventListener("click", () => {
   state.busy = false;
   clearHints();
   renderHints();
-  setStatus(t("end.resignTitle"), t("end.resign"), "lose");
-  state.kingReplay = { type: "resign" };
-  speakKing(t("king.resign"), { calculating: false });
+  if (isLocalVsHuman()) {
+    const color = sideName();
+    setStatus(t("end.resignTitle"), t("end.resignLocal", { color }), "lose");
+    state.kingReplay = { type: "resign" };
+    speakKing(t("king.resignLocal", { color }), { calculating: false });
+  } else {
+    setStatus(t("end.resignTitle"), t("end.resign"), "lose");
+    state.kingReplay = { type: "resign" };
+    speakKing(t("king.resign"), { calculating: false });
+  }
   state.board.setInteractive(false);
 });
 els.skill.addEventListener("change", () => {
   state.skill = Number(els.skill.value);
-  els.engineLabel.textContent = engineLabelText(state.skill);
+  if (!isLocalVsHuman()) els.engineLabel.textContent = engineLabelText(state.skill);
+});
+els.playMode?.addEventListener("change", () => {
+  state.mode = els.playMode.value === "local" ? "local" : "engine";
+  startGame(state.playerColor);
 });
 els.startOpening.addEventListener("change", () => startGame(state.playerColor));
 els.aidMoves.addEventListener("click", () => showAid("moves"));
@@ -1446,6 +1703,7 @@ state.board = new Board(els.boardRoot, {
 });
 
 applyStaticI18n();
+fillModeSelect();
 fillSkillSelect();
 fillStartOpeningSelect();
 setStatus(t("status.loading"), t("status.boot"), "think");
