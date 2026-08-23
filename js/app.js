@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260822bestmove";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260822mixmossa";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -14,7 +14,8 @@ const HINT_LAYOUTS = {
   "4x3": { perPage: 4, pages: 3 },
 };
 const CLOCK_KEY = "5minchess.moveClock";
-const CLOCK_OPTIONS = [0, 30, 45, 60];
+const CLOCK_OPTIONS = [0, 10, 30, 45, 60];
+const CLOCK_AUTO_BEST = new Set([10]);
 const HINT_RECALC_MS = 8000;
 
 function readHintLayout() {
@@ -52,6 +53,10 @@ function readMoveClock() {
 
 function moveClockSec() {
   return CLOCK_OPTIONS.includes(state.moveClockSec) ? state.moveClockSec : 0;
+}
+
+function clockPlaysBest() {
+  return CLOCK_AUTO_BEST.has(moveClockSec());
 }
 
 const MOVE_CLOCK_DELAY_MS = 2000;
@@ -380,11 +385,11 @@ const OPPONENT_FEEDBACK_KEYS = {
 
 const FEEDBACK_REACT = {
   best: "🤩",
-  excellent: "🔥",
+  excellent: "🤩",
   strong: "👌",
   good: "👍",
   inaccuracy: "🤔",
-  mistake: "😅",
+  mistake: "🤔",
   blunder: "😱",
   mateMiss: "🙈",
   mateRisk: "😠",
@@ -479,7 +484,7 @@ function showKingReact(band) {
   els.kingReact.classList.remove("is-pop");
   void els.kingReact.offsetWidth;
   els.kingReact.classList.add("is-pop");
-  state.reactTimer = setTimeout(hideKingReactEmoji, 3000);
+  state.reactTimer = setTimeout(hideKingReactEmoji, 5000);
 }
 
 function clearKingReact() {
@@ -1144,15 +1149,81 @@ function hintScore(info) {
   return Number.isFinite(info.score) ? info.score : -Infinity;
 }
 
-function hintRankTag(hint, pool = state.hintPool) {
+const RANK_TIE_CP = 5;
+
+function gapIsCliff(gap, spread, gaps) {
+  if (spread <= 30 || gap <= RANK_TIE_CP) return false;
+  const pct = gap / spread;
+  if (pct >= 0.4) return true;
+  if (pct < 0.25 || gaps.length < 2) return false;
+  const ordered = [...gaps].sort((a, b) => a - b);
+  const median = ordered[Math.floor(ordered.length / 2)];
+  return gap >= median * 2;
+}
+
+function hintRankMap(pool = state.hintPool) {
   const scored = (pool || []).filter((line) => line && !line.synthetic && Number.isFinite(hintScore(line)));
-  if (!hint || hint.synthetic || !Number.isFinite(hintScore(hint)) || !scored.length) return "";
-  const mine = hintScore(hint);
-  const best = Math.max(...scored.map(hintScore));
-  const worst = Math.min(...scored.map(hintScore));
-  if (mine >= best) return t("hint.tag.best");
-  if (best !== worst && mine <= worst) return t("hint.tag.worst");
-  return t("hint.tag.normal");
+  const kinds = new Map();
+  if (!scored.length) return kinds;
+  const items = scored
+    .map((hint) => ({ hint, score: hintScore(hint) }))
+    .sort((a, b) => b.score - a.score);
+  const top = items[0].score;
+  const bottom = items[items.length - 1].score;
+  const spread = top - bottom;
+  const gaps = [];
+  for (let i = 1; i < items.length; i += 1) {
+    gaps.push(items[i - 1].score - items[i].score);
+  }
+  const cluster = [0];
+  let lastCluster = 0;
+  for (let i = 1; i < items.length; i += 1) {
+    if (gapIsCliff(gaps[i - 1], spread, gaps)) lastCluster += 1;
+    cluster.push(lastCluster);
+  }
+  items.forEach((item, i) => {
+    let kind = "normal";
+    if (item.score >= top - RANK_TIE_CP) kind = "best";
+    else if (lastCluster > 0 && cluster[i] === lastCluster) kind = "worst";
+    else if (lastCluster === 0 && spread > RANK_TIE_CP && item.score <= bottom + RANK_TIE_CP) kind = "worst";
+    kinds.set(item.hint.uci, kind);
+  });
+  return kinds;
+}
+
+function hintRankKind(hint, pool = state.hintPool) {
+  if (!hint || hint.synthetic || !hint.uci) return "";
+  return hintRankMap(pool).get(hint.uci) || "";
+}
+
+function hintRankTag(hint, pool = state.hintPool) {
+  const kind = hintRankKind(hint, pool);
+  if (kind === "best") return t("hint.tag.best");
+  if (kind === "worst") return t("hint.tag.worst");
+  if (kind === "normal") return t("hint.tag.normal");
+  return "";
+}
+
+function hintMixCounts(pool = state.hintPool) {
+  let best = 0;
+  let normal = 0;
+  let worst = 0;
+  for (const hint of pool || []) {
+    const kind = hintRankKind(hint, pool);
+    if (kind === "best") best += 1;
+    else if (kind === "worst") worst += 1;
+    else if (kind === "normal") normal += 1;
+  }
+  return { best, normal, worst };
+}
+
+function formatHintMix(pool = state.hintPool) {
+  const { best, normal, worst } = hintMixCounts(pool);
+  const parts = [];
+  if (best) parts.push(t(best === 1 ? "hint.mix.best1" : "hint.mix.bestN", { n: best }));
+  if (normal) parts.push(t(normal === 1 ? "hint.mix.normal1" : "hint.mix.normalN", { n: normal }));
+  if (worst) parts.push(t(worst === 1 ? "hint.mix.worst1" : "hint.mix.worstN", { n: worst }));
+  return parts.join(" · ");
 }
 
 function formatHintEval(info) {
@@ -1323,6 +1394,18 @@ function syncHintNav() {
     els.moreHints.disabled = !canToggle;
   }
   syncRecalcButton();
+  syncHintMix();
+}
+
+function syncHintMix() {
+  if (!els.hintMix) return;
+  const hidden = waitingForHints()
+    || isReviewing()
+    || !state.hintPool.length
+    || state.game.game_over();
+  const text = hidden ? "" : formatHintMix();
+  els.hintMix.textContent = text;
+  els.hintMix.hidden = !text;
 }
 
 function syncRecalcButton() {
@@ -1761,6 +1844,9 @@ const els = {
   moveClockSelect: document.getElementById("move-clock-sec"),
   openingLine: document.getElementById("opening-line"),
   moves: document.getElementById("moves"),
+  reviewBack: document.getElementById("btn-review-back"),
+  reviewFwd: document.getElementById("btn-review-fwd"),
+  reviewLive: document.getElementById("btn-review-live"),
   playerTop: document.getElementById("player-top"),
   playerYou: document.getElementById("player-you"),
   playerName: document.getElementById("player-name"),
@@ -1780,6 +1866,7 @@ const els = {
   moreHints: document.getElementById("btn-more-hints"),
   hintNav: document.getElementById("hint-nav"),
   hintPanel: document.getElementById("hint-panel"),
+  hintMix: document.getElementById("hint-mix"),
   recalcWrap: document.getElementById("hint-recalc"),
   recalcHints: document.getElementById("btn-recalc-hints"),
   recalcBar: document.getElementById("hint-recalc-bar"),
@@ -1836,6 +1923,7 @@ const state = {
   lastOppFeedbackKey: "",
   lastSeeReplyKey: "",
   lastPlayerScore: -Infinity,
+  reviewPly: null,
   pendingPromo: null,
   moveClockToken: 0,
   moveClockTimer: null,
@@ -2044,7 +2132,7 @@ function startMoveClock() {
       paintMoveClock(left);
       if (left > 0) return;
       stopMoveClock();
-      playWorstHint();
+      playClockHint();
     }, 1000);
   }, MOVE_CLOCK_DELAY_MS);
 }
@@ -2057,12 +2145,24 @@ function worstPoolHint() {
   return list.reduce((worst, hint) => (hintScore(hint) < hintScore(worst) ? hint : worst));
 }
 
-function playWorstHint() {
+function bestPoolHint() {
+  const pool = (state.hintPool || []).filter((hint) => hint?.uci);
+  const real = pool.filter((hint) => !hint.synthetic);
+  const list = real.length ? real : pool;
+  if (!list.length) return null;
+  return list.reduce((best, hint) => (hintScore(hint) > hintScore(best) ? hint : best));
+}
+
+function playClockHint() {
   if (state.busy || !playerIsSideToMove() || state.game.game_over()) return;
-  const hint = worstPoolHint();
+  const hint = clockPlaysBest() ? bestPoolHint() : worstPoolHint();
   if (!hint) return;
   const move = uciToMove(hint.uci);
   applyUserMove(move.from, move.to, move.promotion, hint);
+}
+
+function playWorstHint() {
+  playClockHint();
 }
 
 function hideHintPanel() {
@@ -2082,6 +2182,10 @@ function showHintPanel() {
 }
 
 function revealHintsIfReady() {
+  if (isReviewing()) {
+    hideHintPanel();
+    return;
+  }
   const canShow = playerIsSideToMove() && !state.game.game_over() && state.hintPool.length && !state.kingSpeaking;
   if (!canShow) {
     hideHintPanel();
@@ -2129,10 +2233,89 @@ function kingComment(beforeFen, played, asOpponent, feedbackKey) {
     : narratePlayerMove(before, played, after);
 }
 
+function isReviewing() {
+  return Number.isInteger(state.reviewPly);
+}
+
+function livePly() {
+  return state.game.history().length;
+}
+
+function gameAtPly(ply) {
+  const clone = new Chess();
+  const hist = state.game.history({ verbose: true });
+  const n = Math.max(0, Math.min(ply, hist.length));
+  for (let i = 0; i < n; i += 1) clone.move(hist[i]);
+  return clone;
+}
+
+function syncReviewBar() {
+  const live = livePly();
+  const ply = isReviewing() ? state.reviewPly : live;
+  if (els.reviewBack) els.reviewBack.disabled = !live || ply <= 0;
+  if (els.reviewFwd) els.reviewFwd.disabled = !isReviewing();
+  if (els.reviewLive) els.reviewLive.hidden = !isReviewing();
+  document.body.classList.toggle("is-review", isReviewing());
+}
+
+function paintReviewBoard() {
+  const ply = isReviewing() ? state.reviewPly : livePly();
+  const snap = gameAtPly(ply);
+  const hist = state.game.history({ verbose: true });
+  const last = ply > 0 ? hist[ply - 1] : null;
+  state.board.setPosition(snap.fen());
+  state.board.setLastMove(last?.from || null, last?.to || null);
+  state.board.setCheck(snap.in_check() ? kingSquare(snap, snap.turn()) : null);
+  state.board.setArrows([]);
+  state.board.setInteractive(false);
+  renderGraveyard();
+}
+
+function showReviewPly(ply) {
+  const live = livePly();
+  if (ply >= live) {
+    exitReview();
+    return;
+  }
+  state.reviewPly = Math.max(0, ply);
+  hideHintPanel();
+  paintReviewBoard();
+  syncReviewBar();
+  renderHistory();
+}
+
+function exitReview() {
+  if (!isReviewing()) {
+    syncReviewBar();
+    return;
+  }
+  state.reviewPly = null;
+  document.body.classList.remove("is-review");
+  const hist = state.game.history({ verbose: true });
+  const last = hist[hist.length - 1];
+  state.board.setLastMove(last?.from || null, last?.to || null);
+  syncBoard({ keepArrows: true });
+  if (state.hintPool.length && playerIsSideToMove() && !state.game.game_over()) {
+    state.pendingHintReveal = true;
+    revealHintsIfReady();
+  }
+  syncReviewBar();
+  renderHistory();
+}
+
+function stepReview(delta) {
+  const live = livePly();
+  if (!live) return;
+  const current = isReviewing() ? state.reviewPly : live;
+  showReviewPly(current + delta);
+}
+
 function capturedSets() {
   const lost = { w: [], b: [] };
   const order = { q: 0, r: 1, b: 2, n: 3, p: 4 };
-  for (const move of state.game.history({ verbose: true })) {
+  const hist = state.game.history({ verbose: true });
+  const moves = isReviewing() ? hist.slice(0, state.reviewPly) : hist;
+  for (const move of moves) {
     if (!move.captured) continue;
     const victimColor = move.color === "w" ? "b" : "w";
     lost[victimColor].push(move.captured);
@@ -2182,19 +2365,38 @@ function renderGraveyard() {
 
 function renderHistory() {
   const history = state.game.history({ verbose: true });
+  const mark = isReviewing() ? state.reviewPly : history.length;
   let html = "";
   for (let i = 0; i < history.length; i += 2) {
     const n = i / 2 + 1;
     const white = localizeSan(history[i].san);
     const black = history[i + 1] ? localizeSan(history[i + 1].san) : "";
-    html += `<div class="move-row"><span class="move-n">${n}.</span><span>${white}</span><span>${black}</span></div>`;
+    const whiteOn = mark === i + 1 ? " is-on" : "";
+    const blackOn = mark === i + 2 ? " is-on" : "";
+    html += `<div class="move-row"><span class="move-n">${n}.</span><span class="move-san${whiteOn}" data-ply="${i + 1}">${white}</span>${
+      black ? `<span class="move-san${blackOn}" data-ply="${i + 2}">${black}</span>` : "<span></span>"
+    }</div>`;
   }
   els.moves.innerHTML = html || `<div class="moves-empty">${t("moves.empty")}</div>`;
-  els.moves.scrollTop = els.moves.scrollHeight;
+  if (isReviewing()) {
+    els.moves.querySelector(".move-san.is-on")?.scrollIntoView({ block: "nearest" });
+  } else {
+    els.moves.scrollTop = els.moves.scrollHeight;
+  }
   renderGraveyard();
+  syncReviewBar();
 }
 
 function syncBoard(options = {}) {
+  if (isReviewing() && !options.keepReview) {
+    state.reviewPly = null;
+    document.body.classList.remove("is-review");
+    syncReviewBar();
+  }
+  if (isReviewing()) {
+    paintReviewBoard();
+    return;
+  }
   const fen = state.game.fen();
   state.board.setPosition(fen);
   state.board.setTurn(state.game.turn(), state.playerColor);
@@ -2547,7 +2749,7 @@ function openPromo(from, to) {
 }
 
 function hintsArePlayable() {
-  return playerIsSideToMove() && !state.busy && !state.game.game_over() && state.hints.length;
+  return !isReviewing() && playerIsSideToMove() && !state.busy && !state.game.game_over() && state.hints.length;
 }
 
 function playHintAt(index) {
@@ -2985,6 +3187,8 @@ function startGame(playerColor = state.playerColor) {
   state.mode = els.playMode?.value === "local" ? "local" : "engine";
   state.skill = Number(els.skill?.value || state.skill || 1);
   state.busy = false;
+  state.reviewPly = null;
+  document.body.classList.remove("is-review");
   state.recalcHints = false;
   state.recalcUsedThisTurn = false;
   stopRecalcProgress();
@@ -3071,6 +3275,17 @@ document.getElementById("btn-flip").addEventListener("click", () => {
   renderGraveyard();
 });
 document.getElementById("btn-undo").addEventListener("click", undoFullTurn);
+els.reviewBack?.addEventListener("click", () => stepReview(-1));
+els.reviewFwd?.addEventListener("click", () => stepReview(1));
+els.reviewLive?.addEventListener("click", () => exitReview());
+els.moves?.addEventListener("click", (event) => {
+  const cell = event.target.closest("[data-ply]");
+  if (!cell) return;
+  const ply = Number(cell.dataset.ply);
+  if (!Number.isFinite(ply)) return;
+  if (ply >= livePly()) exitReview();
+  else showReviewPly(ply);
+});
 document.getElementById("btn-resign").addEventListener("click", () => {
   if (state.game.game_over() || !state.game.history().length) {
     openNewGameDialog();
