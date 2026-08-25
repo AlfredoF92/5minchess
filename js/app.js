@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260825castle";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260825white";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -72,6 +72,58 @@ const WAR_KING_ART = {
   captureB: { file: "Re Nero cattura Alfiere.png", title: "art.king.captureB" },
   captureQ: { file: "Re Nero Cattura Regina.png", title: "art.king.captureQ" },
   check: { file: "Re Nero Fa scacco al RE.png", title: "art.king.check" },
+};
+const WAR_W_KNIGHT_DIR = "immagini-stile-war/cavallobianco";
+const WAR_W_PAWN_DIR = "immagini-stile-war/pedonebianco";
+const WAR_W_BISHOP_DIR = "immagini-stile-war/alfierobianco";
+const WAR_W_ROOK_DIR = "immagini-stile-war/torrebianca";
+const WAR_W_QUEEN_DIR = "immagini-stile-war/reginabianca";
+const WAR_W_KING_DIR = "immagini-stile-war/rebianco";
+const WAR_W_KNIGHT_ART = {
+  captureP: { file: "Cavallo Bianco cattura Pedone Nero.png", title: "art.wknight.captureP" },
+  captureR: { file: "Cavallo Bianco cattura Torre Nera.png", title: "art.wknight.captureR" },
+  captureN: { file: "Cavallo Bianco cattura Cavallo.png", title: "art.wknight.captureN" },
+  captureB: { file: "Cavallo Bianco cattura Alfiere.png", title: "art.wknight.captureB" },
+  captureQ: { file: "Cavallo Bianco Cattura Regina.png", title: "art.wknight.captureQ" },
+  check: { file: "Cavallo Bianco Fa scacco al RE.png", title: "art.wknight.check" },
+};
+const WAR_W_PAWN_ART = {
+  captureP: { file: "Pedone Bianco cattura Pedone Nero.png", title: "art.wpawn.captureP" },
+  captureR: { file: "Pedone Bianco cattura Torre Nera.png", title: "art.wpawn.captureR" },
+  captureN: { file: "Pedone Bianco cattura Cavallo.png", title: "art.wpawn.captureN" },
+  captureB: { file: "Pedone Bianco cattura Alfiere.png", title: "art.wpawn.captureB" },
+  captureQ: { file: "Pedone Bianco Cattura Regina.png", title: "art.wpawn.captureQ" },
+  check: { file: "Pedone Bianco Fa scacco al RE.png", title: "art.wpawn.check" },
+};
+const WAR_W_BISHOP_ART = {
+  captureP: { file: "Alfiere Bianco cattura Pedone Nero.png", title: "art.wbishop.captureP" },
+  captureR: { file: "Alfiere Bianco cattura Torre Nera.png", title: "art.wbishop.captureR" },
+  captureN: { file: "Alfiere Bianco cattura Cavallo.png", title: "art.wbishop.captureN" },
+  captureB: { file: "Alfiere Bianco cattura Alfiere.png", title: "art.wbishop.captureB" },
+  captureQ: { file: "Alfiere Bianco Cattura Regina.png", title: "art.wbishop.captureQ" },
+  check: { file: "Alfiere Bianco Fa scacco al RE.png", title: "art.wbishop.check" },
+};
+const WAR_W_ROOK_ART = {
+  captureP: { file: "Torre Bianca cattura Pedone Nero.png", title: "art.wrook.captureP" },
+  captureR: { file: "Torre Bianca cattura Torre Nera.png", title: "art.wrook.captureR" },
+  captureN: { file: "Torre Bianca cattura Cavallo.png", title: "art.wrook.captureN" },
+  captureB: { file: "Torre Bianca cattura Alfiere.png", title: "art.wrook.captureB" },
+  check: { file: "Torre Bianca Fa scacco al RE.png", title: "art.wrook.check" },
+};
+const WAR_W_QUEEN_ART = {
+  captureP: { file: "Regina Bianca cattura Pedone Nero.png", title: "art.wqueen.captureP" },
+  captureR: { file: "Regina Bianca cattura Torre Nera.png", title: "art.wqueen.captureR" },
+  captureN: { file: "Regina Bianca cattura Cavallo.png", title: "art.wqueen.captureN" },
+  captureB: { file: "Regina Bianca cattura Alfiere.png", title: "art.wqueen.captureB" },
+  captureQ: { file: "Regina Bianca Cattura Regina.png", title: "art.wqueen.captureQ" },
+  check: { file: "Regina Bianca Fa scacco al RE.png", title: "art.wqueen.check" },
+};
+const WAR_W_KING_ART = {
+  captureP: { file: "Re Bianco cattura Pedone Nero.png", title: "art.wking.captureP" },
+  captureR: { file: "Re Bianco cattura Torre Nera.png", title: "art.wking.captureR" },
+  captureN: { file: "Re Bianco cattura Cavallo.png", title: "art.wking.captureN" },
+  captureB: { file: "Re Bianco cattura Alfiere.png", title: "art.wking.captureB" },
+  captureQ: { file: "Re Bianco Cattura Regina.png", title: "art.wking.captureQ" },
 };
 const CLOCK_OPTIONS = [0, 10, 30, 45, 60];
 const CLOCK_AUTO_BEST = new Set([10]);
@@ -1504,39 +1556,46 @@ function moveHash(move) {
   return [...key].reduce((n, ch) => n + ch.charCodeAt(0), 0);
 }
 
-function blackKnightPoseArt(n) {
+function numberedPoseArt(filePrefix, title, n) {
   const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
-  return {
-    file: `Cavallo Nero Si muove da solo ${pose}.png`,
-    title: "art.knight.pose",
-    n: pose,
-  };
+  return { file: `${filePrefix} ${pose}.png`, title, n: pose };
+}
+
+function pickWarArt(pack, poseArt, move, poseN) {
+  const san = String(move?.san || "");
+  if ((san.includes("#") || san.includes("+")) && pack.check) return pack.check;
+  const cap = move?.captured;
+  if (cap === "p" && pack.captureP) return pack.captureP;
+  if (cap === "r" && pack.captureR) return pack.captureR;
+  if (cap === "n" && pack.captureN) return pack.captureN;
+  if (cap === "b" && pack.captureB) return pack.captureB;
+  if (cap === "q" && pack.captureQ) return pack.captureQ;
+  return poseArt(poseN || moveHash(move) + 1);
+}
+
+function blackKnightPoseArt(n) {
+  return numberedPoseArt("Cavallo Nero Si muove da solo", "art.knight.pose", n);
+}
+
+function whiteKnightPoseArt(n) {
+  return numberedPoseArt("Cavallo Bianco Si muove da solo", "art.wknight.pose", n);
 }
 
 function blackKnightWarArt(move, poseN) {
-  const san = String(move?.san || "");
-  if (san.includes("#") || san.includes("+")) return WAR_KNIGHT_ART.check;
-  const cap = move?.captured;
-  if (cap === "p") return WAR_KNIGHT_ART.captureP;
-  if (cap === "r") return WAR_KNIGHT_ART.captureR;
-  if (cap === "n") return WAR_KNIGHT_ART.captureN;
-  if (cap === "b") return WAR_KNIGHT_ART.captureB;
-  if (cap === "q") return WAR_KNIGHT_ART.captureQ;
-  return blackKnightPoseArt(poseN || moveHash(move) + 1);
+  return pickWarArt(WAR_KNIGHT_ART, blackKnightPoseArt, move, poseN);
 }
 
 function blackPawnPoseArt(n) {
-  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
-  return {
-    file: `Pedone Nero Si muove da solo ${pose}.png`,
-    title: "art.pawn.pose",
-    n: pose,
-  };
+  return numberedPoseArt("Pedone Nero Si muove da solo", "art.pawn.pose", n);
+}
+
+function whitePawnPoseArt(n) {
+  return numberedPoseArt("Pedone Bianco Si muove da solo", "art.wpawn.pose", n);
 }
 
 function quietPiecePoseMap(hints, side, piece) {
   const map = new Map();
-  if (side !== "b") return map;
+  if (side !== "b" && side !== "w") return map;
   const ucis = [];
   for (const hint of hints || []) {
     if (!hint?.uci) continue;
@@ -1556,78 +1615,43 @@ function quietPawnPoseMap(hints, side) {
 }
 
 function blackPawnWarArt(move, poseN) {
-  const san = String(move?.san || "");
-  if (san.includes("#") || san.includes("+")) return WAR_PAWN_ART.check;
-  const cap = move?.captured;
-  if (cap === "p") return WAR_PAWN_ART.captureP;
-  if (cap === "r") return WAR_PAWN_ART.captureR;
-  if (cap === "n") return WAR_PAWN_ART.captureN;
-  if (cap === "b") return WAR_PAWN_ART.captureB;
-  if (cap === "q") return WAR_PAWN_ART.captureQ;
-  return blackPawnPoseArt(poseN || moveHash(move) + 1);
+  return pickWarArt(WAR_PAWN_ART, blackPawnPoseArt, move, poseN);
 }
 
 function blackBishopPoseArt(n) {
-  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
-  return {
-    file: `Alfiere Nero Si muove da solo ${pose}.png`,
-    title: "art.bishop.pose",
-    n: pose,
-  };
+  return numberedPoseArt("Alfiere Nero Si muove da solo", "art.bishop.pose", n);
+}
+
+function whiteBishopPoseArt(n) {
+  return numberedPoseArt("Alfiere Bianco Si muove da solo", "art.wbishop.pose", n);
 }
 
 function blackBishopWarArt(move, poseN) {
-  const san = String(move?.san || "");
-  if (san.includes("#") || san.includes("+")) return WAR_BISHOP_ART.check;
-  const cap = move?.captured;
-  if (cap === "p") return WAR_BISHOP_ART.captureP;
-  if (cap === "r") return WAR_BISHOP_ART.captureR;
-  if (cap === "n") return WAR_BISHOP_ART.captureN;
-  if (cap === "b") return WAR_BISHOP_ART.captureB;
-  if (cap === "q") return WAR_BISHOP_ART.captureQ;
-  return blackBishopPoseArt(poseN || moveHash(move) + 1);
+  return pickWarArt(WAR_BISHOP_ART, blackBishopPoseArt, move, poseN);
 }
 
 function blackQueenPoseArt(n) {
-  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
-  return {
-    file: `Regina Nera Si muove da sola ${pose}.png`,
-    title: "art.queen.pose",
-    n: pose,
-  };
+  return numberedPoseArt("Regina Nera Si muove da sola", "art.queen.pose", n);
+}
+
+function whiteQueenPoseArt(n) {
+  return numberedPoseArt("Regina Bianca Si muove da sola", "art.wqueen.pose", n);
 }
 
 function blackQueenWarArt(move, poseN) {
-  const san = String(move?.san || "");
-  if (san.includes("#") || san.includes("+")) return WAR_QUEEN_ART.check;
-  const cap = move?.captured;
-  if (cap === "p") return WAR_QUEEN_ART.captureP;
-  if (cap === "r") return WAR_QUEEN_ART.captureR;
-  if (cap === "n") return WAR_QUEEN_ART.captureN;
-  if (cap === "b") return WAR_QUEEN_ART.captureB;
-  if (cap === "q") return WAR_QUEEN_ART.captureQ;
-  return blackQueenPoseArt(poseN || moveHash(move) + 1);
+  return pickWarArt(WAR_QUEEN_ART, blackQueenPoseArt, move, poseN);
 }
 
 function blackRookPoseArt(n) {
-  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
-  return {
-    file: `Torre Nera Si muove da sola ${pose}.png`,
-    title: "art.rook.pose",
-    n: pose,
-  };
+  return numberedPoseArt("Torre Nera Si muove da sola", "art.rook.pose", n);
+}
+
+function whiteRookPoseArt(n) {
+  return numberedPoseArt("Torre Bianca Si muove da sola", "art.wrook.pose", n);
 }
 
 function blackRookWarArt(move, poseN) {
-  const san = String(move?.san || "");
-  if (san.includes("#") || san.includes("+")) return WAR_ROOK_ART.check;
-  const cap = move?.captured;
-  if (cap === "p") return WAR_ROOK_ART.captureP;
-  if (cap === "r") return WAR_ROOK_ART.captureR;
-  if (cap === "n") return WAR_ROOK_ART.captureN;
-  if (cap === "b") return WAR_ROOK_ART.captureB;
-  if (cap === "q") return WAR_ROOK_ART.captureQ;
-  return blackRookPoseArt(poseN || moveHash(move) + 1);
+  return pickWarArt(WAR_ROOK_ART, blackRookPoseArt, move, poseN);
 }
 
 function castlePoseMap(hints, side) {
@@ -1655,24 +1679,15 @@ function blackCastlePoseArt(n) {
 }
 
 function blackKingPoseArt(n) {
-  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
-  return {
-    file: `Re Nero Si muove da solo ${pose}.png`,
-    title: "art.king.pose",
-    n: pose,
-  };
+  return numberedPoseArt("Re Nero Si muove da solo", "art.king.pose", n);
+}
+
+function whiteKingPoseArt(n) {
+  return numberedPoseArt("Re Bianco Si muove da solo", "art.wking.pose", n);
 }
 
 function blackKingWarArt(move, poseN) {
-  const san = String(move?.san || "");
-  if (san.includes("#") || san.includes("+")) return WAR_KING_ART.check;
-  const cap = move?.captured;
-  if (cap === "p") return WAR_KING_ART.captureP;
-  if (cap === "r") return WAR_KING_ART.captureR;
-  if (cap === "n") return WAR_KING_ART.captureN;
-  if (cap === "b") return WAR_KING_ART.captureB;
-  if (cap === "q") return WAR_KING_ART.captureQ;
-  return blackKingPoseArt(poseN || moveHash(move) + 1);
+  return pickWarArt(WAR_KING_ART, blackKingPoseArt, move, poseN);
 }
 
 function warCardHtml(dir, art) {
@@ -1704,6 +1719,27 @@ function storyArtHtml(move, color, poses = {}) {
       return warCardHtml(WAR_CASTLE_DIR, blackCastlePoseArt(poses.castle));
     }
     return warCardHtml(WAR_KING_DIR, blackKingWarArt(move, poses.k));
+  }
+  if (color === "w" && move?.piece === "n") {
+    return warCardHtml(WAR_W_KNIGHT_DIR, pickWarArt(WAR_W_KNIGHT_ART, whiteKnightPoseArt, move, poses.n));
+  }
+  if (color === "w" && move?.piece === "p") {
+    return warCardHtml(WAR_W_PAWN_DIR, pickWarArt(WAR_W_PAWN_ART, whitePawnPoseArt, move, poses.p));
+  }
+  if (color === "w" && move?.piece === "b") {
+    return warCardHtml(WAR_W_BISHOP_DIR, pickWarArt(WAR_W_BISHOP_ART, whiteBishopPoseArt, move, poses.b));
+  }
+  if (color === "w" && move?.piece === "r") {
+    return warCardHtml(WAR_W_ROOK_DIR, pickWarArt(WAR_W_ROOK_ART, whiteRookPoseArt, move, poses.r));
+  }
+  if (color === "w" && move?.piece === "q") {
+    return warCardHtml(WAR_W_QUEEN_DIR, pickWarArt(WAR_W_QUEEN_ART, whiteQueenPoseArt, move, poses.q));
+  }
+  if (color === "w" && move?.piece === "k") {
+    if (String(move?.san || "").startsWith("O-O")) {
+      return warCardHtml(WAR_W_KING_DIR, whiteKingPoseArt(poses.castle || poses.k || moveHash(move) + 1));
+    }
+    return warCardHtml(WAR_W_KING_DIR, pickWarArt(WAR_W_KING_ART, whiteKingPoseArt, move, poses.k));
   }
   const src = pieceIcon(move, color) || `pieces/${color || "w"}N.svg`;
   const title = escapeHtml(move ? pieceName(move.piece || "p") : t("hints.move"));
