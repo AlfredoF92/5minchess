@@ -1,0 +1,52 @@
+---
+description: Commit after every completed change; push every 3 unpushed commits
+alwaysApply: true
+---
+
+# Auto commit + push ogni 3
+
+In questo repo, dopo ogni richiesta utente che modifica file, fai **sempre commit**. Non aspettare che l’utente lo chieda: qui vale questa regola, non “commit only when asked”.
+
+## Dopo ogni modifica completata
+
+1. Non committare a metà lavoro. Aspetta che la modifica sia finita e coerente.
+2. Un commit per richiesta utente (non un commit per ogni file toccato).
+3. In parallelo: `git status`, `git diff`, `git log -5 --oneline`.
+4. Aggiungi **solo i file di questa modifica** (`git add` selettivo). Non mischiare immagini/war, cache o file non toccati.
+5. Non committare segreti (`.env`, credenziali).
+6. Commit nello stile del repo (inglese, imperative, 1 riga sul **perché**):
+
+```
+git commit -m "$(cat <<'EOF'
+Messaggio qui.
+
+EOF
+)"
+```
+
+Su PowerShell, se l’heredoc fallisce, usa:
+
+```
+git commit -m "Messaggio qui."
+```
+
+7. Mai `--no-verify`, `--amend` (salvo regole git esistenti), force push, hard reset.
+
+## Push ogni 3 commit
+
+Dopo **ogni** commit riuscito:
+
+```
+git rev-list --count @{u}..HEAD
+```
+
+- Se il ramo non ha upstream, conta i commit locali non ancora su `origin`.
+- Se il numero è **>= 3**, fai `git push` (o `git push -u origin HEAD` se manca l’upstream).
+- Se è 1 o 2, **non pushare**. Dillo in chiusura: “Commit fatto. Push al 3° (ora N/3).”
+- Se il push fallisce, non forzare: segnala l’errore.
+
+## Esempio
+
+- Modifica 1 → commit → nessun push (1/3)
+- Modifica 2 → commit → nessun push (2/3)
+- Modifica 3 → commit → **push** (0/3)
