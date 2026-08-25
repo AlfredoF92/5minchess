@@ -1,11 +1,13 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
-import { Board } from "./board.js";
+import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260822mixmossa";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260825tags";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
+const TRAIN_MODE_KEY = "5minchess.trainingMode";
+const AUTO_CONTINUE_KEY = "5minchess.autoContinue";
 const HINT_LAYOUTS = {
   "6x1": { perPage: 6, pages: 1 },
   "4x1": { perPage: 4, pages: 1 },
@@ -14,6 +16,7 @@ const HINT_LAYOUTS = {
   "4x3": { perPage: 4, pages: 3 },
 };
 const CLOCK_KEY = "5minchess.moveClock";
+const ROUND_EVAL_KEY = "5minchess.roundEval";
 const CLOCK_OPTIONS = [0, 10, 30, 45, 60];
 const CLOCK_AUTO_BEST = new Set([10]);
 const HINT_RECALC_MS = 8000;
@@ -49,6 +52,30 @@ function readMoveClock() {
     /* ignore */
   }
   return 0;
+}
+
+function readTrainingMode() {
+  try {
+    return localStorage.getItem(TRAIN_MODE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readAutoContinue() {
+  try {
+    return localStorage.getItem(AUTO_CONTINUE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readRoundEval() {
+  try {
+    return localStorage.getItem(ROUND_EVAL_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 function moveClockSec() {
@@ -359,17 +386,20 @@ function evalDrop(hint) {
   return state.hintBestScore - hintScore(hint);
 }
 
-const FEEDBACK_BAND_KEYS = {
-  best: ["fb.1", "fb.2", "fb.3", "fb.4", "fb.5", "fb.6"],
-  excellent: ["fb.7", "fb.8", "fb.9", "fb.10", "fb.11"],
-  strong: ["fb.12", "fb.13", "fb.14", "fb.15", "fb.16"],
-  good: ["fb.17", "fb.18", "fb.19", "fb.20", "fb.21"],
-  inaccuracy: ["fb.22", "fb.23", "fb.24", "fb.25", "fb.26"],
-  mistake: ["fb.27", "fb.28", "fb.29", "fb.30", "fb.31"],
-  blunder: ["fb.32", "fb.33", "fb.34", "fb.35", "fb.36"],
-  mateMiss: ["fb.37", "fb.38"],
-  mateRisk: ["fb.39", "fb.40"],
+const LIFE_FEEDBACK_KEYS = {
+  gain: ["life.gain.1", "life.gain.2", "life.gain.3", "life.gain.4", "life.gain.5", "life.gain.6", "life.gain.7", "life.gain.8", "life.gain.9", "life.gain.10"],
+  hold: ["life.hold.1", "life.hold.2", "life.hold.3", "life.hold.4", "life.hold.5", "life.hold.6", "life.hold.7", "life.hold.8", "life.hold.9", "life.hold.10"],
+  lose05: ["life.lose05.1", "life.lose05.2", "life.lose05.3", "life.lose05.4", "life.lose05.5", "life.lose05.6", "life.lose05.7", "life.lose05.8", "life.lose05.9", "life.lose05.10"],
+  lose10: ["life.lose10.1", "life.lose10.2", "life.lose10.3", "life.lose10.4", "life.lose10.5", "life.lose10.6", "life.lose10.7", "life.lose10.8", "life.lose10.9", "life.lose10.10"],
+  lose15: ["life.lose15.1", "life.lose15.2", "life.lose15.3", "life.lose15.4", "life.lose15.5", "life.lose15.6", "life.lose15.7", "life.lose15.8", "life.lose15.9", "life.lose15.10"],
+  lose20: ["life.lose20.1", "life.lose20.2", "life.lose20.3", "life.lose20.4", "life.lose20.5", "life.lose20.6", "life.lose20.7", "life.lose20.8", "life.lose20.9", "life.lose20.10"],
+  lose25: ["life.lose25.1", "life.lose25.2", "life.lose25.3", "life.lose25.4", "life.lose25.5", "life.lose25.6", "life.lose25.7", "life.lose25.8", "life.lose25.9", "life.lose25.10"],
 };
+
+const OPP_ADV_KEYS = [
+  "opp.adv.1", "opp.adv.2", "opp.adv.3", "opp.adv.4", "opp.adv.5",
+  "opp.adv.6", "opp.adv.7", "opp.adv.8", "opp.adv.9", "opp.adv.10",
+];
 
 const OPPONENT_FEEDBACK_KEYS = {
   best: ["ofb.1", "ofb.2", "ofb.3", "ofb.4", "ofb.5"],
@@ -393,14 +423,26 @@ const FEEDBACK_REACT = {
   blunder: "😱",
   mateMiss: "🙈",
   mateRisk: "😠",
-  heartHalf: "🙁",
-  heartOne: "😢",
+  oppBest: "😭",
+  heartHalf: "😭",
+  heartOne: "😭",
   heartMany: "😭",
+};
+
+const FEEDBACK_REACT_LOW = {
+  best: "👍",
+  excellent: "👍",
+  strong: "👌",
+  good: "👌",
+  inaccuracy: "🤔",
+  mistake: "🤔",
+  blunder: "🤔",
+  mateMiss: "🤔",
 };
 
 const FEEDBACK_LEGEND = [
   "best", "excellent", "strong", "good",
-  "inaccuracy", "mistake", "blunder", "mateMiss", "mateRisk",
+  "inaccuracy", "mistake", "blunder", "mateMiss", "mateRisk", "oppBest",
   "heartHalf", "heartOne", "heartMany",
 ];
 
@@ -443,12 +485,31 @@ function pickKey(keys, lastProp) {
   return pick;
 }
 
-function pickFeedbackKey(hint, bestScore, pool) {
-  return pickKey(FEEDBACK_BAND_KEYS[feedbackBand(hint, bestScore, pool)] || FEEDBACK_BAND_KEYS.good, "lastFeedbackKey");
+function pickLifeFeedbackKey(deltaHalves) {
+  let bucket = "hold";
+  if (deltaHalves > 0) bucket = "gain";
+  else if (deltaHalves === -1) bucket = "lose05";
+  else if (deltaHalves === -2) bucket = "lose10";
+  else if (deltaHalves === -3) bucket = "lose15";
+  else if (deltaHalves === -4) bucket = "lose20";
+  else if (deltaHalves <= -5) bucket = "lose25";
+  return pickKey(LIFE_FEEDBACK_KEYS[bucket], "lastLifeFeedbackKey");
 }
 
-function bandFromFeedbackKey(key) {
-  return Object.keys(FEEDBACK_BAND_KEYS).find((band) => FEEDBACK_BAND_KEYS[band].includes(key)) || "";
+function rankReactBand(kind) {
+  if (kind === "best") return "best";
+  if (kind === "worst") return "inaccuracy";
+  return "good";
+}
+
+function kingMoraleLow() {
+  return kingLifeHalves() <= 3;
+}
+
+function reactEmoji(band) {
+  if (!band) return "";
+  if (kingMoraleLow() && FEEDBACK_REACT_LOW[band]) return FEEDBACK_REACT_LOW[band];
+  return FEEDBACK_REACT[band] || "";
 }
 
 function renderKingLegend() {
@@ -456,7 +517,7 @@ function renderKingLegend() {
   if (!root) return;
   root.innerHTML = FEEDBACK_LEGEND.map((band) => (
     `<span class="legend-item${state.lastFeedbackBand === band ? " is-on" : ""}" data-band="${band}">
-      <span class="legend-emoji">${FEEDBACK_REACT[band]}</span>
+      <span class="legend-emoji">${reactEmoji(band)}</span>
       <span class="legend-label">${t(`legend.${band}`)}</span>
     </span>`
   )).join("");
@@ -470,7 +531,7 @@ function hideKingReactEmoji() {
 }
 
 function showKingReact(band) {
-  const emoji = FEEDBACK_REACT[band];
+  const emoji = reactEmoji(band);
   state.lastFeedbackBand = band || "";
   renderKingLegend();
   clearTimeout(state.reactTimer);
@@ -484,7 +545,7 @@ function showKingReact(band) {
   els.kingReact.classList.remove("is-pop");
   void els.kingReact.offsetWidth;
   els.kingReact.classList.add("is-pop");
-  state.reactTimer = setTimeout(hideKingReactEmoji, 5000);
+  state.reactTimer = setTimeout(hideKingReactEmoji, 8000);
 }
 
 function clearKingReact() {
@@ -521,14 +582,27 @@ function pickOpponentFeedbackKey(hint, bestScore, pool) {
   );
 }
 
+function opponentRankKind(feedbackKey) {
+  const band = Object.keys(OPPONENT_FEEDBACK_KEYS).find((name) =>
+    OPPONENT_FEEDBACK_KEYS[name].includes(feedbackKey)
+  );
+  if (band === "best" || band === "excellent" || band === "mateRisk") return "best";
+  if (band === "inaccuracy" || band === "mistake" || band === "blunder" || band === "mateMiss") return "worst";
+  return "normal";
+}
+
 function pickSeeReplyKey() {
   return pickKey(SEE_REPLY_KEYS, "lastSeeReplyKey");
 }
 
-function playerFeedbackTalk(fbKey, replyKey) {
-  const body = t(fbKey);
-  if (!replyKey) return body;
-  return `${body}\n\n${t(replyKey)}`;
+function playerFeedbackTalk(lifeKey, replyKey, rankKind = "normal") {
+  const opener = t(
+    rankKind === "best" ? "fb.open.best" : rankKind === "worst" ? "fb.open.worst" : "fb.open.normal"
+  );
+  const body = t(lifeKey);
+  const wait = replyKey ? t(replyKey) : "";
+  const line = `<strong>${escapeHtml(opener)}</strong> ${escapeHtml(body)}`.trim();
+  return wait ? `${line}<br><br>${escapeHtml(wait)}` : line;
 }
 
 async function scorePlayedUci(fen, uci) {
@@ -1081,6 +1155,7 @@ function explainMove(before, move, after, hint) {
 }
 
 const ARROW_GREEN = "#8ec85a";
+const ARROW_GRAY = "#c5c5c5";
 
 const SKILL_LEVELS = {
   1: { elo: 1200, skill: 0, movetime: 350 },
@@ -1115,7 +1190,8 @@ function localizeSan(san) {
 function tryHint(hint) {
   if (!hint?.uci) return { played: null, after: null };
   const move = uciToMove(hint.uci);
-  const after = new Chess(state.game.fen());
+  const fen = isTrainHold() && state.trainFen ? state.trainFen : state.game.fen();
+  const after = new Chess(fen);
   const played = after.move({
     from: move.from,
     to: move.to,
@@ -1161,6 +1237,17 @@ function gapIsCliff(gap, spread, gaps) {
   return gap >= median * 2;
 }
 
+function hintLifeDelta(hint) {
+  if (!hint || hint.synthetic) return 0;
+  const score = hintScore(hint);
+  if (!Number.isFinite(score)) return 0;
+  const nowHalves = isTrainHold() && Number.isFinite(state.trainLives) ? state.trainLives : kingLifeHalves();
+  const now = displayLifeHalves(nowHalves);
+  const game = isTrainHold() && state.trainFen ? new Chess(state.trainFen) : state.game;
+  const after = displayLifeHalves(livesFromCp(evalForPlayer(score, game)));
+  return after - now;
+}
+
 function hintRankMap(pool = state.hintPool) {
   const scored = (pool || []).filter((line) => line && !line.synthetic && Number.isFinite(hintScore(line)));
   const kinds = new Map();
@@ -1188,6 +1275,16 @@ function hintRankMap(pool = state.hintPool) {
     else if (lastCluster === 0 && spread > RANK_TIE_CP && item.score <= bottom + RANK_TIE_CP) kind = "worst";
     kinds.set(item.hint.uci, kind);
   });
+  const kindOf = (item) => kinds.get(item.hint.uci);
+  const count = (kind) => items.filter((item) => kindOf(item) === kind).length;
+  if (count("best") === 0) kinds.set(items[0].hint.uci, "best");
+  if (items.length >= 2 && count("normal") === 0) {
+    const notBest = items.find((item) => kindOf(item) !== "best");
+    const target = notBest || items[items.length - 1];
+    if (kindOf(items[0]) === "best" && target.hint.uci !== items[0].hint.uci) {
+      kinds.set(target.hint.uci, "normal");
+    }
+  }
   return kinds;
 }
 
@@ -1199,7 +1296,6 @@ function hintRankKind(hint, pool = state.hintPool) {
 function hintRankTag(hint, pool = state.hintPool) {
   const kind = hintRankKind(hint, pool);
   if (kind === "best") return t("hint.tag.best");
-  if (kind === "worst") return t("hint.tag.worst");
   if (kind === "normal") return t("hint.tag.normal");
   return "";
 }
@@ -1219,10 +1315,10 @@ function hintMixCounts(pool = state.hintPool) {
 
 function formatHintMix(pool = state.hintPool) {
   const { best, normal, worst } = hintMixCounts(pool);
+  const good = normal + worst;
   const parts = [];
   if (best) parts.push(t(best === 1 ? "hint.mix.best1" : "hint.mix.bestN", { n: best }));
-  if (normal) parts.push(t(normal === 1 ? "hint.mix.normal1" : "hint.mix.normalN", { n: normal }));
-  if (worst) parts.push(t(worst === 1 ? "hint.mix.worst1" : "hint.mix.worstN", { n: worst }));
+  if (good) parts.push(t(good === 1 ? "hint.mix.normal1" : "hint.mix.normalN", { n: good }));
   return parts.join(" · ");
 }
 
@@ -1233,10 +1329,53 @@ function formatHintEval(info) {
     if (info.score < 0) return t("eval.mateIn", { n: Math.abs(info.score) });
     return t("eval.mate");
   }
-  const pawns = info.score / 100;
-  if (pawns > 0) return `+${pawns.toFixed(2)}`;
-  if (pawns < 0) return pawns.toFixed(2);
-  return "0.00";
+  const raw = info.score / 100;
+  if (!Number.isFinite(raw)) return "—";
+  const shown = state.roundEval ? Math.round(raw * 10) / 10 : raw;
+  if (!shown) return state.roundEval ? "0.0" : "0.00";
+  const digits = state.roundEval ? Math.abs(shown).toFixed(1) : Math.abs(shown).toFixed(2);
+  return shown > 0 ? `+${digits}` : `-${digits}`;
+}
+
+function hintEvalDir(info) {
+  if (!info || info.synthetic) return "";
+  if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
+  if (state.roundEval) {
+    const rounded = Math.round((info.score / 100) * 10) / 10;
+    if (rounded > 0) return "up";
+    if (rounded < 0) return "down";
+    return "";
+  }
+  if (info.score > 0) return "up";
+  if (info.score < 0) return "down";
+  return "";
+}
+
+function hintEvalArrowSvg(dir) {
+  const path = dir === "down"
+    ? "M12 20 4 12h5V4h6v8h5Z"
+    : "M12 4l8 8h-5v8h-6v-8H4Z";
+  return `<svg class="hint-eval-dir is-${dir}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${path}"/></svg>`;
+}
+
+function hintEvalHtml(info) {
+  if (!info || info.synthetic) return "—";
+  const dir = hintEvalDir(info);
+  const arrow = dir ? hintEvalArrowSvg(dir) : "";
+  return `${arrow}${escapeHtml(formatHintEval(info))}`;
+}
+
+function hintTagHtml(hint, pool = state.hintPool) {
+  const kind = hintRankKind(hint, pool);
+  const tag = hintRankTag(hint, pool);
+  if (!tag) return "";
+  if (kind === "best") {
+    return `<span class="hint-tag is-best"><span class="hint-star" aria-hidden="true">★</span>${escapeHtml(tag)}</span>`;
+  }
+  if (kind === "normal") {
+    return `<span class="hint-tag is-good"><span class="hint-up" aria-hidden="true">👍</span>${escapeHtml(tag)}</span>`;
+  }
+  return "";
 }
 
 function evalClass(info) {
@@ -1247,16 +1386,45 @@ function evalClass(info) {
   return "";
 }
 
+function formatHintSquare(square) {
+  return String(square || "").toUpperCase();
+}
+
+function hintCheckTail(move) {
+  const san = String(move?.san || "");
+  if (san.includes("#")) return t("headline.checkmate");
+  if (san.includes("+")) return t("headline.check");
+  return "";
+}
+
+function withCheckLine(text, move) {
+  const tail = hintCheckTail(move);
+  return tail ? `${text}. ${tail}` : text;
+}
+
 function moveHeadline(move) {
   if (!move) return t("hints.move");
-  if (move.san.startsWith("O-O-O")) return t("headline.castleLong");
-  if (move.san.startsWith("O-O")) return t("headline.castle");
+  if (move.san.startsWith("O-O-O")) return withCheckLine(t("headline.castleLong"), move);
+  if (move.san.startsWith("O-O")) return withCheckLine(t("headline.castle"), move);
   const piece = pieceName(move.piece);
+  const to = formatHintSquare(move.to);
+  const target = move.captured ? pieceName(move.captured).toLowerCase() : "";
+  const ep = String(move.flags || "").includes("e");
+  let line = "";
   if (move.promotion) {
-    return t("headline.promo", { piece, promo: pieceName(move.promotion), to: move.to });
+    line = move.captured
+      ? t("headline.promoTake", { piece, target, to, promo: pieceName(move.promotion) })
+      : t("headline.promo", { piece, to, promo: pieceName(move.promotion) });
+  } else if (ep) {
+    line = t("headline.ep", { to });
+  } else if (move.captured) {
+    line = move.piece === "p"
+      ? t("headline.pawnTake", { to })
+      : t("headline.take", { piece, target, to });
+  } else {
+    line = t("headline.move", { piece, to });
   }
-  if (move.captured) return t("headline.capture", { piece, to: move.to });
-  return t("headline.move", { piece, to: move.to });
+  return withCheckLine(line, move);
 }
 
 function pieceIcon(move, color) {
@@ -1321,11 +1489,11 @@ function evalForPlayer(score, game) {
 }
 
 function livesFromCp(cp) {
-  if (!Number.isFinite(cp) || cp >= -40) return 6;
-  if (cp > -120) return 5;
-  if (cp > -220) return 4;
-  if (cp > -350) return 3;
-  if (cp > -550) return 2;
+  if (!Number.isFinite(cp) || cp >= -100) return 6;
+  if (cp > -180) return 5;
+  if (cp > -280) return 4;
+  if (cp > -410) return 3;
+  if (cp > -610) return 2;
   return 1;
 }
 
@@ -1338,26 +1506,155 @@ function kingLifeHalves() {
   return livesFromCp(state.gameEval);
 }
 
-function opponentReactBand(afterGame, beforeEval) {
+function opponentReactBand(afterGame, beforeEval, feedbackKey) {
   if (afterGame.in_checkmate() || afterGame.in_check()) return "mateRisk";
-  const lost = livesFromCp(beforeEval) - livesFromCp(state.gameEval);
-  if (lost >= 3) return "heartMany";
-  if (lost >= 2) return "heartOne";
-  if (lost >= 1) return "heartHalf";
+  const lost = displayLifeHalves(livesFromCp(beforeEval)) - displayLifeHalves(livesFromCp(state.gameEval));
+  if (lost > 0) return "heartMany";
+  if (feedbackKey && opponentRankKind(feedbackKey) === "best") return "oppBest";
   return "";
+}
+
+function opponentSwingTalk(beforeEval, feedbackKey) {
+  if (!Number.isFinite(beforeEval) || !Number.isFinite(state.gameEval)) return "";
+  const visDelta = displayLifeHalves(livesFromCp(state.gameEval)) - displayLifeHalves(livesFromCp(beforeEval));
+  if (visDelta < 0) return t(pickLifeFeedbackKey(visDelta));
+  if (opponentRankKind(feedbackKey) === "worst") return "";
+  if (beforeEval - state.gameEval >= 40) return t(pickKey(OPP_ADV_KEYS, "lastOppAdvKey"));
+  return "";
+}
+
+function displayLifeHalves(halves = kingLifeHalves()) {
+  return halves === 5 ? 4 : halves;
+}
+
+function visibleLifeHalves() {
+  if (Number.isInteger(state.livesHold)) return displayLifeHalves(state.livesHold);
+  return displayLifeHalves();
+}
+
+function freezeKingLives(halves) {
+  if (!Number.isInteger(halves)) return;
+  state.livesHold = halves;
+}
+
+function thawKingLives() {
+  state.livesHold = null;
+}
+
+function heartKind(halves, i) {
+  const left = halves - i * 2;
+  return left >= 2 ? "full" : left === 1 ? "half" : "empty";
+}
+
+function hintHeartPiece(kind, tone) {
+  return `<span class="king-heart hint-heart is-${kind} is-${tone}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg">♥</span></span>`;
+}
+
+function hintDeltaHeartPieces(halves, tone) {
+  const parts = [];
+  let left = Math.abs(halves);
+  while (left >= 2) {
+    parts.push(hintHeartPiece("full", tone));
+    left -= 2;
+  }
+  if (left === 1) parts.push(hintHeartPiece("half", tone));
+  return parts.join("");
+}
+
+function hintHeartsHtml(hint) {
+  if (!hint || hint.synthetic) return "";
+  const score = hintScore(hint);
+  if (!Number.isFinite(score)) return "";
+  const delta = hintLifeDelta(hint);
+  if (!delta) return "";
+  const gain = delta > 0;
+  const label = gain ? t("hint.lives.gain") : t("hint.lives.lose");
+  const sign = gain ? "+" : "−";
+  const tone = gain ? "gain" : "lose";
+  return `<span class="hint-hearts is-${tone}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}"><span class="hint-hearts-mark">(</span><span class="hint-hearts-sign">${sign}</span>${hintDeltaHeartPieces(delta, tone)}<span class="hint-hearts-mark">)</span></span>`;
+}
+
+function stopLivesAnim() {
+  clearTimeout(state.livesAnimTimer);
+  state.livesAnimTimer = null;
+  state.livesAnimating = false;
+  state.pendingLives = null;
+  els.kingLives?.classList.remove("is-flash");
+}
+
+function paintKingHearts(halves) {
+  const root = els.kingLives;
+  if (!root) return;
+  const shown = displayLifeHalves(halves);
+  root.classList.remove("is-flash");
+  root.innerHTML = [0, 1, 2]
+    .map((i) => {
+      const kind = heartKind(shown, i);
+      return `<span class="king-heart is-${kind}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg">♥</span></span>`;
+    })
+    .join("");
+  state.shownLives = shown;
+}
+
+function applyHeartKinds(halves, { drop = false } = {}) {
+  const root = els.kingLives;
+  const shown = displayLifeHalves(halves);
+  if (!root?.children.length) {
+    paintKingHearts(shown);
+    return;
+  }
+  [...root.children].forEach((el, i) => {
+    const kind = heartKind(shown, i);
+    const prev = el.classList.contains("is-full") ? "full" : el.classList.contains("is-half") ? "half" : "empty";
+    el.classList.remove("is-full", "is-half", "is-empty", "is-drop");
+    el.classList.add(`is-${kind}`);
+    if (drop && prev !== kind) {
+      el.classList.add("is-drop");
+      el.addEventListener("animationend", () => el.classList.remove("is-drop"), { once: true });
+    }
+  });
+  state.shownLives = shown;
+}
+
+function queueLifeLoss(next) {
+  next = displayLifeHalves(next);
+  state.pendingLives = Number.isInteger(state.pendingLives) ? Math.min(state.pendingLives, next) : next;
+  if (state.livesAnimating) return;
+  const root = els.kingLives;
+  if (!root) return;
+  state.livesAnimating = true;
+  root.classList.remove("is-flash");
+  void root.offsetWidth;
+  root.classList.add("is-flash");
+  state.livesAnimTimer = setTimeout(() => {
+    root.classList.remove("is-flash");
+    const to = Number.isInteger(state.pendingLives) ? state.pendingLives : next;
+    state.pendingLives = null;
+    applyHeartKinds(to, { drop: true });
+    state.livesAnimTimer = setTimeout(() => {
+      state.livesAnimating = false;
+      const latest = visibleLifeHalves();
+      if (latest < state.shownLives) queueLifeLoss(latest);
+      else if (latest !== state.shownLives) paintKingHearts(latest);
+    }, 480);
+  }, 900);
 }
 
 function renderKingLives() {
   const root = els.kingLives;
   if (!root) return;
-  const halves = kingLifeHalves();
-  root.innerHTML = [0, 1, 2]
-    .map((i) => {
-      const left = halves - i * 2;
-      const kind = left >= 2 ? "full" : left === 1 ? "half" : "empty";
-      return `<span class="king-heart is-${kind}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg">♥</span></span>`;
-    })
-    .join("");
+  const next = visibleLifeHalves();
+  if (!root.children.length || !Number.isInteger(state.shownLives)) {
+    paintKingHearts(next);
+    return;
+  }
+  if (next === state.shownLives && !state.livesAnimating) return;
+  if (next >= state.shownLives) {
+    stopLivesAnim();
+    paintKingHearts(next);
+    return;
+  }
+  queueLifeLoss(next);
 }
 
 function hintPageCount() {
@@ -1372,6 +1669,99 @@ function visibleHints() {
   return state.hintPool.slice(start, start + perPage);
 }
 
+function visibleHintDests() {
+  const dests = {};
+  for (const hint of state.hints || []) {
+    if (!hint?.uci) continue;
+    const { from, to } = uciToMove(hint.uci);
+    if (!from || !to) continue;
+    if (!dests[from]) dests[from] = [];
+    if (!dests[from].includes(to)) dests[from].push(to);
+  }
+  return dests;
+}
+
+function boardHintPlayReady() {
+  return Boolean(state.board)
+    && hintsArePlayable()
+    && hintPanelOpen()
+    && !waitingForHints()
+    && (state.hints || []).some((hint) => hint?.uci);
+}
+
+function firstBoardPlaySquare() {
+  const dests = visibleHintDests();
+  const squares = Object.keys(dests).filter((square) => dests[square]?.length);
+  const white = state.board?.orientation !== "black";
+  squares.sort((a, b) => {
+    const ay = white ? 8 - Number(a[1]) : Number(a[1]) - 1;
+    const by = white ? 8 - Number(b[1]) : Number(b[1]) - 1;
+    const ax = white ? a.charCodeAt(0) : 7 - (a.charCodeAt(0) - 97);
+    const bx = white ? b.charCodeAt(0) : 7 - (b.charCodeAt(0) - 97);
+    return ay - by || ax - bx;
+  });
+  return squares[0] || null;
+}
+
+function hintIndexForSquares(from, to) {
+  return (state.hints || []).findIndex((hint) => {
+    if (!hint?.uci) return false;
+    const move = uciToMove(hint.uci);
+    return move.from === from && move.to === to;
+  });
+}
+
+function hintIndicesFromSquare(from) {
+  const indices = [];
+  (state.hints || []).forEach((hint, i) => {
+    if (hint?.uci?.slice(0, 2) === from) indices.push(i);
+  });
+  return indices;
+}
+
+function previewHintsFromSquare(from) {
+  const indices = hintIndicesFromSquare(from);
+  showHintArrows(indices.length ? indices : null, { reveal: true });
+}
+
+function previewFromBoardCursor() {
+  if (!state.board) return;
+  const selected = state.board.getSelected();
+  const cursor = state.board.getCursor();
+  if (selected && cursor && cursor !== selected) {
+    const index = hintIndexForSquares(selected, cursor);
+    if (index >= 0) {
+      state.kbdHint = index;
+      paintKbdHint();
+      showHintArrows(index, { reveal: true });
+      return;
+    }
+  }
+  state.kbdHint = null;
+  paintKbdHint();
+  if (selected) previewHintsFromSquare(selected);
+  else if (cursor) previewHintsFromSquare(cursor);
+  else showHintArrows(null, { reveal: Boolean(state.aids.moves) });
+}
+
+function playHintMove(from, to) {
+  const index = hintIndexForSquares(from, to);
+  const hint = index >= 0 ? state.hints[index] : null;
+  const promo = hint ? uciToMove(hint.uci).promotion : undefined;
+  applyUserMove(from, to, promo, hint);
+}
+
+function syncHintBoardPlay() {
+  if (!state.board) return;
+  if (!boardHintPlayReady()) {
+    state.board.setDests({});
+    state.board.setInteractive(false);
+    return;
+  }
+  state.board.setDests(visibleHintDests());
+  state.board.setInteractive(true);
+}
+
 function syncHintLayoutUi() {
   const n = hintsPerPage();
   els.hints?.classList.toggle("is-four", n === 4);
@@ -1379,13 +1769,14 @@ function syncHintLayoutUi() {
 }
 
 function syncHintNav() {
-  const hidden = waitingForHints();
+  const hidden = waitingForHints() && !isTrainHold();
   const perPage = hintsPerPage();
   const label = t("hints.more", { n: perPage });
   els.hints?.classList.toggle("is-waiting", hidden);
   els.hintNav?.classList.toggle("is-waiting", hidden);
-  const canUse = playerIsSideToMove() && !state.busy && !state.game.game_over() && !hidden;
-  const canToggle = canUse && hintPageCount() > 1;
+  const hold = isTrainHold();
+  const canUse = (playerIsSideToMove() || hold) && !hidden && (!state.game.game_over() || hold);
+  const canToggle = canUse && hintPageCount() > 1 && (hold || !state.busy);
   if (els.hintNav) els.hintNav.hidden = hintPageCount() <= 1;
   if (els.moreHints) {
     els.moreHints.textContent = label;
@@ -1397,26 +1788,81 @@ function syncHintNav() {
   syncHintMix();
 }
 
+function currentHintMixLine() {
+  const text = formatHintMix();
+  if (text) state.lastHintMix = text;
+  return text || state.lastHintMix || "";
+}
+
+function kingFinaleAllowed() {
+  if (isReviewing() || isTrainHold()) return false;
+  if (state.game.game_over()) return false;
+  if (!currentHintMixLine()) return false;
+  return playerIsSideToMove();
+}
+
+function paintKingFinaleContent() {
+  if (!els.hintMix) return;
+  const line = currentHintMixLine();
+  if (!line) {
+    els.hintMix.innerHTML = "";
+    els.hintMix.hidden = true;
+    return;
+  }
+  els.hintMix.innerHTML = `${escapeHtml(t("hint.mix.intro"))}<br>${escapeHtml(line)}`;
+  els.hintMix.hidden = false;
+  syncRecalcButton();
+}
+
+function hideKingFinale() {
+  if (els.kingFinale) els.kingFinale.hidden = true;
+}
+
+function revealKingFinale({ animate = false } = {}) {
+  if (!els.kingFinale) return;
+  if (state.kingSpeaking || !kingFinaleAllowed()) {
+    hideKingFinale();
+    paintKingFinaleContent();
+    return;
+  }
+  paintKingFinaleContent();
+  els.kingFinale.hidden = false;
+  if (!animate || !els.hintMix) return;
+  wrapKingWords(els.hintMix);
+  let delay = 80;
+  els.hintMix.querySelectorAll(".king-word").forEach((word) => {
+    word.style.animationDelay = `${delay}ms`;
+    delay += /[:.!?…]$/.test(word.textContent.trim()) ? 110 : 40;
+  });
+  if (els.recalcWrap && !els.recalcWrap.hidden && els.recalcHints) {
+    els.recalcHints.classList.remove("king-word");
+    void els.recalcHints.offsetWidth;
+    els.recalcHints.classList.add("king-word");
+    els.recalcHints.style.animationDelay = `${delay}ms`;
+  }
+}
+
 function syncHintMix() {
   if (!els.hintMix) return;
-  const hidden = waitingForHints()
-    || isReviewing()
-    || !state.hintPool.length
-    || state.game.game_over();
-  const text = hidden ? "" : formatHintMix();
-  els.hintMix.textContent = text;
-  els.hintMix.hidden = !text;
+  if (state.kingSpeaking) {
+    paintKingFinaleContent();
+    hideKingFinale();
+    return;
+  }
+  const wasHidden = Boolean(els.kingFinale?.hidden);
+  revealKingFinale({ animate: wasHidden && kingFinaleAllowed() });
 }
 
 function syncRecalcButton() {
   if (!els.recalcHints) return;
-  const hidden = waitingForHints();
   const canRecalc = playerIsSideToMove()
     && !state.busy
     && !state.recalcHints
     && !state.recalcUsedThisTurn
     && !state.game.game_over()
-    && !hidden
+    && !isReviewing()
+    && !isTrainHold()
+    && !waitingForHints()
     && state.hintPool.length;
   const label = state.recalcHints ? t("hints.recalcing") : t("hints.recalc");
   els.recalcHints.textContent = label;
@@ -1436,12 +1882,122 @@ function showHintPage(page) {
   } else {
     state.hintPage = ((page % pages) + pages) % pages;
   }
+  state.kbdHint = null;
   renderHints();
-  if (state.aids.moves) showHintArrows(null, { reveal: true });
+  if (isTrainHold()) state.board.setArrows([]);
+  else if (state.aids.moves) showHintArrows(null, { reveal: true });
+}
+
+function isTrainHold() {
+  return Boolean(state.trainHold);
+}
+
+function isTrainQuiz() {
+  return Boolean(state.trainingMode) && !state.trainHold;
+}
+
+function clearTrainHold() {
+  state.trainHold = false;
+  state.trainPickedUci = "";
+  state.trainFen = "";
+  state.trainColor = "";
+  state.trainLives = null;
+}
+
+function syncTrainingModeUi() {
+  const on = Boolean(state.trainingMode);
+  els.trainingMode?.classList.toggle("is-on", on);
+  if (els.trainingMode) {
+    els.trainingMode.setAttribute("aria-pressed", on ? "true" : "false");
+    const hint = t("train.modeHint");
+    els.trainingMode.title = hint;
+    els.trainingMode.setAttribute("aria-label", `${t("train.mode")}. ${hint}`);
+  }
+  syncTrainContinue();
+}
+
+function syncTrainContinue() {
+  if (els.trainContinue) {
+    const show = isTrainHold() && !state.autoContinue;
+    els.trainContinue.hidden = !show;
+    els.trainContinue.disabled = !show || state.busy;
+    els.trainContinue.textContent = t("train.continue");
+  }
+  syncOppWait();
+}
+
+function syncOppWait() {
+  const show = isTrainHold();
+  if (els.oppWait) {
+    els.oppWait.hidden = !show;
+    els.oppWait.textContent = t("hints.oppWait");
+  }
+  els.hints?.classList.toggle("is-wait-opp", show);
+  els.hintNav?.classList.toggle("is-wait-opp", show);
+}
+
+function syncAutoContinueUi() {
+  if (els.autoContinue) els.autoContinue.checked = Boolean(state.autoContinue);
+}
+
+function setAutoContinue(on) {
+  state.autoContinue = Boolean(on);
+  try {
+    localStorage.setItem(AUTO_CONTINUE_KEY, state.autoContinue ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  syncAutoContinueUi();
+  syncTrainContinue();
+  if (state.autoContinue && isTrainHold() && !state.busy) continueTrainMove();
+}
+
+function setTrainingMode(on) {
+  const next = Boolean(on);
+  state.trainingMode = next;
+  try {
+    localStorage.setItem(TRAIN_MODE_KEY, next ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  syncTrainingModeUi();
+  renderHints();
+}
+
+async function continueTrainMove({ afterTalk, keepSpeaking = false } = {}) {
+  if (!state.trainHold || state.busy) return;
+  const gameOver = state.game.game_over();
+  const local = isLocalVsHuman();
+  state.busy = true;
+  if (!keepSpeaking) {
+    state.speakToken += 1;
+    state.kingSpeaking = false;
+  }
+  hideKingFinale();
+  syncTrainContinue();
+  if (gameOver) {
+    clearTrainHold();
+    hideHintPanel();
+    finishGame();
+    return;
+  }
+  if (local) {
+    clearTrainHold();
+    hideHintPanel();
+    syncCoach();
+    await refreshHints({ reveal: false });
+    state.busy = false;
+    state.pendingHintReveal = true;
+    revealHintsIfReady();
+    return;
+  }
+  await computerMove({ silentWait: true, afterTalk });
 }
 
 function clearHints() {
   stopMoveClock();
+  clearTrainHold();
+  state.kbdHint = null;
   state.hints = [];
   state.hintPool = [];
   state.hintPage = 0;
@@ -1581,7 +2137,7 @@ function squareList(squares) {
   return joinIt(squares.map((square) => `${t("prep.in")} ${square}`));
 }
 
-function ourHitsPhrase(hits) {
+function ourHitsPhrase(hits, withSquares = true) {
   const order = ["q", "r", "b", "n", "p", "k"];
   const groups = new Map();
   hits.forEach((hit) => {
@@ -1593,20 +2149,19 @@ function ourHitsPhrase(hits) {
   for (const type of order) {
     const squares = groups.get(type);
     if (!squares?.length) continue;
-    parts.push(
-      squares.length === 1
-        ? `${ourSingular(type)} ${squareList(squares)}`
-        : `${ourPlural(type)} ${squareList(squares)}`
-    );
+    const name = squares.length === 1 ? ourSingular(type) : ourPlural(type);
+    parts.push(withSquares ? `${name} ${squareList(squares)}` : name);
   }
   return joinIt(parts);
 }
 
-function hangingAdvice(hits) {
-  if (!hits.length) return "";
-  const phrase = ourHitsPhrase(hits);
-  if (hits.length === 1) return t("king.hang1", { phrase });
-  return t("king.hangN", { phrase });
+function mixedThreatPhrase(threatHits, hanging) {
+  if (!threatHits.length) return "";
+  const hangSet = new Set(hanging.map((hit) => hit.to));
+  const dang = threatHits.filter((hit) => hangSet.has(hit.to));
+  if (!dang.length) return ourHitsPhrase(threatHits);
+  const safe = threatHits.filter((hit) => !hangSet.has(hit.to));
+  return joinIt([ourHitsPhrase(safe, false), ourHitsPhrase(dang)].filter(Boolean));
 }
 
 function capturedOn(move) {
@@ -1614,42 +2169,73 @@ function capturedOn(move) {
   return move.to;
 }
 
-function opponentLead(move) {
-  if (move.san.startsWith("O-O-O")) return t("king.castleLong");
-  if (move.san.startsWith("O-O")) return t("king.castle");
-  if (move.captured) {
-    return t("king.capture", {
-      mover: pieceOnSquare(move.piece, move.to),
-      victim: `${ourSingular(move.captured)} ${squareList([capturedOn(move)])}`,
-    });
+function opponentActionLine(move, hits, hanging) {
+  const victim = move.captured
+    ? `${ourSingular(move.captured)} ${squareList([capturedOn(move)])}`
+    : "";
+  const capSq = move.captured ? capturedOn(move) : "";
+  const threatHits = hits.filter((hit) => hit.to !== capSq);
+  const hangSet = new Set(hanging.map((hit) => hit.to));
+  threatHits.sort((a, b) => Number(hangSet.has(a.to)) - Number(hangSet.has(b.to)));
+  const manyThreats = threatHits.length >= 3;
+  const threatList = manyThreats ? "" : mixedThreatPhrase(threatHits, hanging);
+  const hangPhrase = hanging.length ? ourHitsPhrase(hanging) : "";
+  const hangInThreats = hanging.length && hanging.every((hit) => threatHits.some((th) => th.to === hit.to));
+
+  const parts = [];
+  if (victim) parts.push(t("king.oppEat", { victim }));
+  else if (move.san.startsWith("O-O-O")) parts.push(t("king.oppCastleLong"));
+  else if (move.san.startsWith("O-O")) parts.push(t("king.oppCastle"));
+
+  if (manyThreats) {
+    parts.push(parts.length ? t("king.oppAndMany") : t("king.oppMany"));
+  } else if (threatList) {
+    parts.push(parts.length ? t("king.oppAndThreat", { list: threatList }) : t("king.oppThreat", { list: threatList }));
   }
-  return t("king.play", { mover: pieceOnSquare(move.piece, move.to) });
+
+  if (hangPhrase) {
+    if (hangInThreats && !manyThreats) {
+      parts.push(hanging.length === 1 ? t("king.oppUnprotTail1") : t("king.oppUnprotTailN"));
+    } else if (manyThreats) {
+      parts.push(
+        hanging.length === 1
+          ? t("king.oppAmongHang1", { phrase: hangPhrase })
+          : t("king.oppAmongHangN", { phrase: hangPhrase })
+      );
+    } else if (!parts.length) {
+      parts.push(hanging.length === 1 ? t("king.oppHangOnly1", { phrase: hangPhrase }) : t("king.oppHangOnlyN", { phrase: hangPhrase }));
+    } else {
+      parts.push(hanging.length === 1 ? t("king.oppAndHang1", { phrase: hangPhrase }) : t("king.oppAndHangN", { phrase: hangPhrase }));
+    }
+  }
+
+  if (move.san.includes("+")) {
+    parts.push(parts.length ? t("king.oppAndCheck") : t("king.oppCheckOnly"));
+  }
+  return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
-function narrateOpponentMove(before, move, after, feedbackKey) {
+function narrateOpponentMove(before, move, after, feedbackKey, beforeEval) {
   if (move.san.includes("#")) {
     return t("king.mateOpp");
   }
   const hits = threatsFromMove(after, move, state.playerColor).slice(0, 3);
-  const labels = ourHitsPhrase(hits);
-  let lead = opponentLead(move);
-  if (labels) {
-    lead += move.captured
-      ? `. ${t("king.nowThreats", { list: labels })}`
-      : ` ${t("king.andThreats", { list: labels })}`;
-  } else {
-    lead += ".";
-  }
-  if (move.san.includes("+")) lead += ` ${t("king.check")}`;
-
   const hanging = hits.filter((hit) => !isSquareDefended(after, hit.to, state.playerColor));
-  const warning = hangingAdvice(hanging);
+  const action = opponentActionLine(move, hits, hanging);
+  const swing = opponentSwingTalk(beforeEval, feedbackKey);
   const bits = [];
-  if (feedbackKey) bits.push(t(feedbackKey));
-  bits.push(lead);
-  if (warning) bits.push(warning);
-  bits.push(t("king.closer"));
-  return bits.join("\n\n");
+  if (feedbackKey) {
+    const rank = opponentRankKind(feedbackKey);
+    const opener = t(
+      rank === "best" ? "ofb.open.best" : rank === "worst" ? "ofb.open.worst" : "ofb.open.normal"
+    );
+    bits.push(`<strong>${escapeHtml(opener)}</strong> ${escapeHtml(swing || t(feedbackKey))}`);
+  } else if (swing) {
+    bits.push(escapeHtml(swing));
+  }
+  if (action) bits.push(escapeHtml(action));
+  bits.push(escapeHtml(t("king.closer")));
+  return bits.join("<br><br>");
 }
 
 function narratePlayerMove(before, move, after) {
@@ -1837,6 +2423,10 @@ const els = {
   startKind: document.getElementById("start-kind"),
   customOpeningRow: document.getElementById("custom-opening-row"),
   newGame: document.getElementById("new-game"),
+  newGameTitle: document.getElementById("new-game-title"),
+  newGameTabs: document.querySelector(".new-game-tabs"),
+  friendWhere: document.getElementById("friend-where"),
+  friendSoon: document.getElementById("friend-soon"),
   btnNewCancel: document.getElementById("btn-new-cancel"),
   btnNewStart: document.getElementById("btn-new-start"),
   startOpening: document.getElementById("start-opening"),
@@ -1863,6 +2453,7 @@ const els = {
   overlayText: document.getElementById("overlay-text"),
   promo: document.getElementById("promo"),
   kingNote: document.getElementById("king-note"),
+  kingFinale: document.getElementById("king-finale"),
   moreHints: document.getElementById("btn-more-hints"),
   hintNav: document.getElementById("hint-nav"),
   hintPanel: document.getElementById("hint-panel"),
@@ -1878,6 +2469,11 @@ const els = {
   graveBottom: document.getElementById("grave-bottom"),
   aidMoves: document.getElementById("btn-aid-moves"),
   aidThreats: document.getElementById("btn-aid-threats"),
+  trainingMode: document.getElementById("btn-training-mode"),
+  trainContinue: document.getElementById("btn-train-continue"),
+  oppWait: document.getElementById("opp-wait"),
+  autoContinue: document.getElementById("auto-continue"),
+  roundEval: document.getElementById("round-eval"),
 };
 
 const state = {
@@ -1898,10 +2494,17 @@ const state = {
   hintPage: 0,
   hintsUnlocked: 0,
   hintBestScore: -Infinity,
+  lastHintMix: "",
   gameEval: 0,
   livesForced: null,
+  shownLives: null,
+  livesHold: null,
+  livesAnimating: false,
+  livesAnimTimer: null,
+  pendingLives: null,
   hintLayout: readHintLayout(),
   moveClockSec: readMoveClock(),
+  roundEval: readRoundEval(),
   hasGame: false,
   openingPly: 0,
   startOpening: START_OPENINGS[0],
@@ -1917,10 +2520,11 @@ const state = {
   pendingHintReveal: false,
   gameId: 0,
   kingReplay: null,
-  lastFeedbackKey: "",
+  lastLifeFeedbackKey: "",
   lastFeedbackBand: "",
   reactTimer: null,
   lastOppFeedbackKey: "",
+  lastOppAdvKey: "",
   lastSeeReplyKey: "",
   lastPlayerScore: -Infinity,
   reviewPly: null,
@@ -1928,6 +2532,14 @@ const state = {
   moveClockToken: 0,
   moveClockTimer: null,
   moveClockTick: null,
+  trainingMode: readTrainingMode(),
+  autoContinue: readAutoContinue(),
+  trainHold: false,
+  kbdHint: null,
+  trainPickedUci: "",
+  trainFen: "",
+  trainColor: "",
+  trainLives: null,
 };
 
 function isLocalVsHuman() {
@@ -2029,7 +2641,8 @@ function wrapKingWords(root) {
 function paintKingNote(note, html) {
   if (!els.kingNote) return 0;
   const source = document.createElement("div");
-  source.textContent = note || "";
+  if (html) source.innerHTML = note || "";
+  else source.textContent = note || "";
   wrapKingWords(source);
   els.kingNote.innerHTML = source.innerHTML;
   const words = [...els.kingNote.querySelectorAll(".king-word")];
@@ -2047,6 +2660,7 @@ function clearKingTalk() {
   state.lastKingTalk = "";
   els.kingNote?.classList.remove("is-typing");
   if (els.kingNote) els.kingNote.innerHTML = "";
+  hideKingFinale();
 }
 
 function waitingForHints() {
@@ -2165,23 +2779,73 @@ function playWorstHint() {
   playClockHint();
 }
 
+function trainPickedIndex() {
+  if (!state.trainPickedUci) return null;
+  const i = (state.hints || []).findIndex((hint) => hint?.uci === state.trainPickedUci);
+  return i >= 0 ? i : null;
+}
+
+function revealTrainPick() {
+  const root = els.hints;
+  if (!root) return;
+  root.classList.remove("is-reveal", "is-quiz", "is-waiting");
+  root.classList.add("is-hold");
+  const picked = state.trainPickedUci;
+  const hasMeta = Boolean(root.querySelector(".hint-eval-row"));
+  if (!hasMeta) {
+    renderHints();
+    state.board.setArrows([]);
+    return;
+  }
+  root.querySelectorAll(".hint-btn").forEach((btn) => {
+    if (btn.classList.contains("empty") || btn.classList.contains("is-loading")) return;
+    const hint = state.hints[Number(btn.dataset.index)];
+    btn.classList.toggle("is-picked", Boolean(hint && hint.uci === picked));
+  });
+  root.querySelectorAll(".hint-foot").forEach((el) => {
+    el.removeAttribute("aria-hidden");
+  });
+  showHintPanel();
+  syncHintNav();
+  syncTrainContinue();
+  state.kbdHint = null;
+  paintKbdHint();
+  state.board.setArrows([]);
+  syncHintBoardPlay();
+}
+
 function hideHintPanel() {
   stopMoveClock();
   stopRecalcProgress();
+  if (isTrainHold()) return;
   els.hintPanel?.classList.add("is-waiting");
   els.hints?.classList.remove("is-reveal");
   els.hints?.classList.add("is-waiting");
   els.hintNav?.classList.add("is-waiting");
   if (state.board) state.board.setArrows([]);
+  syncHintMix();
+  syncRecalcButton();
+  syncHintBoardPlay();
+}
+
+function hintPanelOpen() {
+  return Boolean(els.hintPanel && !els.hintPanel.classList.contains("is-waiting"));
 }
 
 function showHintPanel() {
   els.hintPanel?.classList.remove("is-waiting");
   els.hints?.classList.remove("is-waiting");
   els.hintNav?.classList.remove("is-waiting");
+  syncHintMix();
+  syncRecalcButton();
+  syncHintBoardPlay();
 }
 
 function revealHintsIfReady() {
+  if (isTrainHold()) {
+    showHintPanel();
+    return;
+  }
   if (isReviewing()) {
     hideHintPanel();
     return;
@@ -2206,30 +2870,34 @@ function revealHintsIfReady() {
 async function speakKing(note, { calculating = false, html = false } = {}) {
   const token = (state.speakToken += 1);
   const text = note || "";
+  const hold = isTrainHold();
   state.kingSpeaking = Boolean(text);
-  hideHintPanel();
+  hideKingFinale();
+  if (!hold) hideHintPanel();
   els.kingNote?.classList.remove("is-typing");
   if (!text) {
     if (els.kingNote) els.kingNote.innerHTML = "";
     state.kingSpeaking = false;
+    revealKingFinale({ animate: false });
     revealHintsIfReady();
     return;
   }
   const hintsReady = Boolean(state.hintPool.length) && playerIsSideToMove() && !state.game.game_over();
   if (hintsReady) state.pendingHintReveal = true;
-  else renderHints();
+  else if (!hold) renderHints();
   const duration = paintKingNote(text, html);
   await sleep(duration);
   if (token !== state.speakToken) return;
   state.kingSpeaking = false;
+  revealKingFinale({ animate: true });
   revealHintsIfReady();
 }
 
-function kingComment(beforeFen, played, asOpponent, feedbackKey) {
+function kingComment(beforeFen, played, asOpponent, feedbackKey, beforeEval) {
   const before = new Chess(beforeFen);
   const after = new Chess(state.game.fen());
   return asOpponent
-    ? narrateOpponentMove(before, played, after, feedbackKey)
+    ? narrateOpponentMove(before, played, after, feedbackKey, beforeEval)
     : narratePlayerMove(before, played, after);
 }
 
@@ -2400,24 +3068,31 @@ function syncBoard(options = {}) {
   const fen = state.game.fen();
   state.board.setPosition(fen);
   state.board.setTurn(state.game.turn(), state.playerColor);
-  state.board.setDests({});
-  state.board.setInteractive(false);
   state.board.setCheck(state.game.in_check() ? kingSquare(state.game, state.game.turn()) : null);
-  if (state.aids.moves && !waitingForHints()) showHintArrows(null, { reveal: true });
+  syncHintBoardPlay();
+  if (isTrainHold()) {
+    if (!options.keepArrows) state.board.setArrows([]);
+  } else if (state.aids.moves && hintPanelOpen() && !waitingForHints()) showHintArrows(null, { reveal: true });
   else if (!options.keepArrows) state.board.setArrows([]);
   paintActiveThreats();
   syncCoach();
 }
 
 function renderHints() {
-  if (waitingForHints()) {
+  els.hints?.classList.toggle("is-quiz", isTrainQuiz());
+  els.hints?.classList.toggle("is-hold", isTrainHold());
+  if (waitingForHints() && !isTrainHold()) {
     state.hints = [];
     els.hints.innerHTML = "";
     syncHintNav();
     state.board?.setArrows([]);
+    syncTrainContinue();
+    syncHintBoardPlay();
     return;
   }
   state.hints = visibleHints();
+  const quiz = isTrainQuiz();
+  const hold = isTrainHold();
   const buttons = [];
   for (let i = 0; i < hintsPerPage(); i += 1) {
     const hint = state.hints[i];
@@ -2432,54 +3107,73 @@ function renderHints() {
     }
     const played = playedFromHint(hint);
     const san = played ? localizeSan(played.san) : hint.uci;
-    const icon = played ? pieceIcon(played, state.game.turn()) : "";
-    const tag = hintRankTag(hint);
-    const evalLine = [formatHintEval(hint), tag].filter(Boolean).join("  ");
-    const talk = (() => {
-      try {
-        return hint.talk || hintTalk(hint) || `Move to ${played?.to || ""}.`;
-      } catch {
-        return played ? `Move to ${played.to}.` : "";
-      }
-    })();
+    const icon = played ? pieceIcon(played, hold && state.trainColor ? state.trainColor : state.game.turn()) : "";
+    const picked = hold && hint.uci === state.trainPickedUci;
+    const desc = played ? moveHeadline(played) : "";
+    const hiddenMeta = quiz ? " aria-hidden=\"true\"" : "";
     buttons.push(`
-      <button class="hint-btn" data-index="${i}" type="button">
+      <button class="hint-btn${picked ? " is-picked" : ""}" data-index="${i}" type="button">
         <span class="hint-body">
           <span class="hint-rank">${rank}</span>
           <span class="hint-move-row">
             ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
             <span class="hint-main">${san}</span>
           </span>
-          <span class="hint-eval">${escapeHtml(evalLine)}</span>
-          <span class="hint-talk">${escapeHtml(talk)}</span>
+          ${desc ? `<span class="hint-desc">${escapeHtml(desc)}</span>` : ""}
+          <span class="hint-foot"${hiddenMeta}>
+            <span class="hint-divider" aria-hidden="true"></span>
+            <span class="hint-eval-row">
+              <span class="hint-eval">${hintEvalHtml(hint)}</span>
+              ${hintTagHtml(hint)}
+            </span>
+          </span>
         </span>
       </button>`);
   }
   els.hints.innerHTML = buttons.join("");
   syncHintNav();
+  syncTrainContinue();
+  paintKbdHint();
+  syncHintBoardPlay();
 }
 
 function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
+  if (!isTrainHold() && !hintPanelOpen()) {
+    state.board.setArrows([]);
+    return;
+  }
+  if (isTrainHold()) {
+    reveal = true;
+    onlyActive = true;
+  }
   if (!reveal && !state.aids.moves) {
     state.board.setArrows([]);
     return;
   }
-  if (!state.hints.length) {
+  const activeSet = index == null
+    ? null
+    : new Set((Array.isArray(index) ? index : [index]).filter((i) => Number.isInteger(i)));
+  const hasActive = Boolean(activeSet && activeSet.size);
+  if (!state.hints.length || !hasActive && onlyActive) {
     state.board.setArrows([]);
     return;
   }
   state.board.setArrows(
     state.hints
       .map((hint, i) => {
-        const active = index !== null && i === index;
+        const active = hasActive && activeSet.has(i);
         if (onlyActive && !active) return null;
         const to = hint.uci.slice(2, 4);
+        const picked = isTrainHold() && hint.uci === state.trainPickedUci;
+        const preview = isTrainHold() && !picked;
         return {
           from: hint.uci.slice(0, 2),
           to,
-          color: ARROW_GREEN,
-          opacity: active || onlyActive ? 0.9 : 0.64,
-          width: active || onlyActive ? "0.2" : "0.15",
+          color: preview ? ARROW_GRAY : ARROW_GREEN,
+          opacity: preview
+            ? active || onlyActive ? 0.72 : 0.48
+            : active || onlyActive ? 0.95 : 0.64,
+          width: active || onlyActive ? "0.24" : "0.15",
           label: active ? hintSan(hint) : "",
           labelColor: "#1f1f1f",
         };
@@ -2547,6 +3241,7 @@ function endMessage() {
 
 function finishGame() {
   state.busy = false;
+  thawKingLives();
   if (state.game.in_checkmate()) {
     state.livesForced = state.game.turn() !== state.playerColor ? 6 : 0;
   } else {
@@ -2579,8 +3274,10 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
     return;
   }
   state.busy = true;
-  clearHints();
-  renderHints();
+  if (!isTrainHold()) {
+    clearHints();
+    renderHints();
+  }
   setStatus(t("turn.opp"), t("king.waiting"), "think");
   if (!silentWait) {
     state.kingReplay = { type: "waiting" };
@@ -2620,11 +3317,20 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
       if (gameId !== state.gameId || state.game.fen() !== fen) return;
     }
     const oppKey = pickOpponentKeyFromEval(state.lastPlayerScore, state.hintBestScore);
-    const oppBand = opponentReactBand(preview, beforeEval);
+    const oppBand = opponentReactBand(preview, beforeEval, oppKey);
 
-    await waitAtLeast(7000, startedAt);
+    await waitAtLeast(10000, startedAt);
     if (afterTalk) await afterTalk;
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
+
+    state.board.setArrows([]);
+    await sleep(300);
+    if (gameId !== state.gameId || state.game.fen() !== fen) return;
+    if (isTrainHold()) {
+      clearTrainHold();
+      syncTrainContinue();
+    }
+    hideHintPanel();
 
     const played = state.game.move({
       from: move.from,
@@ -2636,6 +3342,7 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
     state.board.setLastMove(played.from, played.to);
     await state.board.animateMove(played.from, played.to);
     if (gameId !== state.gameId) return;
+    thawKingLives();
     state.board.setPosition(state.game.fen());
     flashThreatenedPieces(played);
     renderHistory();
@@ -2653,24 +3360,30 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
     state.pendingHintReveal = true;
     state.busy = false;
     if (oppBand) showKingReact(oppBand);
-    const talk = kingComment(fen, played, true, oppKey);
+    const talk = kingComment(fen, played, true, oppKey, beforeEval);
     state.lastKingTalk = talk;
-    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey, reactBand: oppBand };
+    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey, reactBand: oppBand, beforeEval };
     setStatus(t("turn.you"), `${youLabel()}. ${t("turn.make")}`, "play");
-    speakKing(talk, { calculating: true });
+    speakKing(talk, { calculating: true, html: true });
     syncBoard({ keepArrows: true });
   } catch (err) {
     if (err.message === "aborted" || gameId !== state.gameId) return;
     console.error(err);
     setStatus(t("error"), t("king.engineFail"), "lose");
     state.busy = false;
+    if (isTrainHold()) {
+      clearTrainHold();
+      hideHintPanel();
+      syncTrainContinue();
+    }
+    thawKingLives();
     syncBoard();
     return;
   }
 }
 
 async function applyUserMove(from, to, promotion, chosenHint) {
-  if (state.busy || !playerIsSideToMove() || state.game.game_over()) {
+  if (state.busy || state.trainHold || !playerIsSideToMove() || state.game.game_over()) {
     syncBoard();
     return;
   }
@@ -2681,26 +3394,48 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   const chosen = hintForPlayedMove(from, to, promotion, chosenHint);
   const bestScore = state.hintBestScore;
   const poolSnap = (state.hintPool || []).slice();
-  const band = feedbackBand(chosen, bestScore, poolSnap);
-  const fbKey = pickFeedbackKey(chosen, bestScore, poolSnap);
-  state.lastFeedbackKey = fbKey;
-  showKingReact(band);
+  const rankKind = hintRankKind(chosen, poolSnap) || "normal";
+  const band = rankReactBand(rankKind);
+  const livesBefore = kingLifeHalves();
   state.lastPlayerScore = chosen && !chosen.synthetic ? hintScore(chosen) : -Infinity;
   if (Number.isFinite(state.lastPlayerScore)) {
     state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
   }
+  if (!isLocalVsHuman()) freezeKingLives(livesBefore);
+  const lifeKey = pickLifeFeedbackKey(kingLifeHalves() - livesBefore);
+  const visDelta = displayLifeHalves(kingLifeHalves()) - displayLifeHalves(livesBefore);
   state.busy = true;
+  syncHintBoardPlay();
   const fen = state.game.fen();
+  const trainReview = Boolean(state.trainingMode);
+  if (trainReview) {
+    state.trainHold = true;
+    state.trainPickedUci = chosen?.uci || `${from}${to}${promotion || ""}`;
+    state.trainFen = fen;
+    state.trainColor = state.game.turn();
+    state.trainLives = livesBefore;
+    hideKingFinale();
+    state.kbdHint = null;
+    paintKbdHint();
+  }
+  showKingReact(visDelta < 0 ? "heartMany" : band);
   const played = state.game.move({ from, to, promotion: promotion || undefined });
   if (!played) {
+    clearTrainHold();
+    thawKingLives();
     state.busy = false;
     syncBoard();
     return;
   }
   state.engine.stop();
-  clearHints();
-  hideHintPanel();
-  renderHints();
+  if (trainReview) {
+    stopMoveClock();
+    revealTrainPick();
+  } else {
+    clearHints();
+    hideHintPanel();
+    renderHints();
+  }
   state.board.setLastMove(played.from, played.to);
   await state.board.animateMove(played.from, played.to);
   state.board.setPosition(state.game.fen());
@@ -2708,8 +3443,18 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   renderHistory();
   renderKingLives();
   const replyKey = state.game.game_over() ? "" : pickSeeReplyKey();
-  state.kingReplay = { type: "feedback", key: fbKey, replyKey };
-  const feedbackTalk = speakKing(playerFeedbackTalk(fbKey, replyKey));
+  state.kingReplay = { type: "feedback", key: lifeKey, replyKey, rankKind };
+  const feedbackTalk = speakKing(playerFeedbackTalk(lifeKey, replyKey, rankKind), { html: true });
+  if (trainReview) {
+    if (state.autoContinue && !state.game.game_over()) {
+      state.busy = false;
+      await continueTrainMove({ afterTalk: feedbackTalk, keepSpeaking: true });
+      return;
+    }
+    state.busy = false;
+    syncTrainContinue();
+    return;
+  }
   if (state.game.game_over()) {
     await feedbackTalk;
     finishGame();
@@ -2719,16 +3464,16 @@ async function applyUserMove(from, to, promotion, chosenHint) {
     await feedbackTalk;
     syncCoach();
     const oppKey = pickOpponentFeedbackKey(chosen, bestScore, poolSnap);
-    const talk = kingComment(fen, played, true, oppKey);
-    state.lastKingTalk = talk;
     state.busy = false;
     const beforeEval = Number.isFinite(state.lastPlayerScore) ? state.lastPlayerScore : state.gameEval;
     await refreshHints({ reveal: false });
-    const oppBand = opponentReactBand(state.game, beforeEval);
+    const oppBand = opponentReactBand(state.game, beforeEval, oppKey);
     if (oppBand) showKingReact(oppBand);
-    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey, reactBand: oppBand };
+    const talk = kingComment(fen, played, true, oppKey, beforeEval);
+    state.lastKingTalk = talk;
+    state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey, reactBand: oppBand, beforeEval };
     state.pendingHintReveal = true;
-    speakKing(talk, { calculating: true });
+    speakKing(talk, { calculating: true, html: true });
     return;
   }
   await computerMove({ silentWait: true, afterTalk: feedbackTalk });
@@ -2749,7 +3494,36 @@ function openPromo(from, to) {
 }
 
 function hintsArePlayable() {
-  return !isReviewing() && playerIsSideToMove() && !state.busy && !state.game.game_over() && state.hints.length;
+  return !isReviewing() && playerIsSideToMove() && !state.busy && !state.trainHold && !state.game.game_over() && state.hints.length;
+}
+
+function hintsAreSelectable() {
+  return !isReviewing() && !isTrainHold() && !state.game.game_over() && hintPanelOpen() && state.hints.some(Boolean);
+}
+
+function moreHintsHotkeyReady() {
+  return Boolean(els.moreHints) && !els.moreHints.disabled && !els.hintNav?.hidden && hintPageCount() > 1 && hintPanelOpen();
+}
+
+function paintKbdHint() {
+  els.hints?.querySelectorAll(".hint-btn").forEach((btn) => {
+    btn.classList.toggle("is-kbd", Number.isInteger(state.kbdHint) && Number(btn.dataset.index) === state.kbdHint);
+  });
+}
+
+function selectHintAt(index) {
+  const hint = state.hints[index];
+  if (!hint || hint.synthetic && !hint.uci) {
+    state.kbdHint = null;
+    paintKbdHint();
+    return false;
+  }
+  state.board?.clearPlayFocus();
+  state.kbdHint = index;
+  paintKbdHint();
+  if (isTrainHold() || !state.aids.moves) showHintArrows(index, { reveal: true, onlyActive: true });
+  else showHintArrows(index, { reveal: true });
+  return true;
 }
 
 function playHintAt(index) {
@@ -2777,26 +3551,113 @@ els.hints.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
   if (els.newGame && !els.newGame.hidden) return;
   const target = event.target;
   if (target && (target.closest("input, select, textarea") || target.isContentEditable)) return;
-  if (event.key < "1" || event.key > String(hintsPerPage())) return;
-  if (!hintsArePlayable()) return;
+  const arrow = ({
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+  })[event.key];
+  if (arrow && boardHintPlayReady()) {
+    event.preventDefault();
+    if (!state.board.getCursor()) {
+      const start = firstBoardPlaySquare();
+      if (start) state.board.setCursor(start);
+      previewFromBoardCursor();
+      return;
+    }
+    state.board.stepCursor(arrow[0], arrow[1]);
+    previewFromBoardCursor();
+    return;
+  }
+  if (event.repeat) return;
+  if (event.key === "Escape" && boardHintPlayReady() && (state.board.getSelected() || state.board.getCursor())) {
+    event.preventDefault();
+    state.board.clearPlayFocus();
+    state.kbdHint = null;
+    paintKbdHint();
+    if (state.aids.moves) showHintArrows(null, { reveal: true });
+    else state.board.setArrows([]);
+    return;
+  }
+  if ((event.key === " " || event.key === "Spacebar") && boardHintPlayReady()) {
+    event.preventDefault();
+    const selected = state.board.getSelected();
+    const cursor = state.board.getCursor();
+    if (selected && cursor && hintIndexForSquares(selected, cursor) >= 0) {
+      playHintMove(selected, cursor);
+      return;
+    }
+    if (!cursor) {
+      const start = firstBoardPlaySquare();
+      if (start) state.board.setCursor(start);
+    }
+    state.board.activateCursor();
+    previewFromBoardCursor();
+    return;
+  }
+  if (event.key === "Enter") {
+    const selected = state.board?.getSelected();
+    const cursor = state.board?.getCursor();
+    if (boardHintPlayReady() && selected && cursor && hintIndexForSquares(selected, cursor) >= 0) {
+      event.preventDefault();
+      playHintMove(selected, cursor);
+      return;
+    }
+    if (Number.isInteger(state.kbdHint) && hintsArePlayable()) {
+      event.preventDefault();
+      playHintAt(state.kbdHint);
+      return;
+    }
+    if (boardHintPlayReady()) {
+      event.preventDefault();
+      if (!cursor) {
+        const start = firstBoardPlaySquare();
+        if (start) state.board.setCursor(start);
+      }
+      state.board.activateCursor();
+      previewFromBoardCursor();
+    }
+    return;
+  }
+  if (event.key === "5" && moreHintsHotkeyReady()) {
+    event.preventDefault();
+    els.moreHints.click();
+    return;
+  }
+  if (event.key < "1" || event.key > "9") return;
+  const index = Number(event.key) - 1;
+  if (index >= hintsPerPage() || !hintsAreSelectable()) return;
   event.preventDefault();
-  playHintAt(Number(event.key) - 1);
+  selectHintAt(index);
 });
 
 els.hints.addEventListener("pointerover", (event) => {
   const btn = event.target.closest(".hint-btn");
-  if (!btn || btn.disabled) return;
+  if (!btn || btn.disabled || btn.classList.contains("empty")) return;
   const index = Number(btn.dataset.index);
-  if (state.aids.moves) showHintArrows(index, { reveal: true });
-  else showHintArrows(index, { reveal: true, onlyActive: true });
+  if (state.board?.getSelected() || state.board?.getCursor()) {
+    state.board.clearPlayFocus();
+    state.kbdHint = null;
+    paintKbdHint();
+  }
+  if (isTrainHold()) showHintArrows(index, { reveal: true, onlyActive: true });
+  else showHintArrows(index, { reveal: true });
 });
 
 els.hints.addEventListener("pointerout", (event) => {
   if (event.relatedTarget && els.hints.contains(event.relatedTarget)) return;
+  if (isTrainHold()) {
+    state.board.setArrows([]);
+    return;
+  }
+  if (Number.isInteger(state.kbdHint)) {
+    selectHintAt(state.kbdHint);
+    return;
+  }
   if (state.aids.moves) showHintArrows(null, { reveal: true });
   else state.board.setArrows([]);
 });
@@ -2900,6 +3761,15 @@ function fillModeSelect() {
     .join("");
 }
 
+function fillFriendWhereSelect() {
+  const select = els.friendWhere;
+  if (!select) return;
+  const current = select.value || "local";
+  select.innerHTML = ["local", "online"]
+    .map((where) => `<option value="${where}"${where === current ? " selected" : ""}>${t(`friend.${where}`)}</option>`)
+    .join("");
+}
+
 function fillColorSelect() {
   const select = els.playColor;
   if (!select) return;
@@ -2944,6 +3814,43 @@ function previewOpeningLine() {
   els.openingLine.textContent = formatOpeningLine(probe);
 }
 
+function currentNewGameTab() {
+  return els.newGameTabs?.querySelector("button.is-on")?.dataset.tab || "train";
+}
+
+function canStartNewGame() {
+  const tab = currentNewGameTab();
+  if (tab === "train") return true;
+  return tab === "friend" && els.friendWhere?.value === "local";
+}
+
+function syncPlayModeFromTab() {
+  if (!els.playMode) return;
+  els.playMode.value = currentNewGameTab() === "friend" && els.friendWhere?.value === "local" ? "local" : "engine";
+}
+
+function syncNewGameTabUi() {
+  const tab = currentNewGameTab();
+  els.newGame?.querySelectorAll(".new-game-panel").forEach((panel) => {
+    panel.hidden = panel.dataset.panel !== tab;
+  });
+  if (els.newGameTitle) els.newGameTitle.textContent = t(`tab.${tab}`);
+  if (els.friendSoon) els.friendSoon.hidden = !(tab === "friend" && els.friendWhere?.value === "online");
+  if (els.btnNewStart) els.btnNewStart.hidden = !canStartNewGame();
+  syncPlayModeFromTab();
+  syncNewGameForm();
+}
+
+function setNewGameTab(tab) {
+  const next = ["train", "online", "friend", "settings"].includes(tab) ? tab : "train";
+  els.newGameTabs?.querySelectorAll("[data-tab]").forEach((btn) => {
+    const on = btn.dataset.tab === next;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  syncNewGameTabUi();
+}
+
 function syncNewGameForm() {
   const local = els.playMode?.value === "local";
   const custom = els.startKind?.value === "custom";
@@ -2955,21 +3862,23 @@ function syncNewGameForm() {
 
 function openNewGameDialog() {
   fillModeSelect();
+  fillFriendWhereSelect();
   fillSkillSelect();
   fillColorSelect();
   fillStartKindSelect();
   fillHintLayoutSelect();
   fillClockSelect();
+  fillRoundEvalSelect();
   fillStartOpeningSelect();
-  if (els.playMode) els.playMode.value = state.mode === "local" ? "local" : "engine";
   if (els.skill) els.skill.value = String(state.skill || 2);
   if (els.playColor) els.playColor.value = state.playColorPref || "random";
   if (els.startKind) els.startKind.value = state.startKind || "custom";
   if (els.startOpening) els.startOpening.value = state.startOpeningId || "random";
   if (els.hintLayout) els.hintLayout.value = HINT_LAYOUTS[state.hintLayout] ? state.hintLayout : "6x1";
   if (els.moveClockSelect) els.moveClockSelect.value = String(moveClockSec());
+  if (els.roundEval) els.roundEval.value = state.roundEval ? "1" : "0";
   if (els.btnNewCancel) els.btnNewCancel.hidden = !state.hasGame;
-  syncNewGameForm();
+  setNewGameTab("train");
   if (els.newGame) els.newGame.hidden = false;
 }
 
@@ -2978,6 +3887,8 @@ function closeNewGameDialog() {
 }
 
 function confirmNewGame() {
+  if (!canStartNewGame()) return;
+  syncPlayModeFromTab();
   const local = els.playMode?.value === "local";
   applyHintLayout(els.hintLayout?.value || "6x1");
   applyMoveClock(els.moveClockSelect?.value ?? 0);
@@ -2991,6 +3902,54 @@ function confirmNewGame() {
   }
   closeNewGameDialog();
   startGame(color);
+}
+
+function pickOpeningByMoves(n) {
+  const pool = START_OPENINGS.filter((opening) => opening.sans.length === n);
+  return pool[Math.floor(Math.random() * Math.max(pool.length, 1))] || START_OPENINGS[0];
+}
+
+function applyQuickTrainSettings(moves = 0) {
+  fillSkillSelect();
+  fillColorSelect();
+  fillStartKindSelect();
+  fillHintLayoutSelect();
+  fillClockSelect();
+  fillStartOpeningSelect();
+  if (els.playMode) els.playMode.value = "engine";
+  if (els.skill) els.skill.value = "1";
+  if (els.playColor) els.playColor.value = "random";
+  if (els.hintLayout) els.hintLayout.value = "6x1";
+  if (els.moveClockSelect) els.moveClockSelect.value = "0";
+  applyHintLayout("6x1");
+  applyMoveClock(0);
+  state.mode = "engine";
+  state.skill = 1;
+  state.playColorPref = "random";
+  if (moves > 0) {
+    const opening = pickOpeningByMoves(moves);
+    state.startKind = "custom";
+    state.startOpeningId = opening?.id || "random";
+    if (els.startKind) els.startKind.value = "custom";
+    if (els.startOpening) els.startOpening.value = state.startOpeningId;
+  } else {
+    state.startKind = "standard";
+    state.startOpeningId = "start";
+    if (els.startKind) els.startKind.value = "standard";
+  }
+}
+
+function startQuickTraining(moves = 0) {
+  setAppMenuOpen(false);
+  applyQuickTrainSettings(moves);
+  closeNewGameDialog();
+  startGame(Math.random() < 0.5 ? "w" : "b");
+}
+
+function openQuickOnline() {
+  setAppMenuOpen(false);
+  openNewGameDialog();
+  setNewGameTab("online");
 }
 
 function fillSkillSelect() {
@@ -3018,6 +3977,27 @@ function fillClockSelect() {
   select.innerHTML = CLOCK_OPTIONS
     .map((n) => `<option value="${n}"${String(n) === current ? " selected" : ""}>${t(`clock.${n}`)}</option>`)
     .join("");
+}
+
+function fillRoundEvalSelect() {
+  const select = els.roundEval;
+  if (!select) return;
+  const current = state.roundEval ? "1" : "0";
+  select.innerHTML = [
+    `<option value="0"${current === "0" ? " selected" : ""}>${t("settings.no")}</option>`,
+    `<option value="1"${current === "1" ? " selected" : ""}>${t("settings.yes")}</option>`,
+  ].join("");
+}
+
+function applyRoundEval(value) {
+  state.roundEval = value === "1" || value === true || value === 1;
+  try {
+    localStorage.setItem(ROUND_EVAL_KEY, state.roundEval ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  if (els.roundEval) els.roundEval.value = state.roundEval ? "1" : "0";
+  renderHints();
 }
 
 function applyMoveClock(value) {
@@ -3058,15 +4038,15 @@ function replayKingTalk() {
     return;
   }
   if (replay.type === "feedback" && replay.key) {
-    showKingReact(bandFromFeedbackKey(replay.key));
-    speakKing(playerFeedbackTalk(replay.key, replay.replyKey));
+    showKingReact(rankReactBand(replay.rankKind || "normal"));
+    speakKing(playerFeedbackTalk(replay.key, replay.replyKey, replay.rankKind), { html: true });
     return;
   }
   if (replay.type === "opponent" && replay.move && replay.beforeFen) {
     if (replay.reactBand) showKingReact(replay.reactBand);
     const before = new Chess(replay.beforeFen);
     const after = new Chess(replay.afterFen || state.game.fen());
-    speakKing(narrateOpponentMove(before, replay.move, after, replay.feedbackKey), { calculating: true });
+    speakKing(narrateOpponentMove(before, replay.move, after, replay.feedbackKey, replay.beforeEval), { calculating: true, html: true });
     return;
   }
   if (replay.type === "resign") {
@@ -3084,12 +4064,15 @@ function replayKingTalk() {
 function applyLanguage() {
   applyStaticI18n();
   fillModeSelect();
+  fillFriendWhereSelect();
   fillSkillSelect();
   fillColorSelect();
   fillStartKindSelect();
   fillHintLayoutSelect();
   fillClockSelect();
+  fillRoundEvalSelect();
   fillStartOpeningSelect();
+  if (!els.newGame?.hidden) syncNewGameTabUi();
   renderKingLegend();
   syncCoach();
   if (els.openingLine) {
@@ -3099,6 +4082,8 @@ function applyLanguage() {
   }
   renderHistory();
   renderHints();
+  syncTrainingModeUi();
+  syncAutoContinueUi();
   replayKingTalk();
 }
 
@@ -3172,9 +4157,7 @@ function pickRandomStartOpening() {
 }
 
 function startFirstVisitGame() {
-  if (els.skill) els.skill.value = "2";
-  state.skill = 2;
-  openNewGameDialog();
+  startQuickTraining(0);
 }
 
 function startGame(playerColor = state.playerColor) {
@@ -3192,8 +4175,17 @@ function startGame(playerColor = state.playerColor) {
   state.recalcHints = false;
   state.recalcUsedThisTurn = false;
   stopRecalcProgress();
+  state.lastHintMix = "";
+  hideKingFinale();
+  if (els.hintMix) {
+    els.hintMix.innerHTML = "";
+    els.hintMix.hidden = true;
+  }
   state.gameEval = 0;
   state.livesForced = null;
+  thawKingLives();
+  stopLivesAnim();
+  state.shownLives = null;
   clearKingReact();
   clearHints();
   clearTimeout(state.aidTimer);
@@ -3239,6 +4231,7 @@ function undoFullTurn() {
   const hist = state.game.history({ verbose: true });
   const last = hist[hist.length - 1];
   state.board.setLastMove(last ? last.from : null, last ? last.to : null);
+  thawKingLives();
   clearHints();
   renderHistory();
   syncCoach();
@@ -3263,6 +4256,10 @@ document.getElementById("btn-menu-new")?.addEventListener("click", () => {
   setAppMenuOpen(false);
   openNewGameDialog();
 });
+document.getElementById("quick-train")?.addEventListener("click", () => startQuickTraining(0));
+document.getElementById("quick-train-12")?.addEventListener("click", () => startQuickTraining(12));
+document.getElementById("quick-train-24")?.addEventListener("click", () => startQuickTraining(24));
+document.getElementById("quick-online")?.addEventListener("click", () => openQuickOnline());
 document.addEventListener("click", (event) => {
   const menu = event.target.closest(".app-menu");
   if (!menu) setAppMenuOpen(false);
@@ -3293,6 +4290,7 @@ document.getElementById("btn-resign").addEventListener("click", () => {
   }
   state.engine.stop();
   state.busy = false;
+  thawKingLives();
   state.livesForced = 1;
   clearHints();
   renderHints();
@@ -3309,9 +4307,16 @@ document.getElementById("btn-resign").addEventListener("click", () => {
   }
   state.board.setInteractive(false);
 });
+els.newGameTabs?.addEventListener("click", (event) => {
+  const tab = event.target.closest("[data-tab]");
+  if (!tab) return;
+  setNewGameTab(tab.dataset.tab);
+});
+els.friendWhere?.addEventListener("change", () => syncNewGameTabUi());
 els.playMode?.addEventListener("change", () => syncNewGameForm());
 els.startKind?.addEventListener("change", () => syncNewGameForm());
 els.startOpening?.addEventListener("change", () => previewOpeningLine());
+els.roundEval?.addEventListener("change", () => applyRoundEval(els.roundEval.value));
 els.btnNewStart?.addEventListener("click", () => confirmNewGame());
 els.btnNewCancel?.addEventListener("click", () => {
   if (state.hasGame) closeNewGameDialog();
@@ -3325,20 +4330,53 @@ document.addEventListener("keydown", (event) => {
 });
 els.aidMoves.addEventListener("click", () => showAid("moves"));
 els.aidThreats.addEventListener("click", () => showAid("threats"));
+els.trainingMode?.addEventListener("click", () => setTrainingMode(!state.trainingMode));
+els.autoContinue?.addEventListener("change", () => setAutoContinue(els.autoContinue.checked));
+els.trainContinue?.addEventListener("click", () => {
+  if (els.trainContinue.disabled) return;
+  continueTrainMove();
+});
 
 state.board = new Board(els.boardRoot, {
-  onMove: (from, to) => applyUserMove(from, to),
+  onMove: (from, to) => playHintMove(from, to),
+  onSelect: (square) => {
+    if (!square) {
+      if (isTrainHold()) return;
+      if (hintPanelOpen() && state.aids.moves) showHintArrows(null, { reveal: true });
+      else if (hintPanelOpen()) state.board.setArrows([]);
+      return;
+    }
+    state.kbdHint = null;
+    paintKbdHint();
+    previewHintsFromSquare(square);
+  },
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (event.button != null && event.button !== 0) return;
+  if (!state.board?.getSelected()) return;
+  if (event.target.closest("#board-root") || event.target.closest("#promo")) return;
+  state.board.clearPlayFocus();
+  state.kbdHint = null;
+  paintKbdHint();
+  if (isTrainHold() || event.target.closest(".hint-btn")) return;
+  if (hintPanelOpen() && state.aids.moves) showHintArrows(null, { reveal: true });
+  else state.board.setArrows([]);
 });
 
 applyStaticI18n();
 fillModeSelect();
+fillFriendWhereSelect();
 fillSkillSelect();
 fillColorSelect();
 fillStartKindSelect();
 fillHintLayoutSelect();
 fillClockSelect();
+fillRoundEvalSelect();
 fillStartOpeningSelect();
 syncHintLayoutUi();
+syncTrainingModeUi();
+syncAutoContinueUi();
 renderKingLives();
 renderKingLegend();
 setStatus(t("status.loading"), t("status.boot"), "think");

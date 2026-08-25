@@ -54,9 +54,12 @@ export class Board {
     this.root = root;
     this.orientation = options.orientation || "white";
     this.onMove = options.onMove || (() => {});
+    this.onSelect = options.onSelect || (() => {});
     this.pieces = {};
     this.dests = {};
     this.selected = null;
+    this.cursor = null;
+    this.lastFen = "";
     this.lastMove = null;
     this.check = null;
     this.danger = new Set();
@@ -133,8 +136,13 @@ export class Board {
   }
 
   setPosition(fen) {
+    const same = this.lastFen === fen;
+    this.lastFen = fen;
     this.pieces = parseFenPieces(fen);
-    this.selected = null;
+    if (!same) {
+      this.selected = null;
+      this.cursor = null;
+    }
     this.render();
   }
 
@@ -145,6 +153,12 @@ export class Board {
 
   setDests(dests) {
     this.dests = dests || {};
+    if (this.selected && !this.dests[this.selected]?.length) this.selected = null;
+    const allowed = this.#kbdSquares();
+    if (this.cursor && !allowed.includes(this.cursor)) {
+      this.cursor = this.selected || allowed[0] || null;
+    }
+    this.#paintSquares();
   }
 
   setLastMove(from, to) {
@@ -173,8 +187,99 @@ export class Board {
   }
 
   setInteractive(value) {
-    this.interactive = value;
-    this.boardEl.classList.toggle("frozen", !value);
+    this.interactive = Boolean(value);
+    this.boardEl.classList.toggle("frozen", !this.interactive);
+    if (!this.interactive) {
+      this.selected = null;
+      this.cursor = null;
+      this.#paintSquares();
+    }
+  }
+
+  getSelected() {
+    return this.selected;
+  }
+
+  getCursor() {
+    return this.cursor;
+  }
+
+  setCursor(square) {
+    this.cursor = square || null;
+    this.#paintSquares();
+  }
+
+  clearPlayFocus() {
+    this.selected = null;
+    this.cursor = null;
+    this.#paintSquares();
+  }
+
+  selectSquare(square) {
+    if (!this.#canSelect(square)) return false;
+    this.selected = square;
+    this.cursor = square;
+    this.#paintSquares();
+    this.onSelect(square);
+    return true;
+  }
+
+  activateCursor() {
+    const square = this.cursor;
+    if (!square || !this.interactive) return false;
+    if (this.selected && (this.dests[this.selected] || []).includes(square)) {
+      const from = this.selected;
+      this.selected = null;
+      this.#paintSquares();
+      this.onSelect(null);
+      this.onMove(from, square);
+      return true;
+    }
+    if (this.selected === square) {
+      this.selected = null;
+      this.#paintSquares();
+      this.onSelect(null);
+      return true;
+    }
+    return this.selectSquare(square);
+  }
+
+  stepCursor(dx, dy) {
+    const allowed = this.#kbdSquares();
+    if (!allowed.length) return null;
+    let cur = this.cursor || this.selected || allowed[0];
+    if (!allowed.includes(cur)) cur = allowed[0];
+    const start = this.#squareScreen(cur);
+    let best = null;
+    let bestKey = Infinity;
+    for (const square of allowed) {
+      if (square === cur) continue;
+      const pos = this.#squareScreen(square);
+      const along = (pos.x - start.x) * dx + (pos.y - start.y) * dy;
+      if (along <= 0) continue;
+      const side = Math.abs((pos.x - start.x) * dy - (pos.y - start.y) * dx);
+      const key = side * 24 + along;
+      if (key < bestKey) {
+        bestKey = key;
+        best = square;
+      }
+    }
+    if (!best) {
+      let wrapKey = Infinity;
+      for (const square of allowed) {
+        const pos = this.#squareScreen(square);
+        const along = (pos.x - start.x) * dx + (pos.y - start.y) * dy;
+        const side = Math.abs((pos.x - start.x) * dy - (pos.y - start.y) * dx);
+        const key = along * 24 + side;
+        if (key < wrapKey) {
+          wrapKey = key;
+          best = square;
+        }
+      }
+    }
+    this.cursor = best || cur;
+    this.#paintSquares();
+    return this.cursor;
   }
 
   #renderCoords() {
@@ -234,8 +339,12 @@ export class Board {
   }
 
   #paintSquares() {
-    Object.values(this.squareEls).forEach((el) => {
-      el.classList.remove("selected", "last", "check", "dest", "capture");
+    Object.entries(this.squareEls).forEach(([square, el]) => {
+      el.classList.remove("selected", "last", "check", "dest", "capture", "is-focus", "can-move");
+      const destOfSel = Boolean(this.selected && (this.dests[this.selected] || []).includes(square));
+      const origin = this.#canSelect(square);
+      el.classList.toggle("can-move", Boolean(this.interactive && (destOfSel || origin)));
+      el.classList.toggle("is-focus", this.cursor === square);
     });
     if (this.lastMove) {
       this.squareEls[this.lastMove.from]?.classList.add("last");
@@ -373,15 +482,29 @@ export class Board {
     ghost.remove();
   }
 
+  #squareScreen(square) {
+    const file = square.charCodeAt(0) - 97;
+    const rank = Number(square[1]) - 1;
+    if (this.orientation === "white") return { x: file, y: 7 - rank };
+    return { x: 7 - file, y: rank };
+  }
+
+  #kbdSquares() {
+    const origins = Object.keys(this.dests).filter((square) => this.dests[square]?.length);
+    if (!this.selected) return origins;
+    return [...new Set([this.selected, ...(this.dests[this.selected] || []), ...origins])];
+  }
+
   #canSelect(square) {
     if (!this.interactive) return false;
     const piece = this.pieces[square];
-    if (!piece) return false;
-    return piece[0] === this.playerColor && this.turnColor === this.playerColor;
+    if (!piece || piece[0] !== this.turnColor) return false;
+    return Boolean(this.dests[square]?.length);
   }
 
   #bind() {
     this.boardEl.addEventListener("pointerdown", (event) => {
+      if (!this.interactive) return;
       if (event.button != null && event.button !== 0) return;
       const square = squareFromPoint(
         this.boardEl,
@@ -394,14 +517,25 @@ export class Board {
       if (this.selected && (this.dests[this.selected] || []).includes(square)) {
         const from = this.selected;
         this.selected = null;
+        this.cursor = null;
         this.#paintSquares();
+        this.onSelect(null);
         this.onMove(from, square);
         return;
       }
 
       if (this.#canSelect(square)) {
+        if (this.selected === square) {
+          this.selected = null;
+          this.cursor = null;
+          this.#paintSquares();
+          this.onSelect(null);
+          return;
+        }
         this.selected = square;
+        this.cursor = null;
         this.#paintSquares();
+        this.onSelect(square);
         const pieceEl = this.squareEls[square].querySelector(".piece");
         if (!pieceEl) return;
         this.boardEl.setPointerCapture(event.pointerId);
@@ -417,7 +551,9 @@ export class Board {
         event.preventDefault();
       } else {
         this.selected = null;
+        this.cursor = null;
         this.#paintSquares();
+        this.onSelect(null);
       }
     });
 
@@ -464,7 +600,9 @@ export class Board {
       );
       if (moved && to && to !== from && (this.dests[from] || []).includes(to)) {
         this.selected = null;
+        this.cursor = to;
         this.#paintSquares();
+        this.onSelect(null);
         this.onMove(from, to);
       }
     };
