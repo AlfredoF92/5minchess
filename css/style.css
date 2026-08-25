@@ -610,7 +610,7 @@ button, select { font: inherit; }
   padding: 0;
 }
 .aid-bar button {
-  flex: 1;
+  flex: 1 1 calc(50% - 6px);
   min-width: 0;
   border: 1px solid #ddd;
   background: #fff;
@@ -645,6 +645,240 @@ button, select { font: inherit; }
 .hints.is-four {
   height: 200px;
   min-height: 200px;
+}
+.hints.is-cards {
+  height: 460px;
+  min-height: 460px;
+  gap: 8px;
+}
+.hints.is-cards.is-six {
+  grid-template-columns: repeat(3, 1fr);
+}
+.hints.is-cards.is-four {
+  height: 480px;
+  min-height: 480px;
+}
+.story-preview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.story-preview img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  object-position: center;
+  padding: 0;
+  border-radius: 8px;
+  border: 2px solid #d8c7a0;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+  background: #1a2744;
+}
+.hint-slot {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.hint-slot > .hint-btn {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.hint-verdict {
+  flex: 0 0 38px;
+  height: 38px;
+  margin-top: 4px;
+  padding: 0 2px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #4a3d28;
+  overflow: hidden;
+}
+.hint-verdict:empty {
+  visibility: hidden;
+}
+.hint-verdict .hint-tag {
+  justify-content: center;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 800;
+  color: inherit;
+}
+.hint-verdict .hint-eval {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 1px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5a4a32;
+}
+.hint-slot:has(.is-picked) .hint-verdict,
+.hint-slot:has(.is-picked) .hint-verdict .hint-tag {
+  color: #2d6a12;
+}
+.hint-slot:has(.is-picked) .hint-verdict .hint-eval {
+  color: #2d6a12;
+}
+.hint-btn.is-card {
+  position: relative;
+  flex-direction: column;
+  padding: 0;
+  border: 2px solid #c9b48a;
+  background: #1c140c;
+  border-radius: 10px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.16), inset 0 0 0 1px rgba(255,248,230,0.35);
+  overflow: hidden;
+}
+.hint-btn.is-card:hover:not(:disabled),
+.hint-btn.is-card.is-kbd:not(:disabled) {
+  border-color: #e6d3a4;
+  box-shadow: 0 10px 18px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,248,230,0.5);
+}
+.hint-btn.is-card.is-picked,
+.hint-btn.is-card.is-picked:disabled {
+  border-color: var(--green);
+  background: #1c140c;
+  box-shadow: 0 0 0 2px rgba(98, 153, 36, 0.55), 0 8px 16px rgba(0,0,0,0.2);
+}
+.hint-card-art {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 130px;
+  padding: 0;
+  background: #24324f;
+}
+.hint-card-media {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 130px;
+}
+.hint-card-media .hint-card-art {
+  flex: 1 1 auto;
+  min-height: 130px;
+}
+.hint-card-san {
+  position: absolute;
+  left: 7px;
+  bottom: 5px;
+  z-index: 3;
+  margin: 0;
+  color: #1f1f1f;
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  user-select: none;
+  -webkit-text-stroke: 3.5px #fff;
+  paint-order: stroke fill;
+}
+.hint-card-san.is-3 { font-size: 20px; }
+.hint-card-san.is-4 { font-size: 17px; }
+.hint-card-san.is-long { font-size: 15px; }
+.hint-card-art.is-icon {
+  padding: 10px 8px 4px;
+  background: linear-gradient(180deg, #fbf6ea 0%, #efe3c8 100%);
+}
+.hint-card-art.is-icon img {
+  width: auto;
+  height: 78%;
+  max-height: 124px;
+  max-width: 88%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 6px rgba(40, 28, 12, 0.18));
+}
+.hint-card-art.is-war {
+  background-color: #1a2744;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+.hint-card-art img {
+  display: block;
+  pointer-events: none;
+}
+.hint-card-art.is-empty {
+  min-height: 130px;
+  background: #f3ead8;
+}
+.hint-btn.is-card .hint-body {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  padding: 6px 8px 7px;
+  background: linear-gradient(#fff8e8, #f3e6c8);
+  gap: 2px;
+}
+.hint-btn.is-card .hint-rank {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  background: rgba(255, 248, 232, 0.92);
+  color: #2a2114;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.hint-btn.is-card .hint-main {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6a5a40;
+}
+.hint-btn.is-card .hint-desc {
+  margin-top: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #1a140c;
+}
+.hint-btn.is-card .hint-eval,
+.hint-btn.is-card .hint-tag {
+  color: #4a3d28;
+}
+.hint-btn.is-card .hint-tag {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.hint-btn.is-card .hint-eval {
+  font-size: 11px;
+}
+.hint-btn.is-card .hint-divider {
+  margin: 3px 0 2px;
+  background: rgba(90, 70, 40, 0.18);
+}
+.hint-btn.is-card.is-picked .hint-main,
+.hint-btn.is-card.is-picked .hint-desc,
+.hint-btn.is-card.is-picked .hint-eval,
+.hint-btn.is-card.is-picked .hint-tag {
+  color: #2d6a12;
+}
+.hint-btn.is-card.is-loading .hint-card-art.is-war,
+.hint-btn.is-card.is-loading .hint-card-art img {
+  opacity: 0.35;
+  filter: grayscale(0.2);
+  animation: hint-ghost 1.8s ease-in-out infinite;
+}
+.hints.is-hold .hint-btn.is-card:not(.is-picked):not(.empty):hover,
+.hints.is-hold .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
+  background: #1c140c;
+}
+.hints.is-hold.is-wait-opp .hint-btn.is-card:not(.empty):hover,
+.hints.is-hold.is-wait-opp .hint-btn.is-card.is-kbd:not(.empty) {
+  background: #1c140c;
 }
 .train-actions {
   display: flex;
@@ -837,16 +1071,6 @@ button, select { font: inherit; }
 .hint-btn.is-picked .hint-eval,
 .hint-btn.is-picked .hint-tag {
   color: #2d6a12;
-}
-.hints.is-quiz .hint-foot {
-  display: none;
-}
-.hints.is-hold .hint-foot {
-  animation: hint-meta-in 0.28s ease both;
-}
-@keyframes hint-meta-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 .hint-btn.empty { cursor: default; opacity: 0.7; }
 .hint-btn.is-loading {
@@ -1471,6 +1695,7 @@ body.is-local .vs-engine { display: none; }
     max-width: none;
   }
   .hints { grid-template-columns: repeat(2, 1fr); }
+  .hints.is-cards.is-six { grid-template-columns: repeat(3, 1fr); }
   .brand span { display: none; }
 }
 

@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260825tags";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260825castle";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -17,6 +17,62 @@ const HINT_LAYOUTS = {
 };
 const CLOCK_KEY = "5minchess.moveClock";
 const ROUND_EVAL_KEY = "5minchess.roundEval";
+const STORY_ICONS_KEY = "5minchess.pieceCards";
+const WAR_KNIGHT_DIR = "immagini-stile-war/cavallonero";
+const WAR_PAWN_DIR = "immagini-stile-war/pedonennero";
+const WAR_BISHOP_DIR = "immagini-stile-war/alfierennero";
+const WAR_ROOK_DIR = "immagini-stile-war/torrenera";
+const WAR_QUEEN_DIR = "immagini-stile-war/reginanera";
+const WAR_KING_DIR = "immagini-stile-war/renero";
+const WAR_CASTLE_DIR = "immagini-stile-war/arrocconero";
+const WAR_KNIGHT_ART = {
+  captureP: { file: "Cavallo Nero cattura Pedone Bianco.png", title: "art.knight.captureP" },
+  captureR: { file: "Cavallo Nero cattura Torre Bianca.png", title: "art.knight.captureR" },
+  captureN: { file: "Cavallo Nero cattura Cavallo.png", title: "art.knight.captureN" },
+  captureB: { file: "Cavallo Nero cattura Alfiere.png", title: "art.knight.captureB" },
+  captureQ: { file: "Cavallo Nero Cattura Regina.png", title: "art.knight.captureQ" },
+  check: { file: "Cavallo Nero Fa scacco al RE.png", title: "art.knight.check" },
+};
+const WAR_PAWN_ART = {
+  captureP: { file: "Pedone Nero cattura Pedone Bianco.png", title: "art.pawn.captureP" },
+  captureR: { file: "Pedone Nero cattura Torre Bianca.png", title: "art.pawn.captureR" },
+  captureN: { file: "Pedone Nero cattura Cavallo.png", title: "art.pawn.captureN" },
+  captureB: { file: "Pedone Nero cattura Alfiere.png", title: "art.pawn.captureB" },
+  captureQ: { file: "Pedone Nero Cattura Regina.png", title: "art.pawn.captureQ" },
+  check: { file: "Pedone Nero Fa scacco al RE.png", title: "art.pawn.check" },
+};
+const WAR_BISHOP_ART = {
+  captureP: { file: "Alfiere Nero cattura Pedone Bianco.png", title: "art.bishop.captureP" },
+  captureR: { file: "Alfiere Nero cattura Torre Bianca.png", title: "art.bishop.captureR" },
+  captureN: { file: "Alfiere Nero cattura Cavallo.png", title: "art.bishop.captureN" },
+  captureB: { file: "Alfiere Nero cattura Alfiere.png", title: "art.bishop.captureB" },
+  captureQ: { file: "Alfiere Nero Cattura Regina.png", title: "art.bishop.captureQ" },
+  check: { file: "Alfiere Nero Fa scacco al RE.png", title: "art.bishop.check" },
+};
+const WAR_ROOK_ART = {
+  captureP: { file: "Torre Nera cattura Pedone Bianco.png", title: "art.rook.captureP" },
+  captureR: { file: "Torre Nera cattura Torre Bianca.png", title: "art.rook.captureR" },
+  captureN: { file: "Torre Nera cattura Cavallo.png", title: "art.rook.captureN" },
+  captureB: { file: "Torre Nera cattura Alfiere.png", title: "art.rook.captureB" },
+  captureQ: { file: "Torre Nera Cattura Regina.png", title: "art.rook.captureQ" },
+  check: { file: "Torre Nera Fa scacco al RE.png", title: "art.rook.check" },
+};
+const WAR_QUEEN_ART = {
+  captureP: { file: "Regina Nera cattura Pedone Bianco.png", title: "art.queen.captureP" },
+  captureR: { file: "Regina Nera cattura Torre Bianca.png", title: "art.queen.captureR" },
+  captureN: { file: "Regina Nera cattura Cavallo.png", title: "art.queen.captureN" },
+  captureB: { file: "Regina Nera cattura Alfiere.png", title: "art.queen.captureB" },
+  captureQ: { file: "Regina Nera Cattura Regina.png", title: "art.queen.captureQ" },
+  check: { file: "Regina Nera Fa scacco al RE.png", title: "art.queen.check" },
+};
+const WAR_KING_ART = {
+  captureP: { file: "Re Nero cattura Pedone Bianco.png", title: "art.king.captureP" },
+  captureR: { file: "Re Nero cattura Torre Bianca.png", title: "art.king.captureR" },
+  captureN: { file: "Re Nero cattura Cavallo.png", title: "art.king.captureN" },
+  captureB: { file: "Re Nero cattura Alfiere.png", title: "art.king.captureB" },
+  captureQ: { file: "Re Nero Cattura Regina.png", title: "art.king.captureQ" },
+  check: { file: "Re Nero Fa scacco al RE.png", title: "art.king.check" },
+};
 const CLOCK_OPTIONS = [0, 10, 30, 45, 60];
 const CLOCK_AUTO_BEST = new Set([10]);
 const HINT_RECALC_MS = 8000;
@@ -75,6 +131,14 @@ function readRoundEval() {
     return localStorage.getItem(ROUND_EVAL_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+function readStoryIcons() {
+  try {
+    return localStorage.getItem(STORY_ICONS_KEY) !== "0";
+  } catch {
+    return true;
   }
 }
 
@@ -1296,7 +1360,7 @@ function hintRankKind(hint, pool = state.hintPool) {
 function hintRankTag(hint, pool = state.hintPool) {
   const kind = hintRankKind(hint, pool);
   if (kind === "best") return t("hint.tag.best");
-  if (kind === "normal") return t("hint.tag.normal");
+  if (kind === "normal" || kind === "worst") return t("hint.tag.normal");
   return "";
 }
 
@@ -1372,10 +1436,7 @@ function hintTagHtml(hint, pool = state.hintPool) {
   if (kind === "best") {
     return `<span class="hint-tag is-best"><span class="hint-star" aria-hidden="true">★</span>${escapeHtml(tag)}</span>`;
   }
-  if (kind === "normal") {
-    return `<span class="hint-tag is-good"><span class="hint-up" aria-hidden="true">👍</span>${escapeHtml(tag)}</span>`;
-  }
-  return "";
+  return `<span class="hint-tag is-good"><span class="hint-up" aria-hidden="true">👍</span>${escapeHtml(tag)}</span>`;
 }
 
 function evalClass(info) {
@@ -1432,6 +1493,221 @@ function pieceIcon(move, color) {
   if (move.san.startsWith("O-O")) return `pieces/${color}K.svg`;
   const type = (move.piece || "p").toUpperCase();
   return `pieces/${color}${type}.svg`;
+}
+
+function warArtUrl(dir, art) {
+  return `${dir}/${encodeURIComponent(art.file)}`;
+}
+
+function moveHash(move) {
+  const key = `${move?.from || ""}${move?.to || ""}${move?.san || ""}`;
+  return [...key].reduce((n, ch) => n + ch.charCodeAt(0), 0);
+}
+
+function blackKnightPoseArt(n) {
+  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
+  return {
+    file: `Cavallo Nero Si muove da solo ${pose}.png`,
+    title: "art.knight.pose",
+    n: pose,
+  };
+}
+
+function blackKnightWarArt(move, poseN) {
+  const san = String(move?.san || "");
+  if (san.includes("#") || san.includes("+")) return WAR_KNIGHT_ART.check;
+  const cap = move?.captured;
+  if (cap === "p") return WAR_KNIGHT_ART.captureP;
+  if (cap === "r") return WAR_KNIGHT_ART.captureR;
+  if (cap === "n") return WAR_KNIGHT_ART.captureN;
+  if (cap === "b") return WAR_KNIGHT_ART.captureB;
+  if (cap === "q") return WAR_KNIGHT_ART.captureQ;
+  return blackKnightPoseArt(poseN || moveHash(move) + 1);
+}
+
+function blackPawnPoseArt(n) {
+  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
+  return {
+    file: `Pedone Nero Si muove da solo ${pose}.png`,
+    title: "art.pawn.pose",
+    n: pose,
+  };
+}
+
+function quietPiecePoseMap(hints, side, piece) {
+  const map = new Map();
+  if (side !== "b") return map;
+  const ucis = [];
+  for (const hint of hints || []) {
+    if (!hint?.uci) continue;
+    const played = playedFromHint(hint);
+    if (!played || played.piece !== piece) continue;
+    const san = String(played.san || "");
+    if (played.captured || san.startsWith("O-O") || san.includes("+") || san.includes("#")) continue;
+    ucis.push(hint.uci);
+  }
+  ucis.sort();
+  ucis.forEach((uci, i) => map.set(uci, (i % 9) + 1));
+  return map;
+}
+
+function quietPawnPoseMap(hints, side) {
+  return quietPiecePoseMap(hints, side, "p");
+}
+
+function blackPawnWarArt(move, poseN) {
+  const san = String(move?.san || "");
+  if (san.includes("#") || san.includes("+")) return WAR_PAWN_ART.check;
+  const cap = move?.captured;
+  if (cap === "p") return WAR_PAWN_ART.captureP;
+  if (cap === "r") return WAR_PAWN_ART.captureR;
+  if (cap === "n") return WAR_PAWN_ART.captureN;
+  if (cap === "b") return WAR_PAWN_ART.captureB;
+  if (cap === "q") return WAR_PAWN_ART.captureQ;
+  return blackPawnPoseArt(poseN || moveHash(move) + 1);
+}
+
+function blackBishopPoseArt(n) {
+  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
+  return {
+    file: `Alfiere Nero Si muove da solo ${pose}.png`,
+    title: "art.bishop.pose",
+    n: pose,
+  };
+}
+
+function blackBishopWarArt(move, poseN) {
+  const san = String(move?.san || "");
+  if (san.includes("#") || san.includes("+")) return WAR_BISHOP_ART.check;
+  const cap = move?.captured;
+  if (cap === "p") return WAR_BISHOP_ART.captureP;
+  if (cap === "r") return WAR_BISHOP_ART.captureR;
+  if (cap === "n") return WAR_BISHOP_ART.captureN;
+  if (cap === "b") return WAR_BISHOP_ART.captureB;
+  if (cap === "q") return WAR_BISHOP_ART.captureQ;
+  return blackBishopPoseArt(poseN || moveHash(move) + 1);
+}
+
+function blackQueenPoseArt(n) {
+  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
+  return {
+    file: `Regina Nera Si muove da sola ${pose}.png`,
+    title: "art.queen.pose",
+    n: pose,
+  };
+}
+
+function blackQueenWarArt(move, poseN) {
+  const san = String(move?.san || "");
+  if (san.includes("#") || san.includes("+")) return WAR_QUEEN_ART.check;
+  const cap = move?.captured;
+  if (cap === "p") return WAR_QUEEN_ART.captureP;
+  if (cap === "r") return WAR_QUEEN_ART.captureR;
+  if (cap === "n") return WAR_QUEEN_ART.captureN;
+  if (cap === "b") return WAR_QUEEN_ART.captureB;
+  if (cap === "q") return WAR_QUEEN_ART.captureQ;
+  return blackQueenPoseArt(poseN || moveHash(move) + 1);
+}
+
+function blackRookPoseArt(n) {
+  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
+  return {
+    file: `Torre Nera Si muove da sola ${pose}.png`,
+    title: "art.rook.pose",
+    n: pose,
+  };
+}
+
+function blackRookWarArt(move, poseN) {
+  const san = String(move?.san || "");
+  if (san.includes("#") || san.includes("+")) return WAR_ROOK_ART.check;
+  const cap = move?.captured;
+  if (cap === "p") return WAR_ROOK_ART.captureP;
+  if (cap === "r") return WAR_ROOK_ART.captureR;
+  if (cap === "n") return WAR_ROOK_ART.captureN;
+  if (cap === "b") return WAR_ROOK_ART.captureB;
+  if (cap === "q") return WAR_ROOK_ART.captureQ;
+  return blackRookPoseArt(poseN || moveHash(move) + 1);
+}
+
+function castlePoseMap(hints, side) {
+  const map = new Map();
+  if (side !== "b") return map;
+  const ucis = [];
+  for (const hint of hints || []) {
+    if (!hint?.uci) continue;
+    const played = playedFromHint(hint);
+    if (!played || !String(played.san || "").startsWith("O-O")) continue;
+    ucis.push(hint.uci);
+  }
+  ucis.sort();
+  ucis.forEach((uci, i) => map.set(uci, (i % 9) + 1));
+  return map;
+}
+
+function blackCastlePoseArt(n) {
+  const pose = ((Number(n || 1) - 1) % 9 + 9) % 9 + 1;
+  return {
+    file: `Re Nero Arrocco ${pose}.png`,
+    title: "art.castle.pose",
+    n: pose,
+  };
+}
+
+function blackKingPoseArt(n) {
+  const pose = ((Number(n) - 1) % 3 + 3) % 3 + 1;
+  return {
+    file: `Re Nero Si muove da solo ${pose}.png`,
+    title: "art.king.pose",
+    n: pose,
+  };
+}
+
+function blackKingWarArt(move, poseN) {
+  const san = String(move?.san || "");
+  if (san.includes("#") || san.includes("+")) return WAR_KING_ART.check;
+  const cap = move?.captured;
+  if (cap === "p") return WAR_KING_ART.captureP;
+  if (cap === "r") return WAR_KING_ART.captureR;
+  if (cap === "n") return WAR_KING_ART.captureN;
+  if (cap === "b") return WAR_KING_ART.captureB;
+  if (cap === "q") return WAR_KING_ART.captureQ;
+  return blackKingPoseArt(poseN || moveHash(move) + 1);
+}
+
+function warCardHtml(dir, art) {
+  const title = escapeHtml(t(art.title, { n: art.n || "" }).trim());
+  const src = warArtUrl(dir, art);
+  return `<span class="hint-card-art is-war" role="img" aria-label="${title}" title="${title}" style="background-image:url('${src}')"></span>`;
+}
+
+function hintCardSanHtml(san) {
+  const text = String(san || "").trim();
+  if (!text || text === "—") return "";
+  const n = text.length;
+  const size = n <= 2 ? "is-2" : n <= 3 ? "is-3" : n <= 4 ? "is-4" : "is-long";
+  return `<span class="hint-card-san ${size}">${escapeHtml(text)}</span>`;
+}
+
+function hintCardMediaHtml(art, san) {
+  return `<span class="hint-card-media">${art}${hintCardSanHtml(san)}</span>`;
+}
+
+function storyArtHtml(move, color, poses = {}) {
+  if (color === "b" && move?.piece === "n") return warCardHtml(WAR_KNIGHT_DIR, blackKnightWarArt(move, poses.n));
+  if (color === "b" && move?.piece === "p") return warCardHtml(WAR_PAWN_DIR, blackPawnWarArt(move, poses.p));
+  if (color === "b" && move?.piece === "b") return warCardHtml(WAR_BISHOP_DIR, blackBishopWarArt(move, poses.b));
+  if (color === "b" && move?.piece === "r") return warCardHtml(WAR_ROOK_DIR, blackRookWarArt(move, poses.r));
+  if (color === "b" && move?.piece === "q") return warCardHtml(WAR_QUEEN_DIR, blackQueenWarArt(move, poses.q));
+  if (color === "b" && move?.piece === "k") {
+    if (String(move?.san || "").startsWith("O-O")) {
+      return warCardHtml(WAR_CASTLE_DIR, blackCastlePoseArt(poses.castle));
+    }
+    return warCardHtml(WAR_KING_DIR, blackKingWarArt(move, poses.k));
+  }
+  const src = pieceIcon(move, color) || `pieces/${color || "w"}N.svg`;
+  const title = escapeHtml(move ? pieceName(move.piece || "p") : t("hints.move"));
+  return `<span class="hint-card-art is-icon"><img src="${src}" alt="${title}" title="${title}"></span>`;
 }
 
 function uciFromVerbose(move) {
@@ -1766,6 +2042,7 @@ function syncHintLayoutUi() {
   const n = hintsPerPage();
   els.hints?.classList.toggle("is-four", n === 4);
   els.hints?.classList.toggle("is-six", n !== 4);
+  els.hints?.classList.toggle("is-cards", Boolean(state.storyIcons));
 }
 
 function syncHintNav() {
@@ -2312,6 +2589,13 @@ function clearBoardAids() {
 function syncAidButtons() {
   els.aidMoves?.classList.toggle("is-on", state.aids.moves);
   els.aidThreats?.classList.toggle("is-on", state.aids.threats);
+  syncStoryIconsButton();
+}
+
+function syncStoryIconsButton() {
+  const on = Boolean(state.storyIcons);
+  els.aidIcons?.classList.toggle("is-on", on);
+  els.aidIcons?.setAttribute("aria-pressed", on ? "true" : "false");
 }
 
 function paintThreatPips() {
@@ -2469,11 +2753,13 @@ const els = {
   graveBottom: document.getElementById("grave-bottom"),
   aidMoves: document.getElementById("btn-aid-moves"),
   aidThreats: document.getElementById("btn-aid-threats"),
+  aidIcons: document.getElementById("btn-aid-icons"),
   trainingMode: document.getElementById("btn-training-mode"),
   trainContinue: document.getElementById("btn-train-continue"),
   oppWait: document.getElementById("opp-wait"),
   autoContinue: document.getElementById("auto-continue"),
   roundEval: document.getElementById("round-eval"),
+  storyIcons: document.getElementById("story-icons"),
 };
 
 const state = {
@@ -2505,6 +2791,7 @@ const state = {
   hintLayout: readHintLayout(),
   moveClockSec: readMoveClock(),
   roundEval: readRoundEval(),
+  storyIcons: readStoryIcons(),
   hasGame: false,
   openingPly: 0,
   startOpening: START_OPENINGS[0],
@@ -2518,6 +2805,7 @@ const state = {
   speakToken: 0,
   kingSpeaking: false,
   pendingHintReveal: false,
+  allowHintsWhileSpeaking: false,
   gameId: 0,
   kingReplay: null,
   lastLifeFeedbackKey: "",
@@ -2680,6 +2968,17 @@ function loadingHintCard(rank) {
   const ghost = ghosts[rank - 1];
   const letter = { n: "N", b: "B", q: "Q", r: "R" }[ghost.piece];
   const san = localizeSan(ghost.piece === "p" ? ghost.to : letter + ghost.to);
+  const fake = { piece: ghost.piece, san };
+  if (state.storyIcons) {
+    return wrapHintSlot(`
+      <button class="hint-btn is-card is-loading" disabled>
+        ${hintCardMediaHtml(storyArtHtml(fake, color), san)}
+        <span class="hint-body">
+          <span class="hint-rank">${rank}</span>
+          <span class="hint-calc">${t("hints.loading")}</span>
+        </span>
+      </button>`);
+  }
   return `
     <button class="hint-btn is-loading" disabled>
       <span class="hint-rank">${rank}</span>
@@ -2785,32 +3084,18 @@ function trainPickedIndex() {
   return i >= 0 ? i : null;
 }
 
+function wrapHintSlot(buttonHtml, verdict = "") {
+  return `<div class="hint-slot">${buttonHtml}<span class="hint-verdict">${verdict}</span></div>`;
+}
+
 function revealTrainPick() {
-  const root = els.hints;
-  if (!root) return;
-  root.classList.remove("is-reveal", "is-quiz", "is-waiting");
-  root.classList.add("is-hold");
-  const picked = state.trainPickedUci;
-  const hasMeta = Boolean(root.querySelector(".hint-eval-row"));
-  if (!hasMeta) {
-    renderHints();
-    state.board.setArrows([]);
-    return;
-  }
-  root.querySelectorAll(".hint-btn").forEach((btn) => {
-    if (btn.classList.contains("empty") || btn.classList.contains("is-loading")) return;
-    const hint = state.hints[Number(btn.dataset.index)];
-    btn.classList.toggle("is-picked", Boolean(hint && hint.uci === picked));
-  });
-  root.querySelectorAll(".hint-foot").forEach((el) => {
-    el.removeAttribute("aria-hidden");
-  });
+  renderHints();
+  state.board?.setArrows([]);
   showHintPanel();
   syncHintNav();
   syncTrainContinue();
   state.kbdHint = null;
   paintKbdHint();
-  state.board.setArrows([]);
   syncHintBoardPlay();
 }
 
@@ -2850,7 +3135,7 @@ function revealHintsIfReady() {
     hideHintPanel();
     return;
   }
-  const canShow = playerIsSideToMove() && !state.game.game_over() && state.hintPool.length && !state.kingSpeaking;
+  const canShow = playerIsSideToMove() && !state.game.game_over() && state.hintPool.length && (!state.kingSpeaking || state.allowHintsWhileSpeaking);
   if (!canShow) {
     hideHintPanel();
     if (waitingForHints()) renderHints();
@@ -3079,7 +3364,6 @@ function syncBoard(options = {}) {
 }
 
 function renderHints() {
-  els.hints?.classList.toggle("is-quiz", isTrainQuiz());
   els.hints?.classList.toggle("is-hold", isTrainHold());
   if (waitingForHints() && !isTrainHold()) {
     state.hints = [];
@@ -3091,44 +3375,71 @@ function renderHints() {
     return;
   }
   state.hints = visibleHints();
-  const quiz = isTrainQuiz();
   const hold = isTrainHold();
+  const cards = Boolean(state.storyIcons);
+  const side = hold && state.trainColor ? state.trainColor : state.game.turn();
+  const pawnPoses = quietPawnPoseMap(state.hints, side);
+  const knightPoses = quietPiecePoseMap(state.hints, side, "n");
+  const bishopPoses = quietPiecePoseMap(state.hints, side, "b");
+  const rookPoses = quietPiecePoseMap(state.hints, side, "r");
+  const queenPoses = quietPiecePoseMap(state.hints, side, "q");
+  const kingPoses = quietPiecePoseMap(state.hints, side, "k");
+  const castlePoses = castlePoseMap(state.hints, side);
   const buttons = [];
   for (let i = 0; i < hintsPerPage(); i += 1) {
     const hint = state.hints[i];
     const rank = i + 1;
     if (!hint) {
-      buttons.push(`
-        <button class="hint-btn empty" disabled>
-          <span class="hint-rank">${rank}</span>
-          <span class="hint-main">—</span>
-        </button>`);
+      const emptyBtn = `
+        <button class="hint-btn empty${cards ? " is-card" : ""}" disabled>
+          ${cards ? hintCardMediaHtml(`<span class="hint-card-art is-empty"></span>`, "") : ""}
+          <span class="hint-body">
+            <span class="hint-rank">${rank}</span>
+            ${cards ? "" : `<span class="hint-main">—</span>`}
+          </span>
+        </button>`;
+      buttons.push(cards ? wrapHintSlot(emptyBtn) : emptyBtn);
       continue;
     }
     const played = playedFromHint(hint);
     const san = played ? localizeSan(played.san) : hint.uci;
-    const icon = played ? pieceIcon(played, hold && state.trainColor ? state.trainColor : state.game.turn()) : "";
+    const icon = !cards && played ? pieceIcon(played, side) : "";
+    const art = cards ? hintCardMediaHtml(storyArtHtml(played || { piece: "n", san: "" }, side, {
+      n: knightPoses.get(hint.uci),
+      p: pawnPoses.get(hint.uci),
+      b: bishopPoses.get(hint.uci),
+      r: rookPoses.get(hint.uci),
+      q: queenPoses.get(hint.uci),
+      k: kingPoses.get(hint.uci),
+      castle: castlePoses.get(hint.uci),
+    }), san) : "";
     const picked = hold && hint.uci === state.trainPickedUci;
     const desc = played ? moveHeadline(played) : "";
-    const hiddenMeta = quiz ? " aria-hidden=\"true\"" : "";
-    buttons.push(`
-      <button class="hint-btn${picked ? " is-picked" : ""}" data-index="${i}" type="button">
-        <span class="hint-body">
-          <span class="hint-rank">${rank}</span>
-          <span class="hint-move-row">
-            ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
-            <span class="hint-main">${san}</span>
-          </span>
-          ${desc ? `<span class="hint-desc">${escapeHtml(desc)}</span>` : ""}
-          <span class="hint-foot"${hiddenMeta}>
+    const verdict = hold
+      ? `${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`
+      : "";
+    const foot = !cards && hold ? `
+          <span class="hint-foot">
+            ${hintTagHtml(hint)}
             <span class="hint-divider" aria-hidden="true"></span>
             <span class="hint-eval-row">
               <span class="hint-eval">${hintEvalHtml(hint)}</span>
-              ${hintTagHtml(hint)}
             </span>
-          </span>
+          </span>` : "";
+    const btn = `
+      <button class="hint-btn${cards ? " is-card" : ""}${picked ? " is-picked" : ""}" data-index="${i}" type="button">
+        ${art}
+        <span class="hint-body">
+          <span class="hint-rank">${rank}</span>
+          ${cards ? "" : `<span class="hint-move-row">
+            ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
+            <span class="hint-main">${san}</span>
+          </span>`}
+          ${desc ? `<span class="hint-desc">${escapeHtml(desc)}</span>` : ""}
+          ${foot}
         </span>
-      </button>`);
+      </button>`;
+    buttons.push(cards ? wrapHintSlot(btn, verdict) : btn);
   }
   els.hints.innerHTML = buttons.join("");
   syncHintNav();
@@ -3263,6 +3574,12 @@ function waitAtLeast(ms, startedAt = Date.now()) {
   return new Promise((resolve) => setTimeout(resolve, left));
 }
 
+function isFirstEngineMove() {
+  if (isLocalVsHuman() || state.playerColor !== "b") return false;
+  if (state.game.turn() !== "w" || state.game.game_over()) return false;
+  return state.game.history().length === (state.openingPly || 0);
+}
+
 async function computerMove({ silentWait = false, afterTalk } = {}) {
   const gameId = state.gameId;
   if (state.game.game_over()) {
@@ -3273,13 +3590,15 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
     await refreshHints();
     return;
   }
+  const firstEngine = isFirstEngineMove();
+  if (!firstEngine) state.allowHintsWhileSpeaking = false;
   state.busy = true;
   if (!isTrainHold()) {
     clearHints();
     renderHints();
   }
   setStatus(t("turn.opp"), t("king.waiting"), "think");
-  if (!silentWait) {
+  if (!silentWait && !firstEngine) {
     state.kingReplay = { type: "waiting" };
     if (!state.kingSpeaking) speakKing(t("king.waiting"));
   }
@@ -3319,12 +3638,12 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
     const oppKey = pickOpponentKeyFromEval(state.lastPlayerScore, state.hintBestScore);
     const oppBand = opponentReactBand(preview, beforeEval, oppKey);
 
-    await waitAtLeast(10000, startedAt);
+    if (!firstEngine) await waitAtLeast(10000, startedAt);
     if (afterTalk) await afterTalk;
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
 
     state.board.setArrows([]);
-    await sleep(300);
+    if (!firstEngine) await sleep(300);
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
     if (isTrainHold()) {
       clearTrainHold();
@@ -3359,11 +3678,17 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
     prepareHintTalks();
     state.pendingHintReveal = true;
     state.busy = false;
-    if (oppBand) showKingReact(oppBand);
+    if (oppBand && !firstEngine) showKingReact(oppBand);
     const talk = kingComment(fen, played, true, oppKey, beforeEval);
     state.lastKingTalk = talk;
     state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey, reactBand: oppBand, beforeEval };
     setStatus(t("turn.you"), `${youLabel()}. ${t("turn.make")}`, "play");
+    if (firstEngine) {
+      state.allowHintsWhileSpeaking = true;
+      revealHintsIfReady();
+      syncBoard({ keepArrows: true });
+      return;
+    }
     speakKing(talk, { calculating: true, html: true });
     syncBoard({ keepArrows: true });
   } catch (err) {
@@ -3869,6 +4194,7 @@ function openNewGameDialog() {
   fillHintLayoutSelect();
   fillClockSelect();
   fillRoundEvalSelect();
+  fillStoryIconsSelect();
   fillStartOpeningSelect();
   if (els.skill) els.skill.value = String(state.skill || 2);
   if (els.playColor) els.playColor.value = state.playColorPref || "random";
@@ -3877,6 +4203,7 @@ function openNewGameDialog() {
   if (els.hintLayout) els.hintLayout.value = HINT_LAYOUTS[state.hintLayout] ? state.hintLayout : "6x1";
   if (els.moveClockSelect) els.moveClockSelect.value = String(moveClockSec());
   if (els.roundEval) els.roundEval.value = state.roundEval ? "1" : "0";
+  if (els.storyIcons) els.storyIcons.value = state.storyIcons ? "1" : "0";
   if (els.btnNewCancel) els.btnNewCancel.hidden = !state.hasGame;
   setNewGameTab("train");
   if (els.newGame) els.newGame.hidden = false;
@@ -3989,6 +4316,16 @@ function fillRoundEvalSelect() {
   ].join("");
 }
 
+function fillStoryIconsSelect() {
+  const select = els.storyIcons;
+  if (!select) return;
+  const current = state.storyIcons ? "1" : "0";
+  select.innerHTML = [
+    `<option value="0"${current === "0" ? " selected" : ""}>${t("settings.no")}</option>`,
+    `<option value="1"${current === "1" ? " selected" : ""}>${t("settings.yes")}</option>`,
+  ].join("");
+}
+
 function applyRoundEval(value) {
   state.roundEval = value === "1" || value === true || value === 1;
   try {
@@ -3997,6 +4334,19 @@ function applyRoundEval(value) {
     /* ignore */
   }
   if (els.roundEval) els.roundEval.value = state.roundEval ? "1" : "0";
+  renderHints();
+}
+
+function applyStoryIcons(value) {
+  state.storyIcons = value === "1" || value === true || value === 1;
+  try {
+    localStorage.setItem(STORY_ICONS_KEY, state.storyIcons ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  if (els.storyIcons) els.storyIcons.value = state.storyIcons ? "1" : "0";
+  syncStoryIconsButton();
+  syncHintLayoutUi();
   renderHints();
 }
 
@@ -4071,6 +4421,7 @@ function applyLanguage() {
   fillHintLayoutSelect();
   fillClockSelect();
   fillRoundEvalSelect();
+  fillStoryIconsSelect();
   fillStartOpeningSelect();
   if (!els.newGame?.hidden) syncNewGameTabUi();
   renderKingLegend();
@@ -4317,6 +4668,7 @@ els.playMode?.addEventListener("change", () => syncNewGameForm());
 els.startKind?.addEventListener("change", () => syncNewGameForm());
 els.startOpening?.addEventListener("change", () => previewOpeningLine());
 els.roundEval?.addEventListener("change", () => applyRoundEval(els.roundEval.value));
+els.storyIcons?.addEventListener("change", () => applyStoryIcons(els.storyIcons.value));
 els.btnNewStart?.addEventListener("click", () => confirmNewGame());
 els.btnNewCancel?.addEventListener("click", () => {
   if (state.hasGame) closeNewGameDialog();
@@ -4330,6 +4682,7 @@ document.addEventListener("keydown", (event) => {
 });
 els.aidMoves.addEventListener("click", () => showAid("moves"));
 els.aidThreats.addEventListener("click", () => showAid("threats"));
+els.aidIcons?.addEventListener("click", () => applyStoryIcons(!state.storyIcons));
 els.trainingMode?.addEventListener("click", () => setTrainingMode(!state.trainingMode));
 els.autoContinue?.addEventListener("change", () => setAutoContinue(els.autoContinue.checked));
 els.trainContinue?.addEventListener("click", () => {
@@ -4373,8 +4726,10 @@ fillStartKindSelect();
 fillHintLayoutSelect();
 fillClockSelect();
 fillRoundEvalSelect();
+fillStoryIconsSelect();
 fillStartOpeningSelect();
 syncHintLayoutUi();
+syncStoryIconsButton();
 syncTrainingModeUi();
 syncAutoContinueUi();
 renderKingLives();

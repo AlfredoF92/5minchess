@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BVChess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260825sel">
+  <link rel="stylesheet" href="css/style.css?v=20260825san">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -133,6 +133,7 @@
               <div class="aid-bar">
                 <button id="btn-aid-moves" class="is-on" type="button" data-i18n="aid.moves">Highlight moves</button>
                 <button id="btn-aid-threats" type="button" data-i18n="aid.threats">Highlight threatened</button>
+                <button id="btn-aid-icons" class="is-on" type="button" data-i18n="aid.icons" aria-pressed="true">Usa icone o immagini</button>
               </div>
             </div>
 
@@ -312,6 +313,22 @@
           </select>
         </label>
         <p class="new-game-soon" data-i18n="settings.roundEvalHint">If yes, scores show one decimal: 1.04 becomes 1.0, 0.79 becomes 0.8.</p>
+        <label class="skill-wrap">
+          <span data-i18n="settings.storyIcons">Usa icone o immagini</span>
+          <select id="story-icons" data-i18n-aria="settings.storyIconsAria" aria-label="Use piece icons on move cards">
+            <option value="0">No</option>
+            <option value="1" selected>Yes</option>
+          </select>
+        </label>
+        <p class="new-game-soon" data-i18n="settings.storyIconsHint">If yes, black pieces use the war scenes: capture, quiet move, check or mate.</p>
+        <div class="story-preview" aria-hidden="true">
+          <img src="immagini-stile-war/cavallonero/Cavallo Nero Si muove da solo 1.png" alt="" data-i18n-title="art.knight.quiet">
+          <img src="immagini-stile-war/pedonennero/Pedone Nero Si muove da solo 1.png" alt="" data-i18n-title="art.pawn.quiet">
+          <img src="immagini-stile-war/alfierennero/Alfiere Nero Si muove da solo 1.png" alt="" data-i18n-title="art.bishop.quiet">
+          <img src="immagini-stile-war/torrenera/Torre Nera Si muove da sola 1.png" alt="" data-i18n-title="art.rook.quiet">
+          <img src="immagini-stile-war/reginanera/Regina Nera Si muove da sola 1.png" alt="" data-i18n-title="art.queen.quiet">
+          <img src="immagini-stile-war/renero/Re Nero Si muove da solo 1.png" alt="" data-i18n-title="art.king.quiet">
+        </div>
         <p class="new-game-soon" data-i18n="settings.more">More settings will arrive here soon.</p>
       </div>
       <div class="new-game-actions">
@@ -321,6 +338,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260825sel"></script>
+  <script type="module" src="js/app.js?v=20260825san"></script>
 </body>
 </html>
