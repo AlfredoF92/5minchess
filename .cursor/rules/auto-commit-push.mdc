@@ -30,7 +30,7 @@ Su PowerShell, se l’heredoc fallisce, usa:
 git commit -m "Messaggio qui."
 ```
 
-7. Mai `--no-verify`, `--amend` (salvo regole git esistenti), force push, hard reset.
+7. Mai `--no-verify`, `--amend` (salvo regole git esistenti), force push, hard reset. Non usare `git config`. Se manca identità, riusa nome/email dell’ultimo commit via variabili d’ambiente.
 
 ## Push ogni 3 commit
 
