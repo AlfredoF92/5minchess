@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826board2";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826board3";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1797,6 +1797,40 @@ function shuffle(list) {
   return items;
 }
 
+function squareBoardKey(square, color) {
+  const sq = String(square || "").toLowerCase();
+  const file = sq.charCodeAt(0) - 97;
+  const rank = Number(sq[1]);
+  if (!sq || file < 0 || file > 7 || rank < 1 || rank > 8) return 999;
+  if (color === "b") return (7 - file) * 8 + (8 - rank);
+  return file * 8 + (rank - 1);
+}
+
+function sortHintsByBoard(hints, color) {
+  return [...hints].sort((a, b) => {
+    const aFrom = String(a?.uci || "").slice(0, 2);
+    const bFrom = String(b?.uci || "").slice(0, 2);
+    const fromCmp = squareBoardKey(aFrom, color) - squareBoardKey(bFrom, color);
+    if (fromCmp) return fromCmp;
+    const aTo = String(a?.uci || "").slice(2, 4);
+    const bTo = String(b?.uci || "").slice(2, 4);
+    return squareBoardKey(aTo, color) - squareBoardKey(bTo, color);
+  });
+}
+
+function layoutHintPool(ranked, color) {
+  const perPage = hintsPerPage();
+  const pages = hintLayout().pages;
+  if (pages <= 1) return sortHintsByBoard(ranked, color);
+  const shuffled = shuffle(ranked);
+  const ordered = [];
+  for (let page = 0; page < pages; page += 1) {
+    const block = shuffled.slice(page * perPage, (page + 1) * perPage);
+    ordered.push(...sortHintsByBoard(block, color));
+  }
+  return ordered;
+}
+
 function fillHintPool(engineLines, game, { freezeStand = false } = {}) {
   const pool = [];
   const seen = new Set();
@@ -1832,7 +1866,7 @@ function fillHintPool(engineLines, game, { freezeStand = false } = {}) {
     }
     state.gameEval = evalForPlayer(hintScore(realBest), game);
   }
-  return shuffle(ranked);
+  return layoutHintPool(ranked, game.turn());
 }
 
 function adoptHintPool(pool, { freezeStand = false } = {}) {
