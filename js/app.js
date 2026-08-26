@@ -2,12 +2,21 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826fade2";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827opplives";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
 const TRAIN_MODE_KEY = "5minchess.trainingMode";
 const AUTO_CONTINUE_KEY = "5minchess.autoContinue";
+const AID_THREATS_KEY = "5minchess.aidThreats";
+const HINT_FAKE_LOAD_MS = 3000;
+const OPP_REPLY_MIN_MS = 10000;
+const KING_TALK_HIDE = {
+  hintMix: true,
+  oppMoveDetail: true,
+  hanging: true,
+  talkAfterRank: true,
+};
 const HINT_LAYOUTS = {
   "6x1": { perPage: 6, pages: 1 },
   "4x1": { perPage: 4, pages: 1 },
@@ -19,6 +28,7 @@ const CLOCK_KEY = "5minchess.moveClock";
 const ROUND_EVAL_KEY = "5minchess.roundEval";
 const STORY_ICONS_KEY = "5minchess.pieceCards";
 const EVAL_VIEW_KEY = "5minchess.evalView";
+const HINT_INFO_KEY = "5minchess.hintInfo";
 const WAR_KNIGHT_DIR = "immagini-stile-war/cavallonero";
 const WAR_PAWN_DIR = "immagini-stile-war/pedonennero";
 const WAR_BISHOP_DIR = "immagini-stile-war/alfierennero";
@@ -179,6 +189,14 @@ function readAutoContinue() {
   }
 }
 
+function readAidThreats() {
+  try {
+    return localStorage.getItem(AID_THREATS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function readRoundEval() {
   try {
     return localStorage.getItem(ROUND_EVAL_KEY) === "1";
@@ -192,6 +210,25 @@ function readEvalView() {
     return localStorage.getItem(EVAL_VIEW_KEY) === "abs" ? "abs" : "delta";
   } catch {
     return "delta";
+  }
+}
+
+function readHintInfo() {
+  const fallback = {
+    place: true,
+    arrow: readEvalView() === "delta",
+    score: "number",
+  };
+  try {
+    const raw = JSON.parse(localStorage.getItem(HINT_INFO_KEY) || "null");
+    if (!raw || typeof raw !== "object") return fallback;
+    return {
+      place: raw.place !== false,
+      arrow: raw.arrow !== false,
+      score: raw.score === "hearts" ? "hearts" : "number",
+    };
+  } catch {
+    return fallback;
   }
 }
 
@@ -567,7 +604,7 @@ const FEEDBACK_REACT_LOW = {
 
 const FEEDBACK_LEGEND = [
   "best", "excellent", "strong", "good",
-  "inaccuracy", "mistake", "blunder", "mateMiss", "mateRisk", "oppBest",
+  "inaccuracy", "mistake", "blunder", "mateMiss", "mateRisk",
   "heartHalf", "heartOne", "heartMany",
 ];
 
@@ -724,9 +761,14 @@ function playerFeedbackTalk(lifeKey, replyKey, rankKind = "normal") {
   const opener = t(
     rankKind === "best" ? "fb.open.best" : rankKind === "worst" ? "fb.open.worst" : "fb.open.normal"
   );
+  const head = `<strong>${escapeHtml(opener)}</strong>`;
+  if (KING_TALK_HIDE.talkAfterRank) {
+    const wait = replyKey ? t("king.waiting") : "";
+    return wait ? `${head}<br><br>${escapeHtml(wait)}` : head;
+  }
   const body = t(lifeKey);
   const wait = replyKey ? t(replyKey) : "";
-  const line = `<strong>${escapeHtml(opener)}</strong> ${escapeHtml(body)}`.trim();
+  const line = `${head} ${escapeHtml(body)}`.trim();
   return wait ? `${line}<br><br>${escapeHtml(wait)}` : line;
 }
 
@@ -1528,11 +1570,19 @@ function hintEvalArrowSvg(dir) {
 
 function hintEvalHtml(info) {
   if (!info || info.synthetic) return "—";
-  const score = escapeHtml(state.evalView !== "delta" ? formatHintEval(info) : formatHintDelta(info));
-  if (state.evalView !== "delta") return score;
-  const dir = hintEvalDir(info);
+  const dir = state.hintInfo?.arrow ? hintEvalDir(info) : "";
   const arrow = dir ? hintEvalArrowSvg(dir) : "";
+  if (state.hintInfo?.score === "hearts") {
+    const hearts = state.evalView === "delta" ? hintHeartsHtml(info) : hintLivesRowHtml(info);
+    return `${arrow}${hearts}`;
+  }
+  const score = escapeHtml(state.evalView !== "delta" ? formatHintEval(info) : formatHintDelta(info));
   return `${arrow}${score}`;
+}
+
+function hintVerdictHtml(hint) {
+  const place = state.hintInfo?.place ? hintPlaceHtml(hint) : "";
+  return `${place}${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`;
 }
 
 function hintPlaceHtml(hint, pool = state.hintPool) {
@@ -1760,8 +1810,14 @@ function hintCardSanHtml(san) {
   const text = String(san || "").trim();
   if (!text || text === "—") return "";
   const n = text.length;
-  const size = n <= 2 ? "is-2" : n <= 3 ? "is-3" : n <= 4 ? "is-4" : "is-long";
-  return `<span class="hint-card-san ${size}">${escapeHtml(text)}</span>`;
+  const fontSize = 26;
+  const strokeW = (0.07 / 0.36) * fontSize;
+  const pad = strokeW + 2;
+  const w = Math.ceil(n * fontSize * 0.74 + pad * 2);
+  const h = Math.ceil(fontSize + pad * 2);
+  return `<svg class="hint-card-san" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <text x="${(w - pad).toFixed(1)}" y="${(h / 2).toFixed(1)}" text-anchor="end" dominant-baseline="middle" dy="0.08" fill="#1f1f1f" fill-opacity="0.92" stroke="#fff" stroke-width="${strokeW.toFixed(2)}" stroke-linejoin="round" paint-order="stroke" font-size="${fontSize}" font-weight="700" font-family='"Segoe UI", "Trebuchet MS", Arial, sans-serif'>${escapeHtml(text)}</text>
+  </svg>`;
 }
 
 function hintCardMediaHtml(art, san) {
@@ -1917,11 +1973,11 @@ function evalForPlayer(score, game) {
 }
 
 function livesFromCp(cp) {
-  if (!Number.isFinite(cp) || cp >= -100) return 6;
-  if (cp > -180) return 5;
-  if (cp > -280) return 4;
-  if (cp > -410) return 3;
-  if (cp > -610) return 2;
+  if (!Number.isFinite(cp) || cp >= 0) return 6;
+  if (cp >= -100) return 5;
+  if (cp >= -150) return 4;
+  if (cp >= -200) return 3;
+  if (cp >= -300) return 2;
   return 1;
 }
 
@@ -1938,7 +1994,6 @@ function opponentReactBand(afterGame, beforeEval, feedbackKey) {
   if (afterGame.in_checkmate() || afterGame.in_check()) return "mateRisk";
   const lost = displayLifeHalves(livesFromCp(beforeEval)) - displayLifeHalves(livesFromCp(state.gameEval));
   if (lost > 0) return "heartMany";
-  if (feedbackKey && opponentRankKind(feedbackKey) === "best") return "oppBest";
   return "";
 }
 
@@ -1952,7 +2007,8 @@ function opponentSwingTalk(beforeEval, feedbackKey) {
 }
 
 function displayLifeHalves(halves = kingLifeHalves()) {
-  return halves === 5 ? 4 : halves;
+  if (!Number.isFinite(halves)) return 6;
+  return Math.max(0, Math.min(6, halves));
 }
 
 function visibleLifeHalves() {
@@ -1989,12 +2045,25 @@ function hintDeltaHeartPieces(halves, tone) {
   return parts.join("");
 }
 
-function hintHeartsHtml(hint) {
-  if (!hint || hint.synthetic) return "";
+function hintLivesRowHtml(hint) {
+  if (!hint || hint.synthetic) return "—";
   const score = hintScore(hint);
-  if (!Number.isFinite(score)) return "";
+  if (!Number.isFinite(score)) return "—";
+  const halves = displayLifeHalves(livesFromCp(evalForPlayer(score, hintEvalGame())));
+  const label = t(hintLifeDelta(hint) < 0 ? "hint.lives.lose" : hintLifeDelta(hint) > 0 ? "hint.lives.gain" : "hint.lives.hold");
+  const hearts = [0, 1, 2].map((i) => hintHeartPiece(heartKind(halves, i), "hold")).join("");
+  return `<span class="hint-hearts is-hold" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${hearts}</span>`;
+}
+
+function hintHeartsHtml(hint) {
+  if (!hint || hint.synthetic) return "—";
+  const score = hintScore(hint);
+  if (!Number.isFinite(score)) return "—";
   const delta = hintLifeDelta(hint);
-  if (!delta) return "";
+  if (!delta) {
+    const label = t("hint.lives.hold");
+    return `<span class="hint-hearts is-hold" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}"><span class="hint-hearts-mark">(</span><span class="hint-hearts-sign">=</span><span class="hint-hearts-mark">)</span></span>`;
+  }
   const gain = delta > 0;
   const label = gain ? t("hint.lives.gain") : t("hint.lives.lose");
   const sign = gain ? "+" : "−";
@@ -2010,18 +2079,39 @@ function stopLivesAnim() {
   els.kingLives?.classList.remove("is-flash");
 }
 
-function paintKingHearts(halves) {
-  const root = els.kingLives;
-  if (!root) return;
+function heartsMarkup(halves) {
   const shown = displayLifeHalves(halves);
-  root.classList.remove("is-flash");
-  root.innerHTML = [0, 1, 2]
+  return [0, 1, 2]
     .map((i) => {
       const kind = heartKind(shown, i);
       return `<span class="king-heart is-${kind}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg">♥</span></span>`;
     })
     .join("");
+}
+
+function oppLifeHalves() {
+  if (state.game.in_checkmate()) {
+    return state.game.turn() === state.playerColor ? 6 : 0;
+  }
+  if (state.game.game_over()) return 6;
+  const cp = Number.isFinite(state.gameEval) ? -state.gameEval : 0;
+  return livesFromCp(cp);
+}
+
+function paintOppHearts() {
+  const root = els.oppLives;
+  if (!root) return;
+  root.innerHTML = heartsMarkup(oppLifeHalves());
+}
+
+function paintKingHearts(halves) {
+  const root = els.kingLives;
+  if (!root) return;
+  const shown = displayLifeHalves(halves);
+  root.classList.remove("is-flash");
+  root.innerHTML = heartsMarkup(shown);
   state.shownLives = shown;
+  paintOppHearts();
 }
 
 function applyHeartKinds(halves, { drop = false } = {}) {
@@ -2042,6 +2132,7 @@ function applyHeartKinds(halves, { drop = false } = {}) {
     }
   });
   state.shownLives = shown;
+  paintOppHearts();
 }
 
 function queueLifeLoss(next) {
@@ -2069,6 +2160,7 @@ function queueLifeLoss(next) {
 }
 
 function renderKingLives() {
+  paintOppHearts();
   const root = els.kingLives;
   if (!root) return;
   const next = visibleLifeHalves();
@@ -2114,6 +2206,7 @@ function boardHintPlayReady() {
     && hintsArePlayable()
     && hintPanelOpen()
     && !waitingForHints()
+    && !isHintFakeLoad()
     && (state.hints || []).some((hint) => hint?.uci);
 }
 
@@ -2205,7 +2298,7 @@ function syncHintNav() {
   els.hintNav?.classList.toggle("is-waiting", hidden);
   const hold = isTrainHold();
   const canUse = (playerIsSideToMove() || hold) && !hidden && (!state.game.game_over() || hold);
-  const canToggle = canUse && hintPageCount() > 1 && (hold || !state.busy);
+  const canToggle = canUse && hintPageCount() > 1 && (hold || !state.busy && !isHintFakeLoad());
   if (els.hintNav) els.hintNav.hidden = hintPageCount() <= 1;
   if (els.moreHints) {
     els.moreHints.textContent = label;
@@ -2224,6 +2317,7 @@ function currentHintMixLine() {
 }
 
 function kingFinaleAllowed() {
+  if (KING_TALK_HIDE.hintMix) return false;
   if (isReviewing() || isTrainHold()) return false;
   if (state.game.game_over()) return false;
   if (!currentHintMixLine()) return false;
@@ -2232,6 +2326,11 @@ function kingFinaleAllowed() {
 
 function paintKingFinaleContent() {
   if (!els.hintMix) return;
+  if (KING_TALK_HIDE.hintMix) {
+    els.hintMix.innerHTML = "";
+    els.hintMix.hidden = true;
+    return;
+  }
   const line = currentHintMixLine();
   if (!line) {
     els.hintMix.innerHTML = "";
@@ -2263,12 +2362,6 @@ function revealKingFinale({ animate = false } = {}) {
     word.style.animationDelay = `${delay}ms`;
     delay += /[:.!?…]$/.test(word.textContent.trim()) ? 110 : 40;
   });
-  if (els.recalcWrap && !els.recalcWrap.hidden && els.recalcHints) {
-    els.recalcHints.classList.remove("king-word");
-    void els.recalcHints.offsetWidth;
-    els.recalcHints.classList.add("king-word");
-    els.recalcHints.style.animationDelay = `${delay}ms`;
-  }
 }
 
 function syncHintMix() {
@@ -2282,6 +2375,10 @@ function syncHintMix() {
   revealKingFinale({ animate: wasHidden && kingFinaleAllowed() });
 }
 
+function switchLabel(on) {
+  return t(on ? "toggle.on" : "toggle.off");
+}
+
 function syncRecalcButton() {
   if (!els.recalcHints) return;
   const canRecalc = playerIsSideToMove()
@@ -2292,15 +2389,16 @@ function syncRecalcButton() {
     && !isReviewing()
     && !isTrainHold()
     && !waitingForHints()
+    && !isHintFakeLoad()
     && state.hintPool.length;
-  const label = state.recalcHints ? t("hints.recalcing") : t("hints.recalc");
-  els.recalcHints.textContent = label;
+  const busy = Boolean(state.recalcHints);
+  const label = busy ? t("hints.recalcing") : t("hints.recalc");
+  els.recalcHints.textContent = busy ? "…" : t("hints.recalcGo");
   els.recalcHints.title = label;
   els.recalcHints.setAttribute("aria-label", label);
   els.recalcHints.disabled = !canRecalc;
-  els.recalcWrap?.classList.toggle("is-busy", Boolean(state.recalcHints));
-  const show = state.recalcHints || canRecalc;
-  if (els.recalcWrap) els.recalcWrap.hidden = !show;
+  els.recalcHints.classList.toggle("is-on", busy);
+  els.recalcWrap?.classList.toggle("is-busy", busy);
 }
 
 function showHintPage(page) {
@@ -2326,6 +2424,7 @@ function isTrainQuiz() {
 }
 
 function clearTrainHold() {
+  clearAutoContinueTimer();
   state.trainHold = false;
   state.trainPickedUci = "";
   state.trainFen = "";
@@ -2334,6 +2433,7 @@ function clearTrainHold() {
   state.continueArmed = false;
   state.pendingOpp = null;
   state.trainNext = null;
+  state.oppWaitStartedAt = 0;
   state.oppSearchToken += 1;
 }
 
@@ -2350,30 +2450,67 @@ function syncTrainingModeUi() {
 }
 
 function syncTrainContinue() {
+  const hasNext = Boolean(state.trainNext);
+  const local = isLocalVsHuman();
+  const over = isTrainHold() && state.game.game_over();
+  const showReply = isTrainHold() && hasNext && !state.autoContinue;
+  const showContinue = isTrainHold() && (local || over) && !hasNext;
+  const show = showReply || showContinue;
+  if (els.trainReply) {
+    const appear = show && els.trainReply.hidden;
+    els.trainReply.hidden = !show;
+    if (!show) els.trainReply.classList.remove("is-enter");
+    else if (appear) {
+      els.trainReply.classList.remove("is-enter");
+      void els.trainReply.offsetWidth;
+      els.trainReply.classList.add("is-enter");
+    }
+  }
   if (els.trainContinue) {
-    const hasNext = Boolean(state.trainNext);
-    const waiting = isTrainHold() && state.continueArmed && !hasNext;
-    const show = isTrainHold() && !state.autoContinue && !waiting;
-    els.trainContinue.hidden = !show;
     els.trainContinue.disabled = !show || state.busy;
-    els.trainContinue.textContent = hasNext ? t("train.reply") : t("train.continue");
+    els.trainContinue.classList.toggle("is-reply", showReply);
+    els.trainContinue.textContent = showReply ? t("train.reply") : t("train.continue");
   }
   syncOppWait();
 }
 
 function syncOppWait() {
-  const show = isTrainHold() && state.continueArmed && !state.trainNext;
-  if (els.oppWait) {
-    els.oppWait.hidden = !show;
-    els.oppWait.textContent = t("hints.oppWait");
-  }
+  const show = isTrainHold()
+    && !state.trainNext
+    && !isLocalVsHuman()
+    && !state.game.game_over();
   els.hints?.classList.toggle("is-wait-opp", show);
   els.hintNav?.classList.toggle("is-wait-opp", show);
-  els.hints?.classList.toggle("is-opp-replied", isTrainHold() && Boolean(state.trainNext));
+  const replied = isTrainHold() && Boolean(state.trainNext);
+  els.hints?.classList.toggle("is-opp-replied", replied);
+  els.hintPanel?.classList.toggle("is-opp-replied", replied);
+  if (isTrainHold()) els.hints?.classList.remove("is-reveal");
 }
 
 function syncAutoContinueUi() {
-  if (els.autoContinue) els.autoContinue.checked = Boolean(state.autoContinue);
+  if (!els.autoContinue) return;
+  const on = Boolean(state.autoContinue);
+  els.autoContinue.textContent = switchLabel(on);
+  els.autoContinue.classList.toggle("is-on", on);
+  els.autoContinue.setAttribute("aria-pressed", on ? "true" : "false");
+}
+
+let autoContinueTimer = 0;
+
+function clearAutoContinueTimer() {
+  if (autoContinueTimer) {
+    clearTimeout(autoContinueTimer);
+    autoContinueTimer = 0;
+  }
+}
+
+function scheduleAutoContinue() {
+  clearAutoContinueTimer();
+  if (!state.autoContinue || !isTrainHold() || state.busy || !state.trainNext) return;
+  autoContinueTimer = setTimeout(() => {
+    autoContinueTimer = 0;
+    if (state.autoContinue && isTrainHold() && !state.busy && state.trainNext) revealTrainNext();
+  }, 900);
 }
 
 function setAutoContinue(on) {
@@ -2387,6 +2524,8 @@ function setAutoContinue(on) {
   syncTrainContinue();
   if (state.autoContinue && isTrainHold() && !state.busy && state.trainNext) {
     revealTrainNext();
+  } else {
+    clearAutoContinueTimer();
   }
 }
 
@@ -2441,6 +2580,7 @@ async function continueTrainMove({ afterTalk, keepSpeaking = false } = {}) {
 
 function clearHints() {
   stopMoveClock();
+  stopHintFakeLoad();
   clearTrainHold();
   state.kbdHint = null;
   state.hints = [];
@@ -2665,9 +2805,9 @@ function narrateOpponentMove(before, move, after, feedbackKey, beforeEval) {
   if (move.san.includes("#")) {
     return t("king.mateOpp");
   }
-  const hits = threatsFromMove(after, move, state.playerColor).slice(0, 3);
-  const hanging = hits.filter((hit) => !isSquareDefended(after, hit.to, state.playerColor));
-  const action = opponentActionLine(move, hits, hanging);
+  const hits = KING_TALK_HIDE.oppMoveDetail ? [] : threatsFromMove(after, move, state.playerColor).slice(0, 3);
+  const hanging = KING_TALK_HIDE.hanging ? [] : hits.filter((hit) => !isSquareDefended(after, hit.to, state.playerColor));
+  const action = KING_TALK_HIDE.oppMoveDetail ? "" : opponentActionLine(move, hits, hanging);
   const swing = opponentSwingTalk(beforeEval, feedbackKey);
   const bits = [];
   if (feedbackKey) {
@@ -2675,8 +2815,9 @@ function narrateOpponentMove(before, move, after, feedbackKey, beforeEval) {
     const opener = t(
       rank === "best" ? "ofb.open.best" : rank === "worst" ? "ofb.open.worst" : "ofb.open.normal"
     );
-    bits.push(`<strong>${escapeHtml(opener)}</strong> ${escapeHtml(swing || t(feedbackKey))}`);
-  } else if (swing) {
+    if (KING_TALK_HIDE.talkAfterRank) bits.push(`<strong>${escapeHtml(opener)}</strong>`);
+    else bits.push(`<strong>${escapeHtml(opener)}</strong> ${escapeHtml(swing || t(feedbackKey))}`);
+  } else if (swing && !KING_TALK_HIDE.talkAfterRank) {
     bits.push(escapeHtml(swing));
   }
   if (action) bits.push(escapeHtml(action));
@@ -2691,12 +2832,14 @@ function narratePlayerMove(before, move, after) {
     parts.push(t("king.youMate"));
     return joinTalk(parts);
   }
-  const loss = worstImmediateLoss(after, state.playerColor);
-  if (loss === "q") parts.push(t("king.hangQueen"));
-  else if (loss === "r") parts.push(t("king.hangRook"));
-  else if (loss === "n") parts.push(t("king.hangKnight"));
-  else if (loss === "b") parts.push(t("king.hangBishop"));
-  else parts.push(explainMove(before, move, after, null));
+  if (!KING_TALK_HIDE.hanging) {
+    const loss = worstImmediateLoss(after, state.playerColor);
+    if (loss === "q") parts.push(t("king.hangQueen"));
+    else if (loss === "r") parts.push(t("king.hangRook"));
+    else if (loss === "n") parts.push(t("king.hangKnight"));
+    else if (loss === "b") parts.push(t("king.hangBishop"));
+    else parts.push(explainMove(before, move, after, null));
+  }
   parts.push(t("king.seeReply"));
   return joinTalk(parts);
 }
@@ -2728,6 +2871,7 @@ function boldItems(items) {
 }
 
 function kingTurnAdvice() {
+  if (KING_TALK_HIDE.hanging) return t("turn.make");
   const opponent = state.playerColor === "w" ? "b" : "w";
   const ours = hangingSquares(state.game, state.playerColor).map(pieceSquareLabel);
   const theirs = hangingSquares(state.game, opponent).map(pieceSquareLabel);
@@ -2747,7 +2891,6 @@ function kingTurnAdvice() {
 
 function clearBoardAids() {
   state.aids.moves = true;
-  state.aids.threats = false;
   if (state.board) {
     state.board.setArrows([]);
     paintActiveThreats();
@@ -2756,18 +2899,165 @@ function clearBoardAids() {
 }
 
 function syncAidButtons() {
-  els.aidMoves?.classList.toggle("is-on", state.aids.moves);
-  els.aidThreats?.classList.toggle("is-on", state.aids.threats);
+  if (els.aidMoves) {
+    const on = Boolean(state.aids.moves);
+    els.aidMoves.textContent = switchLabel(on);
+    els.aidMoves.classList.toggle("is-on", on);
+    els.aidMoves.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  if (els.aidThreats) {
+    const on = Boolean(state.aids.threats);
+    els.aidThreats.textContent = switchLabel(on);
+    els.aidThreats.classList.toggle("is-on", on);
+    els.aidThreats.setAttribute("aria-pressed", on ? "true" : "false");
+  }
   syncStoryIconsButton();
 }
 
 function syncStoryIconsButton() {
-  const on = Boolean(state.storyIcons);
-  els.aidIcons?.classList.toggle("is-on", on);
-  els.aidIcons?.setAttribute("aria-pressed", on ? "true" : "false");
-  if (els.aidIcons) {
-    els.aidIcons.textContent = t(on ? "settings.storyIcons.images" : "settings.storyIcons.standard");
+  fillCardStyleMenu();
+  if (els.cardStyleBtn) {
+    els.cardStyleBtn.textContent = t(state.storyIcons ? "settings.storyIcons.warShort" : "settings.storyIcons.standardShort");
   }
+}
+
+function persistHintInfo() {
+  try {
+    localStorage.setItem(HINT_INFO_KEY, JSON.stringify({
+      place: Boolean(state.hintInfo.place),
+      arrow: Boolean(state.hintInfo.arrow),
+      score: state.hintInfo.score === "hearts" ? "hearts" : "number",
+    }));
+  } catch {
+    /* ignore */
+  }
+}
+
+function applyHintPlace(on) {
+  state.hintInfo.place = Boolean(on);
+  persistHintInfo();
+  syncHintInfoUi();
+  renderHints();
+}
+
+function applyHintArrow(on) {
+  state.hintInfo.arrow = Boolean(on);
+  persistHintInfo();
+  syncHintInfoUi();
+  renderHints();
+}
+
+function applyHintScoreMode(value) {
+  state.hintInfo.score = value === "hearts" ? "hearts" : "number";
+  persistHintInfo();
+  syncHintInfoUi();
+  renderHints();
+}
+
+function syncHintSwitch(btn, on) {
+  if (!btn) return;
+  btn.textContent = switchLabel(on);
+  btn.classList.toggle("is-on", on);
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+}
+
+function fillHintEvalViewMenu() {
+  if (!els.evalViewList) return;
+  const current = state.evalView === "abs" ? "abs" : "delta";
+  const items = [
+    { id: "abs", key: "settings.evalView.abs" },
+    { id: "delta", key: "settings.evalView.delta" },
+  ];
+  els.evalViewList.innerHTML = items
+    .map(
+      (item) =>
+        `<button type="button" role="menuitem" class="style-menu-item${item.id === current ? " is-on" : ""}" data-eval-view="${item.id}">${t(item.key)}</button>`
+    )
+    .join("");
+}
+
+function fillHintScoreModeMenu() {
+  if (!els.scoreModeList) return;
+  const current = state.hintInfo.score === "hearts" ? "hearts" : "number";
+  const items = [
+    { id: "number", key: "tools.hintInfo.score.number" },
+    { id: "hearts", key: "tools.hintInfo.score.hearts" },
+  ];
+  els.scoreModeList.innerHTML = items
+    .map(
+      (item) =>
+        `<button type="button" role="menuitem" class="style-menu-item${item.id === current ? " is-on" : ""}" data-score-mode="${item.id}">${t(item.key)}</button>`
+    )
+    .join("");
+}
+
+function syncHintInfoUi() {
+  syncHintSwitch(els.hintPlace, Boolean(state.hintInfo.place));
+  syncHintSwitch(els.hintArrow, Boolean(state.hintInfo.arrow));
+  fillHintEvalViewMenu();
+  fillHintScoreModeMenu();
+  if (els.evalViewBtn) {
+    els.evalViewBtn.textContent = t(state.evalView === "abs" ? "tools.hintInfo.eval.abs" : "tools.hintInfo.eval.delta");
+  }
+  if (els.scoreModeBtn) {
+    els.scoreModeBtn.textContent = t(state.hintInfo.score === "hearts" ? "tools.hintInfo.score.hearts" : "tools.hintInfo.score.number");
+  }
+}
+
+function valueMenus() {
+  return [
+    { list: els.cardStyleList, btn: els.cardStyleBtn, root: els.cardStyleMenu },
+    { list: els.evalViewList, btn: els.evalViewBtn, root: els.evalViewMenu },
+    { list: els.scoreModeList, btn: els.scoreModeBtn, root: els.scoreModeMenu },
+  ];
+}
+
+function closeValueMenus(except) {
+  valueMenus().forEach(({ list, btn }) => {
+    if (!list || list === except) return;
+    list.hidden = true;
+    btn?.setAttribute("aria-expanded", "false");
+  });
+}
+
+function valueMenuOpen() {
+  return valueMenus().some(({ list }) => list && !list.hidden);
+}
+
+function toggleValueMenu(list, btn, fill) {
+  if (!list) return;
+  const open = list.hidden;
+  closeValueMenus(list);
+  if (fill) fill();
+  list.hidden = !open;
+  btn?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function fillCardStyleMenu() {
+  if (!els.cardStyleList) return;
+  const current = state.storyIcons ? "war" : "icons";
+  const items = [
+    { id: "icons", key: "settings.storyIcons.standard" },
+    { id: "war", key: "settings.storyIcons.war" },
+  ];
+  els.cardStyleList.innerHTML = items
+    .map(
+      (item) =>
+        `<button type="button" role="menuitem" class="style-menu-item${item.id === current ? " is-on" : ""}" data-card-style="${item.id}">${t(item.key)}</button>`
+    )
+    .join("");
+}
+
+function cardStyleMenuOpen() {
+  return Boolean(els.cardStyleList && !els.cardStyleList.hidden);
+}
+
+function closeCardStyleMenu() {
+  closeValueMenus();
+}
+
+function toggleCardStyleMenu() {
+  toggleValueMenu(els.cardStyleList, els.cardStyleBtn, fillCardStyleMenu);
 }
 
 function paintThreatPips() {
@@ -2815,18 +3105,14 @@ function showAid(kind) {
     syncAidButtons();
     return;
   }
-  clearTimeout(state.aidTimer);
-  state.aids.threats = true;
-  paintThreatPips();
-  if (state.aids.moves) showHintArrows(null, { reveal: true });
+  state.aids.threats = !state.aids.threats;
+  try {
+    localStorage.setItem(AID_THREATS_KEY, state.aids.threats ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  paintActiveThreats();
   syncAidButtons();
-  const token = (state.aidToken += 1);
-  state.aidTimer = setTimeout(() => {
-    if (state.aidToken !== token) return;
-    state.aids.threats = false;
-    paintActiveThreats();
-    syncAidButtons();
-  }, 5000);
 }
 
 function flashThreatenedPieces(move) {
@@ -2871,6 +3157,7 @@ const els = {
   statusText: document.getElementById("status-text"),
   statusIcon: document.getElementById("status-icon"),
   engineLabel: document.getElementById("engine-label"),
+  gameInfo: document.getElementById("game-info"),
   skill: document.getElementById("skill"),
   skillRow: document.getElementById("skill-row"),
   playMode: document.getElementById("play-mode"),
@@ -2902,6 +3189,7 @@ const els = {
   kingPiece: document.getElementById("king-piece"),
   kingTitle: document.getElementById("king-title"),
   kingLives: document.getElementById("king-lives"),
+  oppLives: document.getElementById("opp-lives"),
   kingReact: document.getElementById("king-react"),
   kingLegend: document.getElementById("king-legend"),
   turnBanner: document.getElementById("turn-banner"),
@@ -2926,11 +3214,24 @@ const els = {
   graveBottom: document.getElementById("grave-bottom"),
   aidMoves: document.getElementById("btn-aid-moves"),
   aidThreats: document.getElementById("btn-aid-threats"),
-  aidIcons: document.getElementById("btn-aid-icons"),
+  cardStyleBtn: document.getElementById("btn-card-style"),
+  cardStyleList: document.getElementById("card-style-list"),
+  cardStyleMenu: document.getElementById("card-style-menu"),
+  hintPlace: document.getElementById("btn-hint-place"),
+  hintArrow: document.getElementById("btn-hint-arrow"),
+  evalViewBtn: document.getElementById("btn-hint-eval-view"),
+  evalViewList: document.getElementById("hint-eval-view-list"),
+  evalViewMenu: document.getElementById("hint-eval-view-menu"),
+  scoreModeBtn: document.getElementById("btn-hint-score-mode"),
+  scoreModeList: document.getElementById("hint-score-mode-list"),
+  scoreModeMenu: document.getElementById("hint-score-mode-menu"),
+  quickTools: document.getElementById("quick-tools"),
+  quickToolsOpen: document.getElementById("btn-quick-tools"),
+  quickToolsClose: document.getElementById("btn-quick-tools-close"),
   trainingMode: document.getElementById("btn-training-mode"),
   trainContinue: document.getElementById("btn-train-continue"),
-  oppWait: document.getElementById("opp-wait"),
-  autoContinue: document.getElementById("auto-continue"),
+  trainReply: document.getElementById("train-reply"),
+  autoContinue: document.getElementById("btn-auto-continue"),
   roundEval: document.getElementById("round-eval"),
   evalView: document.getElementById("eval-view"),
   storyIcons: document.getElementById("story-icons"),
@@ -2968,11 +3269,12 @@ const state = {
   moveClockSec: readMoveClock(),
   roundEval: readRoundEval(),
   evalView: readEvalView(),
+  hintInfo: readHintInfo(),
   storyIcons: readStoryIcons(),
   hasGame: false,
   openingPly: 0,
   startOpening: START_OPENINGS[0],
-  aids: { moves: true, threats: false },
+  aids: { moves: true, threats: readAidThreats() },
   aidTimer: null,
   aidToken: 0,
   flashToken: 0,
@@ -2982,6 +3284,8 @@ const state = {
   speakToken: 0,
   kingSpeaking: false,
   pendingHintReveal: false,
+  hintFakeLoad: false,
+  hintFakeLoadTimer: 0,
   allowHintsWhileSpeaking: false,
   gameId: 0,
   kingReplay: null,
@@ -3003,6 +3307,7 @@ const state = {
   continueArmed: false,
   pendingOpp: null,
   trainNext: null,
+  oppWaitStartedAt: 0,
   oppSearchToken: 0,
   kbdHint: null,
   trainPickedUci: "",
@@ -3023,6 +3328,15 @@ function playerIsSideToMove() {
 
 function sideName(color = state.game.turn()) {
   return t(color === "w" ? "player.white" : "player.black");
+}
+
+function syncGameInfo() {
+  if (!els.gameInfo) return;
+  const n = hintPoolSize();
+  const sec = moveClockSec();
+  const clock = sec ? t("game.info.clock.sec", { n: sec }) : t("game.info.clock.0");
+  const mode = t("game.info.mode", { name: t("game.info.mode.best") });
+  els.gameInfo.textContent = `${t("game.info.best", { n })} | ${clock} | ${mode}`;
 }
 
 function syncCoach() {
@@ -3061,6 +3375,7 @@ function syncCoach() {
     if (els.oppKing) els.oppKing.src = `pieces/${state.playerColor === "w" ? "b" : "w"}K.svg`;
   }
   renderKingLives();
+  syncGameInfo();
 }
 
 function setStatus(title, text, kind = "info") {
@@ -3273,6 +3588,7 @@ function revealTrainPick() {
 
 function hideHintPanel() {
   stopMoveClock();
+  stopHintFakeLoad();
   stopRecalcProgress();
   if (isTrainHold()) return;
   els.hintPanel?.classList.add("is-waiting");
@@ -3298,6 +3614,46 @@ function showHintPanel() {
   syncHintBoardPlay();
 }
 
+function isHintFakeLoad() {
+  return Boolean(state.hintFakeLoad);
+}
+
+function stopHintFakeLoad() {
+  if (state.hintFakeLoadTimer) {
+    clearTimeout(state.hintFakeLoadTimer);
+    state.hintFakeLoadTimer = 0;
+  }
+  state.hintFakeLoad = false;
+  els.hints?.classList.remove("is-fake-load");
+}
+
+function finishHintFakeLoad() {
+  state.hintFakeLoadTimer = 0;
+  state.hintFakeLoad = false;
+  els.hints?.classList.remove("is-fake-load");
+  syncHintNav();
+  syncHintBoardPlay();
+  if (state.aids.moves) showHintArrows(null, { reveal: true });
+  startMoveClock();
+}
+
+function startHintFakeLoad() {
+  if (state.hintFakeLoadTimer) {
+    clearTimeout(state.hintFakeLoadTimer);
+    state.hintFakeLoadTimer = 0;
+  }
+  state.hintFakeLoad = true;
+  els.hints?.classList.add("is-fake-load");
+  state.board?.setArrows([]);
+  syncHintNav();
+  syncHintBoardPlay();
+  const gameId = state.gameId;
+  state.hintFakeLoadTimer = setTimeout(() => {
+    if (gameId !== state.gameId || !state.hintFakeLoad) return;
+    finishHintFakeLoad();
+  }, HINT_FAKE_LOAD_MS);
+}
+
 function revealHintsIfReady() {
   if (isTrainHold()) {
     showHintPanel();
@@ -3315,13 +3671,13 @@ function revealHintsIfReady() {
   }
   if (!state.pendingHintReveal) return;
   showHintPanel();
+  els.hints?.classList.add("is-fake-load");
   renderHints();
   els.hints.classList.remove("is-reveal");
   void els.hints.offsetWidth;
   els.hints.classList.add("is-reveal");
   state.pendingHintReveal = false;
-  if (state.aids.moves) showHintArrows(null, { reveal: true });
-  startMoveClock();
+  startHintFakeLoad();
 }
 
 async function speakKing(note, { calculating = false, html = false } = {}) {
@@ -3536,7 +3892,11 @@ function syncBoard(options = {}) {
 }
 
 function renderHints() {
-  els.hints?.classList.toggle("is-hold", isTrainHold());
+  const hold = isTrainHold();
+  els.hints?.classList.toggle("is-hold", hold);
+  els.hints?.classList.toggle("is-opp-replied", hold && Boolean(state.trainNext));
+  els.hintPanel?.classList.toggle("is-opp-replied", hold && Boolean(state.trainNext));
+  if (hold) els.hints?.classList.remove("is-reveal");
   if (waitingForHints() && !isTrainHold()) {
     state.hints = [];
     els.hints.innerHTML = "";
@@ -3547,7 +3907,6 @@ function renderHints() {
     return;
   }
   state.hints = visibleHints();
-  const hold = isTrainHold();
   const side = hold && state.trainColor ? state.trainColor : state.game.turn();
   const pawnPoses = quietPawnPoseMap(state.hints, side);
   const knightPoses = quietPiecePoseMap(state.hints, side, "n");
@@ -3584,9 +3943,7 @@ function renderHints() {
     }), san);
     const picked = hold && hint.uci === state.trainPickedUci;
     const desc = played ? moveHeadline(played) : "";
-    const verdict = hold
-      ? `${hintPlaceHtml(hint)}${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`
-      : "";
+    const verdict = hold ? hintVerdictHtml(hint) : "";
     const btn = `
       <button class="hint-btn is-card${picked ? " is-picked" : ""}" data-index="${i}" type="button">
         ${art}
@@ -3594,6 +3951,8 @@ function renderHints() {
           <span class="hint-rank">${rank}</span>
           ${desc ? `<span class="hint-desc">${escapeHtml(desc)}</span>` : ""}
         </span>
+        <span class="hint-load-label">${escapeHtml(t("hints.calc"))}</span>
+        <span class="hint-load" aria-hidden="true"><i></i></span>
       </button>`;
     buttons.push(wrapHintSlot(btn, verdict));
   }
@@ -3605,6 +3964,10 @@ function renderHints() {
 }
 
 function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
+  if (isHintFakeLoad()) {
+    state.board.setArrows([]);
+    return;
+  }
   if (!isTrainHold() && !hintPanelOpen()) {
     state.board.setArrows([]);
     return;
@@ -3730,15 +4093,20 @@ function waitAtLeast(ms, startedAt = Date.now()) {
   return new Promise((resolve) => setTimeout(resolve, left));
 }
 
+function waitForOppReplyMin() {
+  const started = state.oppWaitStartedAt;
+  if (!started) return Promise.resolve();
+  return waitAtLeast(OPP_REPLY_MIN_MS, started);
+}
+
 function isFirstEngineMove() {
   if (isLocalVsHuman() || state.playerColor !== "b") return false;
   if (state.game.turn() !== "w" || state.game.game_over()) return false;
   return state.game.history().length === (state.openingPly || 0);
 }
 
-async function resolveOppMove(fen, { afterTalk } = {}) {
+async function resolveOppMove(fen) {
   const firstEngine = isFirstEngineMove();
-  const startedAt = Date.now();
   const settings = skillSettings(state.skill);
   let uci = "";
   try {
@@ -3777,9 +4145,6 @@ async function resolveOppMove(fen, { afterTalk } = {}) {
   state.nextStandEval = prevNext;
   const oppKey = pickOpponentKeyFromEval(state.lastPlayerScore, prevBest);
   const oppBand = opponentReactBand(preview, beforeEval, oppKey);
-
-  if (!firstEngine) await waitAtLeast(10000, startedAt);
-  if (afterTalk) await afterTalk;
 
   return { fen, move, pool, oppKey, oppBand, beforeEval, firstEngine, nextBest, nextEval };
 }
@@ -3900,6 +4265,7 @@ async function playTrainOppOnBoard(resolved) {
 
 function revealTrainNext() {
   if (!state.trainNext || state.busy) return;
+  clearAutoContinueTimer();
   const next = state.trainNext;
   state.trainNext = null;
   state.continueArmed = false;
@@ -3924,11 +4290,14 @@ async function startTrainOppReply({ afterTalk } = {}) {
   const gameId = state.gameId;
   const fen = state.game.fen();
   try {
-    const resolved = await resolveOppMove(fen, { afterTalk });
+    const resolved = await resolveOppMove(fen);
+    if (token !== state.oppSearchToken || gameId !== state.gameId || state.game.fen() !== fen) return;
+    if (!resolved.firstEngine) await waitForOppReplyMin();
+    if (afterTalk) await afterTalk;
     if (token !== state.oppSearchToken || gameId !== state.gameId || state.game.fen() !== fen) return;
     await playTrainOppOnBoard(resolved);
     if (token !== state.oppSearchToken || gameId !== state.gameId) return;
-    if (state.autoContinue && state.trainNext) revealTrainNext();
+    if (state.autoContinue && state.trainNext) scheduleAutoContinue();
   } catch (err) {
     if (err.message === "aborted" || gameId !== state.gameId || token !== state.oppSearchToken) return;
     console.error(err);
@@ -3968,7 +4337,10 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
   }
   const fen = state.game.fen();
   try {
-    const resolved = await resolveOppMove(fen, { afterTalk });
+    const resolved = await resolveOppMove(fen);
+    if (gameId !== state.gameId || state.game.fen() !== fen) return;
+    if (!resolved.firstEngine) await waitForOppReplyMin();
+    if (afterTalk) await afterTalk;
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
     await applyOppMove(resolved);
   } catch (err) {
@@ -4041,21 +4413,24 @@ async function applyUserMove(from, to, promotion, chosenHint) {
     hideHintPanel();
     renderHints();
   }
+  if (!isLocalVsHuman() && !state.game.game_over()) {
+    state.oppWaitStartedAt = Date.now();
+  }
+  const replyKey = state.game.game_over() ? "" : pickSeeReplyKey();
+  state.kingReplay = { type: "feedback", key: lifeKey, replyKey, rankKind };
+  const feedbackTalk = speakKing(playerFeedbackTalk(lifeKey, replyKey, rankKind), { html: true });
+  if (trainReview && !state.game.game_over() && !isLocalVsHuman()) {
+    void startTrainOppReply({ afterTalk: feedbackTalk });
+  }
   state.board.setLastMove(played.from, played.to);
   await state.board.animateMove(played.from, played.to);
   state.board.setPosition(state.game.fen());
   flashThreatenedPieces(played);
   renderHistory();
   renderKingLives();
-  const replyKey = state.game.game_over() ? "" : pickSeeReplyKey();
-  state.kingReplay = { type: "feedback", key: lifeKey, replyKey, rankKind };
-  const feedbackTalk = speakKing(playerFeedbackTalk(lifeKey, replyKey, rankKind), { html: true });
   if (trainReview) {
     state.busy = false;
     syncTrainContinue();
-    if (!state.game.game_over() && !isLocalVsHuman()) {
-      void startTrainOppReply({ afterTalk: feedbackTalk });
-    }
     return;
   }
   if (state.game.game_over()) {
@@ -4097,11 +4472,11 @@ function openPromo(from, to) {
 }
 
 function hintsArePlayable() {
-  return !isReviewing() && playerIsSideToMove() && !state.busy && !state.trainHold && !state.game.game_over() && state.hints.length;
+  return !isReviewing() && playerIsSideToMove() && !state.busy && !state.trainHold && !isHintFakeLoad() && !state.game.game_over() && state.hints.length;
 }
 
 function hintsAreSelectable() {
-  return !isReviewing() && !isTrainHold() && !state.game.game_over() && hintPanelOpen() && state.hints.some(Boolean);
+  return !isReviewing() && !isTrainHold() && !isHintFakeLoad() && !state.game.game_over() && hintPanelOpen() && state.hints.some(Boolean);
 }
 
 function moreHintsHotkeyReady() {
@@ -4149,7 +4524,7 @@ els.promo.addEventListener("click", (event) => {
 
 els.hints.addEventListener("click", (event) => {
   const btn = event.target.closest(".hint-btn");
-  if (!btn || btn.disabled || isTrainHold()) return;
+  if (!btn || btn.disabled || isTrainHold() || isHintFakeLoad()) return;
   playHintAt(Number(btn.dataset.index));
 });
 
@@ -4318,8 +4693,8 @@ async function recalculateHints() {
     state.hintsUnlocked = 0;
     prepareHintTalks();
     renderKingLives();
+    startHintFakeLoad();
     renderHints();
-    if (state.aids.moves) showHintArrows(null, { reveal: true });
     els.hints.classList.remove("is-reveal");
     void els.hints.offsetWidth;
     els.hints.classList.add("is-reveal");
@@ -4339,7 +4714,7 @@ async function recalculateHints() {
       state.busy = false;
       state.recalcHints = false;
       syncHintNav();
-      startMoveClock();
+      if (!isHintFakeLoad()) startMoveClock();
     }
   }
 }
@@ -4465,6 +4840,7 @@ function syncNewGameForm() {
 }
 
 function openNewGameDialog(tab = "train") {
+  closeQuickTools();
   fillModeSelect();
   fillFriendWhereSelect();
   fillSkillSelect();
@@ -4497,6 +4873,27 @@ function openSettingsDialog() {
 
 function closeNewGameDialog() {
   if (els.newGame) els.newGame.hidden = true;
+}
+
+function isQuickToolsOpen() {
+  return Boolean(els.quickTools && !els.quickTools.hidden);
+}
+
+function openQuickTools() {
+  closeNewGameDialog();
+  closeCardStyleMenu();
+  syncAidButtons();
+  syncRecalcButton();
+  syncAutoContinueUi();
+  syncHintInfoUi();
+  if (els.quickTools) els.quickTools.hidden = false;
+  els.quickToolsOpen?.setAttribute("aria-expanded", "true");
+}
+
+function closeQuickTools() {
+  closeCardStyleMenu();
+  if (els.quickTools) els.quickTools.hidden = true;
+  els.quickToolsOpen?.setAttribute("aria-expanded", "false");
 }
 
 function confirmNewGame() {
@@ -4609,6 +5006,7 @@ function applyEvalView(value) {
     /* ignore */
   }
   if (els.evalView) els.evalView.value = state.evalView;
+  syncHintInfoUi();
   renderHints();
 }
 
@@ -4628,7 +5026,7 @@ function fillStoryIconsSelect() {
   const current = state.storyIcons ? "1" : "0";
   select.innerHTML = [
     `<option value="0"${current === "0" ? " selected" : ""}>${t("settings.storyIcons.standard")}</option>`,
-    `<option value="1"${current === "1" ? " selected" : ""}>${t("settings.storyIcons.images")}</option>`,
+    `<option value="1"${current === "1" ? " selected" : ""}>${t("settings.storyIcons.war")}</option>`,
   ].join("");
 }
 
@@ -4644,7 +5042,7 @@ function applyRoundEval(value) {
 }
 
 function applyStoryIcons(value) {
-  state.storyIcons = value === "1" || value === true || value === 1;
+  state.storyIcons = value === "1" || value === true || value === 1 || value === "war";
   try {
     localStorage.setItem(STORY_ICONS_KEY, state.storyIcons ? "1" : "0");
   } catch {
@@ -4668,6 +5066,7 @@ function applyMoveClock(value) {
   if (els.moveClock && !els.moveClock.hidden && playerIsSideToMove() && state.hintPool.length) {
     startMoveClock();
   }
+  syncGameInfo();
 }
 
 function applyHintLayout(id) {
@@ -4680,6 +5079,7 @@ function applyHintLayout(id) {
   }
   if (els.hintLayout) els.hintLayout.value = next;
   syncHintLayoutUi();
+  syncGameInfo();
 }
 
 function replayKingTalk() {
@@ -4733,7 +5133,10 @@ function applyLanguage() {
   if (!els.newGame?.hidden) syncNewGameTabUi();
   renderKingLegend();
   syncCoach();
-  syncStoryIconsButton();
+  syncGameInfo();
+  syncAidButtons();
+  syncHintInfoUi();
+  syncRecalcButton();
   if (els.openingLine) {
     els.openingLine.textContent = state.startOpening?.sans?.length
       ? formatOpeningLine(state.game)
@@ -4822,6 +5225,7 @@ function startFirstVisitGame() {
 function startGame(playerColor = state.playerColor) {
   state.hasGame = true;
   state.gameId += 1;
+  state.oppWaitStartedAt = 0;
   state.speakToken += 1;
   state.kingSpeaking = false;
   state.engine.stop();
@@ -4990,14 +5394,61 @@ els.newGame?.addEventListener("click", (event) => {
   if (event.target === els.newGame && state.hasGame) closeNewGameDialog();
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape" || els.newGame?.hidden || !state.hasGame) return;
-  closeNewGameDialog();
+  if (event.key !== "Escape") return;
+  if (valueMenuOpen()) {
+    closeValueMenus();
+    return;
+  }
+  if (isQuickToolsOpen()) {
+    closeQuickTools();
+    return;
+  }
+  if (!els.newGame?.hidden && state.hasGame) closeNewGameDialog();
+});
+els.quickToolsOpen?.addEventListener("click", () => {
+  if (isQuickToolsOpen()) closeQuickTools();
+  else openQuickTools();
+});
+els.quickToolsClose?.addEventListener("click", () => closeQuickTools());
+els.quickTools?.addEventListener("click", (event) => {
+  if (event.target === els.quickTools) closeQuickTools();
 });
 els.aidMoves.addEventListener("click", () => showAid("moves"));
-els.aidThreats.addEventListener("click", () => showAid("threats"));
-els.aidIcons?.addEventListener("click", () => applyStoryIcons(!state.storyIcons));
+els.aidThreats?.addEventListener("click", () => showAid("threats"));
+els.cardStyleBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleCardStyleMenu();
+});
+els.cardStyleList?.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-card-style]");
+  if (!item) return;
+  applyStoryIcons(item.getAttribute("data-card-style"));
+  closeValueMenus();
+});
+els.hintPlace?.addEventListener("click", () => applyHintPlace(!state.hintInfo.place));
+els.hintArrow?.addEventListener("click", () => applyHintArrow(!state.hintInfo.arrow));
+els.evalViewBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleValueMenu(els.evalViewList, els.evalViewBtn, fillHintEvalViewMenu);
+});
+els.evalViewList?.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-eval-view]");
+  if (!item) return;
+  applyEvalView(item.getAttribute("data-eval-view"));
+  closeValueMenus();
+});
+els.scoreModeBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleValueMenu(els.scoreModeList, els.scoreModeBtn, fillHintScoreModeMenu);
+});
+els.scoreModeList?.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-score-mode]");
+  if (!item) return;
+  applyHintScoreMode(item.getAttribute("data-score-mode"));
+  closeValueMenus();
+});
 els.trainingMode?.addEventListener("click", () => setTrainingMode(!state.trainingMode));
-els.autoContinue?.addEventListener("change", () => setAutoContinue(els.autoContinue.checked));
+els.autoContinue?.addEventListener("click", () => setAutoContinue(!state.autoContinue));
 els.trainContinue?.addEventListener("click", () => {
   if (els.trainContinue.disabled) return;
   continueTrainMove();
@@ -5019,6 +5470,8 @@ state.board = new Board(els.boardRoot, {
 });
 
 document.addEventListener("pointerdown", (event) => {
+  const insideMenu = valueMenus().some(({ root }) => root?.contains(event.target));
+  if (!insideMenu) closeValueMenus();
   if (event.button != null && event.button !== 0) return;
   if (!state.board?.getSelected()) return;
   if (event.target.closest("#board-root") || event.target.closest("#promo")) return;
@@ -5043,9 +5496,12 @@ fillEvalViewSelect();
 fillStoryIconsSelect();
 fillStartOpeningSelect();
 syncHintLayoutUi();
-syncStoryIconsButton();
+syncAidButtons();
+syncHintInfoUi();
+syncRecalcButton();
 syncTrainingModeUi();
 syncAutoContinueUi();
+syncGameInfo();
 renderKingLives();
 renderKingLegend();
 setStatus(t("status.loading"), t("status.boot"), "think");
