@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826var";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826var2";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1164,17 +1164,17 @@ function prepareHintTalks() {
   }
 }
 
-async function computeHintPool(game, { movetime = 3000 } = {}) {
+async function computeHintPool(game, { movetime = 3000, freezeStand = false } = {}) {
   if (game.game_over()) return [];
   try {
     const lines = await state.engine.analyze(game.fen(), {
       multipv: 12,
       movetime,
     });
-    return fillHintPool(lines || [], game);
+    return fillHintPool(lines || [], game, { freezeStand });
   } catch (err) {
     if (err.message === "aborted") throw err;
-    return fillHintPool([], game);
+    return fillHintPool([], game, { freezeStand });
   }
 }
 
@@ -1460,6 +1460,15 @@ function formatHintMix(pool = state.hintPool) {
   return parts.join(" · ");
 }
 
+function hintEvalGame() {
+  return isTrainHold() && state.trainFen ? new Chess(state.trainFen) : state.game;
+}
+
+function hintMoveEval(info) {
+  if (!info || info.synthetic || !Number.isFinite(hintScore(info))) return null;
+  return evalForPlayer(hintScore(info), hintEvalGame());
+}
+
 function formatHintEval(info) {
   if (!info || info.synthetic) return "—";
   if (info.scoreType === "mate") {
@@ -1476,16 +1485,12 @@ function formatHintEval(info) {
 }
 
 function hintEvalDir(info) {
-  if (!info || info.synthetic) return "";
-  if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
-  if (state.roundEval) {
-    const rounded = Math.round((info.score / 100) * 10) / 10;
-    if (rounded > 0) return "up";
-    if (rounded < 0) return "down";
-    return "";
-  }
-  if (info.score > 0) return "up";
-  if (info.score < 0) return "down";
+  const moveEval = hintMoveEval(info);
+  if (moveEval == null) return "";
+  const now = Number.isFinite(state.standEval) ? state.standEval : 0;
+  const step = state.roundEval ? 10 : 5;
+  if (moveEval > now + step) return "up";
+  if (moveEval < now - step) return "down";
   return "";
 }
 
@@ -1781,7 +1786,7 @@ function shuffle(list) {
   return items;
 }
 
-function fillHintPool(engineLines, game) {
+function fillHintPool(engineLines, game, { freezeStand = false } = {}) {
   const pool = [];
   const seen = new Set();
   [...engineLines]
@@ -1811,9 +1816,20 @@ function fillHintPool(engineLines, game) {
   state.hintBestScore = ranked.length ? hintScore(ranked[0]) : -Infinity;
   const realBest = ranked.find((line) => line && !line.synthetic);
   if (realBest && Number.isFinite(hintScore(realBest))) {
+    if (!freezeStand) {
+      state.nextStandEval = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+    }
     state.gameEval = evalForPlayer(hintScore(realBest), game);
   }
   return shuffle(ranked);
+}
+
+function adoptHintPool(pool, { freezeStand = false } = {}) {
+  if (!freezeStand && Number.isFinite(state.nextStandEval)) {
+    state.standEval = state.nextStandEval;
+  }
+  state.nextStandEval = null;
+  state.hintPool = pool || [];
 }
 
 function evalForPlayer(score, game) {
@@ -2338,6 +2354,7 @@ function clearHints() {
   state.hintPage = 0;
   state.hintsUnlocked = 0;
   state.hintBestScore = -Infinity;
+  state.nextStandEval = null;
   state.recalcUsedThisTurn = false;
 }
 
@@ -2841,6 +2858,8 @@ const state = {
   hintBestScore: -Infinity,
   lastHintMix: "",
   gameEval: 0,
+  standEval: 0,
+  nextStandEval: null,
   livesForced: null,
   shownLives: null,
   livesHold: null,
@@ -3476,11 +3495,10 @@ function renderHints() {
     }), san) : "";
     const picked = hold && hint.uci === state.trainPickedUci;
     const desc = played ? moveHeadline(played) : "";
-    const showLabel = hold && picked;
-    const verdict = showLabel
+    const verdict = hold
       ? `${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`
       : "";
-    const foot = !cards && showLabel ? `
+    const foot = !cards && hold ? `
           <span class="hint-foot">
             ${hintTagHtml(hint)}
             <span class="hint-divider" aria-hidden="true"></span>
@@ -3575,7 +3593,7 @@ async function refreshHints({ reveal = true } = {}) {
   try {
     const pool = await computeHintPool(state.game);
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
-    state.hintPool = pool;
+    adoptHintPool(pool);
     state.hintPage = 0;
     state.hintsUnlocked = 0;
     prepareHintTalks();
@@ -3734,7 +3752,7 @@ async function computerMove({ silentWait = false, afterTalk } = {}) {
       return;
     }
 
-    state.hintPool = pool;
+    adoptHintPool(pool);
     state.hintPage = 0;
     state.hintsUnlocked = 0;
     prepareHintTalks();
@@ -4094,10 +4112,10 @@ async function recalculateHints() {
   syncRecalcButton();
   startRecalcProgress(HINT_RECALC_MS);
   try {
-    const pool = await computeHintPool(state.game, { movetime: HINT_RECALC_MS });
+    const pool = await computeHintPool(state.game, { movetime: HINT_RECALC_MS, freezeStand: true });
     if (gameId !== state.gameId || state.game.fen() !== fen) return;
     state.recalcUsedThisTurn = true;
-    state.hintPool = pool;
+    adoptHintPool(pool, { freezeStand: true });
     state.hintPage = 0;
     state.hintsUnlocked = 0;
     prepareHintTalks();
@@ -4114,6 +4132,7 @@ async function recalculateHints() {
     state.hintPage = prevPage;
     state.hintBestScore = prevBest;
     state.gameEval = prevEval;
+    state.nextStandEval = null;
     renderHints();
   } finally {
     stopRecalcProgress();
@@ -4595,6 +4614,8 @@ function startGame(playerColor = state.playerColor) {
     els.hintMix.hidden = true;
   }
   state.gameEval = 0;
+  state.standEval = 0;
+  state.nextStandEval = null;
   state.livesForced = null;
   thawKingLives();
   stopLivesAnim();
