@@ -736,7 +736,7 @@ button, select { font: inherit; }
 }
 .hint-verdict .hint-place {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
   color: inherit;
