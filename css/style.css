@@ -713,19 +713,19 @@ button, select { font: inherit; }
 .hint-verdict {
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 6px;
   flex: 0 0 auto;
   height: auto;
   min-height: 0;
-  margin-top: 3px;
-  padding: 4px 6px;
+  margin-top: 4px;
+  padding: 5px 6px;
   text-align: center;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 500;
-  line-height: 1.45;
+  line-height: 1.4;
   letter-spacing: 0.01em;
   color: #3d3326;
   overflow: hidden;
@@ -733,35 +733,47 @@ button, select { font: inherit; }
 .hint-verdict:empty {
   display: none;
 }
+.hint-verdict .hint-place {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: inherit;
+}
 .hint-verdict .hint-tag {
   justify-content: flex-start;
   width: auto;
   min-width: 0;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 500;
-  line-height: 1.45;
+  line-height: 1.4;
   color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.hint-verdict .hint-star {
+  font-size: 16px;
+}
 .hint-verdict .hint-eval {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   flex-shrink: 0;
   width: auto;
   margin: 0;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 500;
-  line-height: 1.45;
+  line-height: 1.4;
   color: #3d3326;
 }
 .hint-verdict .hint-eval-dir {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
 }
 .hint-slot:has(.is-picked) .hint-verdict,
+.hint-slot:has(.is-picked) .hint-verdict .hint-place,
 .hint-slot:has(.is-picked) .hint-verdict .hint-tag {
   color: #2d6a12;
 }

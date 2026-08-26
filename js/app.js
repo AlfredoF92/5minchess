@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826set";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826verdict";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1442,9 +1442,8 @@ function hintRankKind(hint, pool = state.hintPool) {
 function hintRankTag(hint, pool = state.hintPool) {
   const place = hintPlaceMap(pool).get(hint?.uci);
   if (!place) return "";
-  const ordinal = formatPlace(place);
-  if (place === 1) return t("hint.tag.bestPlace", { place: ordinal });
-  return t("hint.tag.variant", { place: ordinal });
+  if (place === 1) return t("hint.tag.best");
+  return t("hint.tag.variant");
 }
 
 function hintMixCounts(pool = state.hintPool) {
@@ -1529,10 +1528,18 @@ function hintEvalArrowSvg(dir) {
 
 function hintEvalHtml(info) {
   if (!info || info.synthetic) return "—";
-  if (state.evalView !== "delta") return escapeHtml(formatHintEval(info));
+  const score = state.evalView !== "delta" ? formatHintEval(info) : formatHintDelta(info);
+  const wrapped = escapeHtml(`(${score})`);
+  if (state.evalView !== "delta") return wrapped;
   const dir = hintEvalDir(info);
   const arrow = dir ? hintEvalArrowSvg(dir) : "";
-  return `${arrow}${escapeHtml(formatHintDelta(info))}`;
+  return `${arrow}${wrapped}`;
+}
+
+function hintPlaceHtml(hint, pool = state.hintPool) {
+  const place = hintPlaceMap(pool).get(hint?.uci);
+  if (!place) return "";
+  return `<span class="hint-place">${escapeHtml(formatPlace(place))}</span>`;
 }
 
 function hintTagHtml(hint, pool = state.hintPool) {
@@ -3559,7 +3566,7 @@ function renderHints() {
     const picked = hold && hint.uci === state.trainPickedUci;
     const desc = played ? moveHeadline(played) : "";
     const verdict = hold
-      ? `<span class="hint-eval">${hintEvalHtml(hint)}</span>${hintTagHtml(hint)}`
+      ? `${hintPlaceHtml(hint)}${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`
       : "";
     const btn = `
       <button class="hint-btn is-card${picked ? " is-picked" : ""}" data-index="${i}" type="button">
