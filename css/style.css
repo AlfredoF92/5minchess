@@ -781,20 +781,11 @@ button, select { font: inherit; }
   overflow: hidden;
   transition: box-shadow 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
-.hint-slot:nth-child(even) .hint-btn.is-card {
-  background: var(--board-dark);
-  border-color: var(--board-dark);
-}
 .hint-btn.is-card:hover:not(:disabled):not(.empty):not(.is-loading):not(.is-picked),
 .hint-btn.is-card.is-kbd:not(:disabled):not(.empty):not(.is-picked) {
   border-color: #6e4a30;
   box-shadow: 0 0 0 3px #6e4a30;
   transform: translateY(-2px);
-}
-.hint-slot:nth-child(even) .hint-btn.is-card:hover:not(:disabled):not(.empty):not(.is-loading):not(.is-picked),
-.hint-slot:nth-child(even) .hint-btn.is-card.is-kbd:not(:disabled):not(.empty):not(.is-picked) {
-  border-color: var(--board-light);
-  box-shadow: 0 0 0 3px var(--board-light);
 }
 .hint-btn.is-card.is-picked,
 .hint-btn.is-card.is-picked:hover,
@@ -807,12 +798,6 @@ button, select { font: inherit; }
   box-shadow: 0 0 0 3px var(--green);
   transform: none;
   opacity: 1;
-}
-.hint-slot:nth-child(even) .hint-btn.is-card.is-picked,
-.hint-slot:nth-child(even) .hint-btn.is-card.is-picked:hover,
-.hint-slot:nth-child(even) .hint-btn.is-card.is-picked.is-kbd,
-.hint-slot:nth-child(even) .hint-btn.is-card.is-picked:disabled {
-  background: var(--board-dark);
 }
 .hint-card-art {
   position: relative;
@@ -861,9 +846,6 @@ button, select { font: inherit; }
   padding: 8px 6px 3px;
   background: var(--board-light);
 }
-.hint-slot:nth-child(even) .hint-card-art.is-icon {
-  background: var(--board-dark);
-}
 .hint-card-art.is-icon img {
   width: auto;
   height: 78%;
@@ -885,24 +867,16 @@ button, select { font: inherit; }
   min-height: 122px;
   background: var(--board-light);
 }
-.hint-slot:nth-child(even) .hint-card-art.is-empty {
-  background: var(--board-dark);
-}
 .hint-btn.is-card .hint-body {
   flex: 0 0 32px;
   height: 32px;
   min-height: 32px;
   max-height: 32px;
   overflow: hidden;
-  padding: 5px 6px;
+  padding: 5px 6px 4px;
   background: var(--board-light);
+  border-top: 1px solid rgba(181, 136, 99, 0.55);
   gap: 0;
-}
-.hint-slot:nth-child(even) .hint-btn.is-card .hint-body {
-  background: var(--board-dark);
-}
-.hint-slot:nth-child(even) .hint-btn.is-card .hint-desc {
-  color: var(--board-light);
 }
 .hint-btn.is-card .hint-rank {
   position: absolute;
@@ -969,11 +943,6 @@ button, select { font: inherit; }
   border-color: var(--board-dark);
   box-shadow: none;
   transform: none;
-}
-.hints.is-hold .hint-slot:nth-child(even) .hint-btn.is-card:not(.is-picked):not(.empty):hover,
-.hints.is-hold .hint-slot:nth-child(even) .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
-  background: var(--board-dark);
-  border-color: var(--board-dark);
 }
 .hints.is-hold .hint-btn.is-card.is-picked,
 .hints.is-hold .hint-btn.is-card.is-picked:hover,
