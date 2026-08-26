@@ -12,7 +12,6 @@
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
   --wood: #5a3a22;
   --radius: 6px;
-  --hint-card-row: 164px;
   font-family: "Segoe UI", "Noto Sans", sans-serif;
 }
 
@@ -606,9 +605,11 @@ button, select { font: inherit; }
 .coach-col .hints.is-cards.is-four,
 .coach-col .hints.is-cards.is-six,
 .coach-col .hints.is-cards.is-hold {
-  grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: var(--hint-card-row);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: auto;
   min-height: 0;
+  column-gap: 2px;
+  row-gap: 2px;
 }
 .coach-col .king-talk {
   margin-top: 10px;
@@ -672,10 +673,11 @@ button, select { font: inherit; }
 .hints.is-cards.is-four,
 .hints.is-cards.is-six,
 .hints.is-cards.is-hold {
-  grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: var(--hint-card-row);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: auto;
   min-height: 0;
-  gap: 5px;
+  column-gap: 2px;
+  row-gap: 2px;
 }
 .story-preview {
   display: grid;
@@ -698,17 +700,16 @@ button, select { font: inherit; }
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
+  height: auto;
 }
 .hint-slot > .hint-btn {
   flex: 1 1 auto;
   min-height: 0;
 }
 .hint-verdict {
-  flex: 0 0 34px;
-  height: 34px;
-  min-height: 34px;
-  max-height: 34px;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
   margin-top: 2px;
   padding: 0 1px;
   text-align: center;
@@ -719,7 +720,7 @@ button, select { font: inherit; }
   overflow: hidden;
 }
 .hint-verdict:empty {
-  visibility: hidden;
+  display: none;
 }
 .hint-verdict .hint-tag {
   justify-content: center;
@@ -743,9 +744,6 @@ button, select { font: inherit; }
 }
 .hint-slot:has(.is-picked) .hint-verdict .hint-eval {
   color: #2d6a12;
-}
-.hints.is-hold .hint-verdict {
-  visibility: visible;
 }
 .hint-btn.is-card {
   position: relative;
@@ -775,7 +773,7 @@ button, select { font: inherit; }
   justify-content: center;
   width: 100%;
   flex: 1 1 auto;
-  min-height: 72px;
+  min-height: 122px;
   padding: 0;
   background: #24324f;
 }
@@ -785,40 +783,40 @@ button, select { font: inherit; }
   flex-direction: column;
   width: 100%;
   flex: 1 1 auto;
-  min-height: 72px;
+  min-height: 122px;
 }
 .hint-card-media .hint-card-art {
   flex: 1 1 auto;
-  min-height: 72px;
+  min-height: 122px;
 }
 .hint-card-san {
   position: absolute;
-  left: 5px;
-  bottom: 3px;
+  left: 6px;
+  bottom: 4px;
   z-index: 3;
   margin: 0;
   color: #1f1f1f;
   font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.01em;
   pointer-events: none;
   user-select: none;
-  -webkit-text-stroke: 2.5px #fff;
+  -webkit-text-stroke: 3px #fff;
   paint-order: stroke fill;
 }
-.hint-card-san.is-3 { font-size: 15px; }
-.hint-card-san.is-4 { font-size: 13px; }
-.hint-card-san.is-long { font-size: 12px; }
+.hint-card-san.is-3 { font-size: 18px; }
+.hint-card-san.is-4 { font-size: 15px; }
+.hint-card-san.is-long { font-size: 13px; }
 .hint-card-art.is-icon {
-  padding: 6px 4px 2px;
+  padding: 8px 6px 3px;
   background: linear-gradient(180deg, #fbf6ea 0%, #efe3c8 100%);
 }
 .hint-card-art.is-icon img {
   width: auto;
   height: 78%;
-  max-height: 78px;
+  max-height: 110px;
   max-width: 86%;
   object-fit: contain;
   filter: drop-shadow(0 3px 4px rgba(40, 28, 12, 0.16));
@@ -833,16 +831,16 @@ button, select { font: inherit; }
   pointer-events: none;
 }
 .hint-card-art.is-empty {
-  min-height: 72px;
+  min-height: 122px;
   background: #f3ead8;
 }
 .hint-btn.is-card .hint-body {
-  flex: 0 0 28px;
-  height: 28px;
-  min-height: 28px;
-  max-height: 28px;
+  flex: 0 0 32px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
   overflow: hidden;
-  padding: 4px 6px;
+  padding: 5px 6px;
   background: linear-gradient(#fff8e8, #f3e6c8);
   gap: 0;
 }
@@ -1899,7 +1897,11 @@ body.is-local .vs-engine { display: none; }
   .hints.is-cards,
   .hints.is-cards.is-four,
   .hints.is-cards.is-six,
-  .hints.is-cards.is-hold { grid-template-columns: repeat(3, 1fr); }
+  .hints.is-cards.is-hold {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 2px;
+    row-gap: 2px;
+  }
   .brand span { display: none; }
 }
 
