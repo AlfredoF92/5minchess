@@ -611,7 +611,7 @@ button, select { font: inherit; }
   margin-top: 8px;
 }
 .coach-col .hint-panel {
-  margin-top: 6px;
+  margin-top: 0;
 }
 .coach-col .hints {
   grid-template-columns: 1fr 1fr;
@@ -627,7 +627,11 @@ button, select { font: inherit; }
   row-gap: 8px;
 }
 .coach-col .king-talk {
-  margin-top: 10px;
+  margin-top: 6px;
+  margin-bottom: 8px;
+}
+.coach-col .side-dock {
+  margin: 0 0 6px;
 }
 .hint-panel.is-waiting {
   opacity: 0;

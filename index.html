@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BVChess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260826star2">
+  <link rel="stylesheet" href="css/style.css?v=20260826lay">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -80,6 +80,27 @@
       </section>
 
       <section class="coach-col">
+        <p id="turn-banner" class="turn-banner">Loading</p>
+        <div class="king-talk">
+          <div class="king-side">
+            <img id="king-piece" src="pieces/wK.svg" alt="">
+            <span id="king-react" class="king-react" hidden aria-hidden="true"></span>
+            <strong id="king-title" data-i18n="king">The King</strong>
+            <div id="king-lives" class="king-lives" data-i18n-aria="king.lives" aria-label="How the game stands"></div>
+          </div>
+          <blockquote class="speech" aria-live="polite">
+            <p id="king-note">Good luck!</p>
+            <div id="king-finale" class="king-finale" hidden>
+              <div id="hint-mix" class="hint-mix" hidden></div>
+              <div id="hint-recalc" class="hint-recalc" hidden>
+                <div id="hint-recalc-bar" class="hint-recalc-bar" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-aria="hints.recalcBar" aria-label="Recalculating moves">
+                  <i id="hint-recalc-fill"></i>
+                </div>
+                <button id="btn-recalc-hints" class="recalc-hints" type="button" data-i18n="hints.recalc" disabled>Ricalcolami le mosse migliori</button>
+              </div>
+            </div>
+          </blockquote>
+        </div>
         <aside class="panel side-dock">
           <div class="card is-compact">
             <div class="dock-row">
@@ -149,15 +170,6 @@
             </div>
           </div>
         </aside>
-
-        <p id="turn-banner" class="turn-banner">Loading</p>
-        <div class="train-actions">
-          <label class="auto-continue">
-            <input type="checkbox" id="auto-continue">
-            <span data-i18n="train.autoContinue">Continua automaticamente</span>
-          </label>
-          <button type="button" id="btn-train-continue" class="train-continue" hidden data-i18n="train.continue">Continue</button>
-        </div>
         <div id="hint-panel" class="hint-panel is-waiting">
         <div id="move-clock" class="move-clock" hidden data-i18n-aria="clock.aria" aria-label="Move timer">
           <span id="move-clock-num" class="move-clock-num">20</span>
@@ -169,26 +181,12 @@
         </div>
         <p id="opp-wait" class="opp-wait" hidden data-i18n="hints.oppWait">In attesa dell'avversario...</p>
         </div>
-
-        <div class="king-talk">
-          <div class="king-side">
-            <img id="king-piece" src="pieces/wK.svg" alt="">
-            <span id="king-react" class="king-react" hidden aria-hidden="true"></span>
-            <strong id="king-title" data-i18n="king">The King</strong>
-            <div id="king-lives" class="king-lives" data-i18n-aria="king.lives" aria-label="How the game stands"></div>
-          </div>
-          <blockquote class="speech" aria-live="polite">
-            <p id="king-note">Good luck!</p>
-            <div id="king-finale" class="king-finale" hidden>
-              <div id="hint-mix" class="hint-mix" hidden></div>
-              <div id="hint-recalc" class="hint-recalc" hidden>
-                <div id="hint-recalc-bar" class="hint-recalc-bar" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-aria="hints.recalcBar" aria-label="Recalculating moves">
-                  <i id="hint-recalc-fill"></i>
-                </div>
-                <button id="btn-recalc-hints" class="recalc-hints" type="button" data-i18n="hints.recalc" disabled>Ricalcolami le mosse migliori</button>
-              </div>
-            </div>
-          </blockquote>
+        <div class="train-actions">
+          <label class="auto-continue">
+            <input type="checkbox" id="auto-continue">
+            <span data-i18n="train.autoContinue">Continua automaticamente</span>
+          </label>
+          <button type="button" id="btn-train-continue" class="train-continue" hidden data-i18n="train.continue">Continue</button>
         </div>
       </section>
     </main>
