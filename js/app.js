@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826var3";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826card";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1735,6 +1735,17 @@ function hintCardMediaHtml(art, san) {
   return `<span class="hint-card-media">${art}${hintCardSanHtml(san)}</span>`;
 }
 
+function iconArtHtml(move, color) {
+  const src = pieceIcon(move, color) || `pieces/${color || "w"}N.svg`;
+  const title = escapeHtml(move ? pieceName(move.piece || "p") : t("hints.move"));
+  return `<span class="hint-card-art is-icon"><img src="${src}" alt="${title}" title="${title}"></span>`;
+}
+
+function hintArtHtml(move, color, poses = {}) {
+  if (state.storyIcons) return storyArtHtml(move || { piece: "n", san: "" }, color, poses);
+  return iconArtHtml(move, color);
+}
+
 function storyArtHtml(move, color, poses = {}) {
   if (color === "b" && move?.piece === "n") return warCardHtml(WAR_KNIGHT_DIR, blackKnightWarArt(move, poses.n));
   if (color === "b" && move?.piece === "p") return warCardHtml(WAR_PAWN_DIR, blackPawnWarArt(move, poses.p));
@@ -2116,7 +2127,7 @@ function syncHintLayoutUi() {
   const n = hintsPerPage();
   els.hints?.classList.toggle("is-four", n === 4);
   els.hints?.classList.toggle("is-six", n !== 4);
-  els.hints?.classList.toggle("is-cards", Boolean(state.storyIcons));
+  els.hints?.classList.add("is-cards");
 }
 
 function syncHintNav() {
@@ -2671,6 +2682,9 @@ function syncStoryIconsButton() {
   const on = Boolean(state.storyIcons);
   els.aidIcons?.classList.toggle("is-on", on);
   els.aidIcons?.setAttribute("aria-pressed", on ? "true" : "false");
+  if (els.aidIcons) {
+    els.aidIcons.textContent = t(on ? "settings.storyIcons.images" : "settings.storyIcons.standard");
+  }
 }
 
 function paintThreatPips() {
@@ -3049,25 +3063,14 @@ function loadingHintCard(rank) {
   const letter = { n: "N", b: "B", q: "Q", r: "R" }[ghost.piece];
   const san = localizeSan(ghost.piece === "p" ? ghost.to : letter + ghost.to);
   const fake = { piece: ghost.piece, san };
-  if (state.storyIcons) {
-    return wrapHintSlot(`
-      <button class="hint-btn is-card is-loading" disabled>
-        ${hintCardMediaHtml(storyArtHtml(fake, color), san)}
-        <span class="hint-body">
-          <span class="hint-rank">${rank}</span>
-          <span class="hint-calc">${t("hints.loading")}</span>
-        </span>
-      </button>`);
-  }
-  return `
-    <button class="hint-btn is-loading" disabled>
-      <span class="hint-rank">${rank}</span>
-      <span class="hint-move-row">
-        <img class="hint-icon" src="pieces/${color}${ghost.piece.toUpperCase()}.svg" alt="">
-        <span class="hint-main">${san}</span>
+  return wrapHintSlot(`
+    <button class="hint-btn is-card is-loading" disabled>
+      ${hintCardMediaHtml(hintArtHtml(fake, color), san)}
+      <span class="hint-body">
+        <span class="hint-rank">${rank}</span>
+        <span class="hint-calc">${t("hints.loading")}</span>
       </span>
-      <span class="hint-calc">${t("hints.loading")}</span>
-    </button>`;
+    </button>`);
 }
 
 function paintMoveClock(sec) {
@@ -3456,7 +3459,6 @@ function renderHints() {
   }
   state.hints = visibleHints();
   const hold = isTrainHold();
-  const cards = Boolean(state.storyIcons);
   const side = hold && state.trainColor ? state.trainColor : state.game.turn();
   const pawnPoses = quietPawnPoseMap(state.hints, side);
   const knightPoses = quietPiecePoseMap(state.hints, side, "n");
@@ -3471,20 +3473,18 @@ function renderHints() {
     const rank = i + 1;
     if (!hint) {
       const emptyBtn = `
-        <button class="hint-btn empty${cards ? " is-card" : ""}" disabled>
-          ${cards ? hintCardMediaHtml(`<span class="hint-card-art is-empty"></span>`, "") : ""}
+        <button class="hint-btn empty is-card" disabled>
+          ${hintCardMediaHtml(`<span class="hint-card-art is-empty"></span>`, "")}
           <span class="hint-body">
             <span class="hint-rank">${rank}</span>
-            ${cards ? "" : `<span class="hint-main">—</span>`}
           </span>
         </button>`;
-      buttons.push(cards ? wrapHintSlot(emptyBtn) : emptyBtn);
+      buttons.push(wrapHintSlot(emptyBtn));
       continue;
     }
     const played = playedFromHint(hint);
     const san = played ? localizeSan(played.san) : hint.uci;
-    const icon = !cards && played ? pieceIcon(played, side) : "";
-    const art = cards ? hintCardMediaHtml(storyArtHtml(played || { piece: "n", san: "" }, side, {
+    const art = hintCardMediaHtml(hintArtHtml(played || { piece: "n", san: "" }, side, {
       n: knightPoses.get(hint.uci),
       p: pawnPoses.get(hint.uci),
       b: bishopPoses.get(hint.uci),
@@ -3492,34 +3492,21 @@ function renderHints() {
       q: queenPoses.get(hint.uci),
       k: kingPoses.get(hint.uci),
       castle: castlePoses.get(hint.uci),
-    }), san) : "";
+    }), san);
     const picked = hold && hint.uci === state.trainPickedUci;
     const desc = played ? moveHeadline(played) : "";
     const verdict = hold
       ? `${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`
       : "";
-    const foot = !cards && hold ? `
-          <span class="hint-foot">
-            ${hintTagHtml(hint)}
-            <span class="hint-divider" aria-hidden="true"></span>
-            <span class="hint-eval-row">
-              <span class="hint-eval">${hintEvalHtml(hint)}</span>
-            </span>
-          </span>` : "";
     const btn = `
-      <button class="hint-btn${cards ? " is-card" : ""}${picked ? " is-picked" : ""}" data-index="${i}" type="button">
+      <button class="hint-btn is-card${picked ? " is-picked" : ""}" data-index="${i}" type="button">
         ${art}
         <span class="hint-body">
           <span class="hint-rank">${rank}</span>
-          ${cards ? "" : `<span class="hint-move-row">
-            ${icon ? `<img class="hint-icon" src="${icon}" alt="">` : ""}
-            <span class="hint-main">${san}</span>
-          </span>`}
           ${desc ? `<span class="hint-desc">${escapeHtml(desc)}</span>` : ""}
-          ${foot}
         </span>
       </button>`;
-    buttons.push(cards ? wrapHintSlot(btn, verdict) : btn);
+    buttons.push(wrapHintSlot(btn, verdict));
   }
   els.hints.innerHTML = buttons.join("");
   syncHintNav();
@@ -4402,8 +4389,8 @@ function fillStoryIconsSelect() {
   if (!select) return;
   const current = state.storyIcons ? "1" : "0";
   select.innerHTML = [
-    `<option value="0"${current === "0" ? " selected" : ""}>${t("settings.no")}</option>`,
-    `<option value="1"${current === "1" ? " selected" : ""}>${t("settings.yes")}</option>`,
+    `<option value="0"${current === "0" ? " selected" : ""}>${t("settings.storyIcons.standard")}</option>`,
+    `<option value="1"${current === "1" ? " selected" : ""}>${t("settings.storyIcons.images")}</option>`,
   ].join("");
 }
 
@@ -4507,6 +4494,7 @@ function applyLanguage() {
   if (!els.newGame?.hidden) syncNewGameTabUi();
   renderKingLegend();
   syncCoach();
+  syncStoryIconsButton();
   if (els.openingLine) {
     els.openingLine.textContent = state.startOpening?.sans?.length
       ? formatOpeningLine(state.game)

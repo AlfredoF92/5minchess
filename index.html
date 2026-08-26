@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BVChess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260826var3">
+  <link rel="stylesheet" href="css/style.css?v=20260826card">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -142,7 +142,7 @@
               <div class="aid-bar">
                 <button id="btn-aid-moves" class="is-on" type="button" data-i18n="aid.moves">Highlight moves</button>
                 <button id="btn-aid-threats" type="button" data-i18n="aid.threats">Highlight threatened</button>
-                <button id="btn-aid-icons" class="is-on" type="button" data-i18n="aid.icons" aria-pressed="true">Usa icone o immagini</button>
+                <button id="btn-aid-icons" class="is-on" type="button" data-i18n-aria="settings.storyIconsAria" aria-label="Stile delle carte delle mosse" aria-pressed="true">Cards con immagini</button>
               </div>
             </div>
           </div>
@@ -161,7 +161,7 @@
           <span id="move-clock-num" class="move-clock-num">20</span>
           <span class="move-clock-bar" aria-hidden="true"><i id="move-clock-fill"></i></span>
         </div>
-        <div id="hints" class="hints is-waiting" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
+        <div id="hints" class="hints is-cards is-waiting" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
         <div id="hint-nav" class="hint-nav is-waiting">
           <button id="btn-more-hints" class="more-hints" type="button" disabled>See the other 6 moves</button>
         </div>
@@ -315,13 +315,13 @@
         </label>
         <p class="new-game-soon" data-i18n="settings.roundEvalHint">If yes, scores show one decimal: 1.04 becomes 1.0, 0.79 becomes 0.8.</p>
         <label class="skill-wrap">
-          <span data-i18n="settings.storyIcons">Usa icone o immagini</span>
-          <select id="story-icons" data-i18n-aria="settings.storyIconsAria" aria-label="Use piece icons on move cards">
-            <option value="0">No</option>
-            <option value="1" selected>Yes</option>
+          <span data-i18n="settings.storyIcons">Stile cards</span>
+          <select id="story-icons" data-i18n-aria="settings.storyIconsAria" aria-label="Stile delle carte delle mosse">
+            <option value="0">Standard - Icone</option>
+            <option value="1" selected>Cards con immagini</option>
           </select>
         </label>
-        <p class="new-game-soon" data-i18n="settings.storyIconsHint">If yes, pieces use the illustrated scenes: capture, quiet move, check or mate.</p>
+        <p class="new-game-soon" data-i18n="settings.storyIconsHint">Le carte hanno lo stesso formato. Cambia solo il contenuto: icone dei pezzi oppure scene illustrate.</p>
         <div class="story-preview" aria-hidden="true">
           <img src="immagini-stile-war/cavallonero/Cavallo Nero Si muove da solo 1.png" alt="" data-i18n-title="art.knight.quiet">
           <img src="immagini-stile-war/pedonennero/Pedone Nero Si muove da solo 1.png" alt="" data-i18n-title="art.pawn.quiet">
@@ -345,6 +345,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260826var3"></script>
+  <script type="module" src="js/app.js?v=20260826card"></script>
 </body>
 </html>
