@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826eval";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826set";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -4316,7 +4316,7 @@ function syncNewGameForm() {
   previewOpeningLine();
 }
 
-function openNewGameDialog() {
+function openNewGameDialog(tab = "train") {
   fillModeSelect();
   fillFriendWhereSelect();
   fillSkillSelect();
@@ -4338,8 +4338,13 @@ function openNewGameDialog() {
   if (els.evalView) els.evalView.value = state.evalView === "abs" ? "abs" : "delta";
   if (els.storyIcons) els.storyIcons.value = state.storyIcons ? "1" : "0";
   if (els.btnNewCancel) els.btnNewCancel.hidden = !state.hasGame;
-  setNewGameTab("train");
+  setNewGameTab(tab);
   if (els.newGame) els.newGame.hidden = false;
+}
+
+function openSettingsDialog() {
+  setAppMenuOpen(false);
+  openNewGameDialog("settings");
 }
 
 function closeNewGameDialog() {
@@ -4408,8 +4413,7 @@ function startQuickTraining(moves = 0) {
 
 function openQuickOnline() {
   setAppMenuOpen(false);
-  openNewGameDialog();
-  setNewGameTab("online");
+  openNewGameDialog("online");
 }
 
 function fillSkillSelect() {
@@ -4765,10 +4769,12 @@ document.getElementById("btn-menu-new")?.addEventListener("click", () => {
   setAppMenuOpen(false);
   openNewGameDialog();
 });
+document.getElementById("btn-menu-settings")?.addEventListener("click", () => openSettingsDialog());
 document.getElementById("quick-train")?.addEventListener("click", () => startQuickTraining(0));
 document.getElementById("quick-train-12")?.addEventListener("click", () => startQuickTraining(12));
 document.getElementById("quick-train-24")?.addEventListener("click", () => startQuickTraining(24));
 document.getElementById("quick-online")?.addEventListener("click", () => openQuickOnline());
+document.getElementById("quick-settings")?.addEventListener("click", () => openSettingsDialog());
 document.addEventListener("click", (event) => {
   const menu = event.target.closest(".app-menu");
   if (!menu) setAppMenuOpen(false);

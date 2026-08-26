@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BVChess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260826eval">
+  <link rel="stylesheet" href="css/style.css?v=20260826set">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -41,6 +41,7 @@
         <button type="button" id="quick-train-24" class="quick-btn" data-i18n="quick.train24" data-i18n-title="quick.train24Hint" title="Training after 24 moves">24 moves</button>
         <button type="button" id="btn-training-mode" class="quick-btn" data-i18n="train.mode" data-i18n-title="train.modeHint" title="First you only see the moves. After you pick one, scores, labels and hearts appear." aria-pressed="false">Training mode</button>
         <button type="button" id="quick-online" class="quick-btn" data-i18n="tab.online" data-i18n-title="quick.onlineHint" title="Play online">Play online</button>
+        <button type="button" id="quick-settings" class="quick-btn" data-i18n="tab.settings" data-i18n-title="quick.settingsHint" title="Open settings">Settings</button>
       </nav>
       <div class="app-menu">
         <button type="button" id="btn-menu" class="app-menu-btn" data-i18n-aria="menu.aria" aria-label="Menu" aria-expanded="false" aria-controls="app-menu-panel">☰</button>
@@ -66,6 +67,7 @@
             </button>
           </div>
           <button type="button" id="btn-menu-new" class="app-menu-new" data-i18n="newgame.menu">Start a new game</button>
+          <button type="button" id="btn-menu-settings" class="app-menu-settings" data-i18n="tab.settings">Settings</button>
         </div>
       </div>
     </header>
@@ -330,20 +332,6 @@
           </select>
         </label>
         <p class="new-game-soon" data-i18n="settings.storyIconsHint">Le carte hanno lo stesso formato. Cambia solo il contenuto: icone dei pezzi oppure scene illustrate.</p>
-        <div class="story-preview" aria-hidden="true">
-          <img src="immagini-stile-war/cavallonero/Cavallo Nero Si muove da solo 1.png" alt="" data-i18n-title="art.knight.quiet">
-          <img src="immagini-stile-war/pedonennero/Pedone Nero Si muove da solo 1.png" alt="" data-i18n-title="art.pawn.quiet">
-          <img src="immagini-stile-war/alfierennero/Alfiere Nero Si muove da solo 1.png" alt="" data-i18n-title="art.bishop.quiet">
-          <img src="immagini-stile-war/torrenera/Torre Nera Si muove da sola 1.png" alt="" data-i18n-title="art.rook.quiet">
-          <img src="immagini-stile-war/reginanera/Regina Nera Si muove da sola 1.png" alt="" data-i18n-title="art.queen.quiet">
-          <img src="immagini-stile-war/renero/Re Nero Si muove da solo 1.png" alt="" data-i18n-title="art.king.quiet">
-          <img src="immagini-stile-war/cavallobianco/Cavallo Bianco Si muove da solo 1.png" alt="" data-i18n-title="art.wknight.quiet">
-          <img src="immagini-stile-war/pedonebianco/Pedone Bianco Si muove da solo 1.png" alt="" data-i18n-title="art.wpawn.quiet">
-          <img src="immagini-stile-war/alfierobianco/Alfiere Bianco Si muove da solo 1.png" alt="" data-i18n-title="art.wbishop.quiet">
-          <img src="immagini-stile-war/torrebianca/Torre Bianca Si muove da sola 1.png" alt="" data-i18n-title="art.wrook.quiet">
-          <img src="immagini-stile-war/reginabianca/Regina Bianca Si muove da sola 1.png" alt="" data-i18n-title="art.wqueen.quiet">
-          <img src="immagini-stile-war/rebianco/Re Bianco Si muove da solo 1.png" alt="" data-i18n-title="art.wking.quiet">
-        </div>
         <p class="new-game-soon" data-i18n="settings.more">More settings will arrive here soon.</p>
       </div>
       <div class="new-game-actions">
@@ -353,6 +341,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260826eval"></script>
+  <script type="module" src="js/app.js?v=20260826set"></script>
 </body>
 </html>

@@ -152,6 +152,21 @@ button, select { font: inherit; }
   background: #52821c;
   border-color: #52821c;
 }
+.app-menu-settings {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #333;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.app-menu-settings:hover {
+  border-color: var(--green);
+  background: #f7fff0;
+}
 .lang-switch {
   display: flex;
   width: 100%;
@@ -678,23 +693,6 @@ button, select { font: inherit; }
   min-height: 0;
   column-gap: 8px;
   row-gap: 8px;
-}
-.story-preview {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 0 0 8px;
-}
-.story-preview img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: contain;
-  object-position: center;
-  padding: 0;
-  border-radius: 8px;
-  border: 2px solid #d8c7a0;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
-  background: #1a2744;
 }
 .hint-slot {
   display: flex;
