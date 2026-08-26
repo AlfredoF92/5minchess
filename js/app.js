@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826verdict";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826v2";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1528,12 +1528,11 @@ function hintEvalArrowSvg(dir) {
 
 function hintEvalHtml(info) {
   if (!info || info.synthetic) return "—";
-  const score = state.evalView !== "delta" ? formatHintEval(info) : formatHintDelta(info);
-  const wrapped = escapeHtml(`(${score})`);
-  if (state.evalView !== "delta") return wrapped;
+  const score = escapeHtml(state.evalView !== "delta" ? formatHintEval(info) : formatHintDelta(info));
+  if (state.evalView !== "delta") return score;
   const dir = hintEvalDir(info);
   const arrow = dir ? hintEvalArrowSvg(dir) : "";
-  return `${arrow}${wrapped}`;
+  return `${arrow}${score}`;
 }
 
 function hintPlaceHtml(hint, pool = state.hintPool) {
