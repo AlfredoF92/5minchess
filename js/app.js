@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826board3";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826eval";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -18,6 +18,7 @@ const HINT_LAYOUTS = {
 const CLOCK_KEY = "5minchess.moveClock";
 const ROUND_EVAL_KEY = "5minchess.roundEval";
 const STORY_ICONS_KEY = "5minchess.pieceCards";
+const EVAL_VIEW_KEY = "5minchess.evalView";
 const WAR_KNIGHT_DIR = "immagini-stile-war/cavallonero";
 const WAR_PAWN_DIR = "immagini-stile-war/pedonennero";
 const WAR_BISHOP_DIR = "immagini-stile-war/alfierennero";
@@ -183,6 +184,14 @@ function readRoundEval() {
     return localStorage.getItem(ROUND_EVAL_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+function readEvalView() {
+  try {
+    return localStorage.getItem(EVAL_VIEW_KEY) === "abs" ? "abs" : "delta";
+  } catch {
+    return "delta";
   }
 }
 
@@ -1469,6 +1478,15 @@ function hintMoveEval(info) {
   return evalForPlayer(hintScore(info), hintEvalGame());
 }
 
+function formatSignedPawns(cp) {
+  const raw = cp / 100;
+  if (!Number.isFinite(raw)) return "—";
+  const shown = state.roundEval ? Math.round(raw * 10) / 10 : raw;
+  if (!shown) return state.roundEval ? "0.0" : "0.00";
+  const digits = state.roundEval ? Math.abs(shown).toFixed(1) : Math.abs(shown).toFixed(2);
+  return shown > 0 ? `+${digits}` : `-${digits}`;
+}
+
 function formatHintEval(info) {
   if (!info || info.synthetic) return "—";
   if (info.scoreType === "mate") {
@@ -1476,12 +1494,20 @@ function formatHintEval(info) {
     if (info.score < 0) return t("eval.mateIn", { n: Math.abs(info.score) });
     return t("eval.mate");
   }
-  const raw = info.score / 100;
-  if (!Number.isFinite(raw)) return "—";
-  const shown = state.roundEval ? Math.round(raw * 10) / 10 : raw;
-  if (!shown) return state.roundEval ? "0.0" : "0.00";
-  const digits = state.roundEval ? Math.abs(shown).toFixed(1) : Math.abs(shown).toFixed(2);
-  return shown > 0 ? `+${digits}` : `-${digits}`;
+  return formatSignedPawns(info.score);
+}
+
+function formatHintDelta(info) {
+  if (!info || info.synthetic) return "—";
+  if (info.scoreType === "mate") {
+    if (info.score > 0) return t("eval.mateIn", { n: info.score });
+    if (info.score < 0) return t("eval.mateIn", { n: Math.abs(info.score) });
+    return t("eval.mate");
+  }
+  const moveEval = hintMoveEval(info);
+  if (moveEval == null) return "—";
+  const now = Number.isFinite(state.standEval) ? state.standEval : 0;
+  return formatSignedPawns(moveEval - now);
 }
 
 function hintEvalDir(info) {
@@ -1503,9 +1529,10 @@ function hintEvalArrowSvg(dir) {
 
 function hintEvalHtml(info) {
   if (!info || info.synthetic) return "—";
+  if (state.evalView !== "delta") return escapeHtml(formatHintEval(info));
   const dir = hintEvalDir(info);
   const arrow = dir ? hintEvalArrowSvg(dir) : "";
-  return `${arrow}${escapeHtml(formatHintEval(info))}`;
+  return `${arrow}${escapeHtml(formatHintDelta(info))}`;
 }
 
 function hintTagHtml(hint, pool = state.hintPool) {
@@ -2883,6 +2910,7 @@ const els = {
   oppWait: document.getElementById("opp-wait"),
   autoContinue: document.getElementById("auto-continue"),
   roundEval: document.getElementById("round-eval"),
+  evalView: document.getElementById("eval-view"),
   storyIcons: document.getElementById("story-icons"),
 };
 
@@ -2917,6 +2945,7 @@ const state = {
   hintLayout: readHintLayout(),
   moveClockSec: readMoveClock(),
   roundEval: readRoundEval(),
+  evalView: readEvalView(),
   storyIcons: readStoryIcons(),
   hasGame: false,
   openingPly: 0,
@@ -4296,6 +4325,7 @@ function openNewGameDialog() {
   fillHintLayoutSelect();
   fillClockSelect();
   fillRoundEvalSelect();
+  fillEvalViewSelect();
   fillStoryIconsSelect();
   fillStartOpeningSelect();
   if (els.skill) els.skill.value = String(state.skill || 2);
@@ -4305,6 +4335,7 @@ function openNewGameDialog() {
   if (els.hintLayout) els.hintLayout.value = HINT_LAYOUTS[state.hintLayout] ? state.hintLayout : "6x1";
   if (els.moveClockSelect) els.moveClockSelect.value = String(moveClockSec());
   if (els.roundEval) els.roundEval.value = state.roundEval ? "1" : "0";
+  if (els.evalView) els.evalView.value = state.evalView === "abs" ? "abs" : "delta";
   if (els.storyIcons) els.storyIcons.value = state.storyIcons ? "1" : "0";
   if (els.btnNewCancel) els.btnNewCancel.hidden = !state.hasGame;
   setNewGameTab("train");
@@ -4406,6 +4437,27 @@ function fillClockSelect() {
   select.innerHTML = CLOCK_OPTIONS
     .map((n) => `<option value="${n}"${String(n) === current ? " selected" : ""}>${t(`clock.${n}`)}</option>`)
     .join("");
+}
+
+function fillEvalViewSelect() {
+  const select = els.evalView;
+  if (!select) return;
+  const current = state.evalView === "abs" ? "abs" : "delta";
+  select.innerHTML = [
+    `<option value="abs"${current === "abs" ? " selected" : ""}>${t("settings.evalView.abs")}</option>`,
+    `<option value="delta"${current === "delta" ? " selected" : ""}>${t("settings.evalView.delta")}</option>`,
+  ].join("");
+}
+
+function applyEvalView(value) {
+  state.evalView = value === "abs" ? "abs" : "delta";
+  try {
+    localStorage.setItem(EVAL_VIEW_KEY, state.evalView);
+  } catch {
+    /* ignore */
+  }
+  if (els.evalView) els.evalView.value = state.evalView;
+  renderHints();
 }
 
 function fillRoundEvalSelect() {
@@ -4523,6 +4575,7 @@ function applyLanguage() {
   fillHintLayoutSelect();
   fillClockSelect();
   fillRoundEvalSelect();
+  fillEvalViewSelect();
   fillStoryIconsSelect();
   fillStartOpeningSelect();
   if (!els.newGame?.hidden) syncNewGameTabUi();
@@ -4773,6 +4826,7 @@ els.playMode?.addEventListener("change", () => syncNewGameForm());
 els.startKind?.addEventListener("change", () => syncNewGameForm());
 els.startOpening?.addEventListener("change", () => previewOpeningLine());
 els.roundEval?.addEventListener("change", () => applyRoundEval(els.roundEval.value));
+els.evalView?.addEventListener("change", () => applyEvalView(els.evalView.value));
 els.storyIcons?.addEventListener("change", () => applyStoryIcons(els.storyIcons.value));
 els.btnNewStart?.addEventListener("click", () => confirmNewGame());
 els.btnNewCancel?.addEventListener("click", () => {
@@ -4831,6 +4885,7 @@ fillStartKindSelect();
 fillHintLayoutSelect();
 fillClockSelect();
 fillRoundEvalSelect();
+fillEvalViewSelect();
 fillStoryIconsSelect();
 fillStartOpeningSelect();
 syncHintLayoutUi();

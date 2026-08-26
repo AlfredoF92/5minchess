@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BVChess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260826board3">
+  <link rel="stylesheet" href="css/style.css?v=20260826eval">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -315,6 +315,14 @@
         </label>
         <p class="new-game-soon" data-i18n="settings.roundEvalHint">If yes, scores show one decimal: 1.04 becomes 1.0, 0.79 becomes 0.8.</p>
         <label class="skill-wrap">
+          <span data-i18n="settings.evalView">Visualizzazione punteggio</span>
+          <select id="eval-view" data-i18n-aria="settings.evalViewAria" aria-label="Come mostrare il punteggio delle mosse">
+            <option value="abs">Valutazione assoluta della posizione</option>
+            <option value="delta" selected>Variazione rispetto alla posizione</option>
+          </select>
+        </label>
+        <p class="new-game-soon" data-i18n="settings.evalViewHint">Assoluta: quanto stai avanti o indietro dopo la mossa. Variazione: quanto quella mossa alza o abbassa il punteggio rispetto a ora, con la freccia.</p>
+        <label class="skill-wrap">
           <span data-i18n="settings.storyIcons">Stile cards</span>
           <select id="story-icons" data-i18n-aria="settings.storyIconsAria" aria-label="Stile delle carte delle mosse">
             <option value="0">Standard - Icone</option>
@@ -345,6 +353,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260826board3"></script>
+  <script type="module" src="js/app.js?v=20260826eval"></script>
 </body>
 </html>
