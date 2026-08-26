@@ -978,13 +978,10 @@ button, select { font: inherit; }
   color: inherit;
 }
 .hints.is-hold .hint-btn.is-card:not(.empty) {
-  opacity: 0.48;
   cursor: default;
-  transition: opacity 0.18s ease;
 }
 .hints.is-hold .hint-btn.is-card:not(.is-picked):not(.empty):hover,
 .hints.is-hold .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
-  opacity: 0.48;
   background: var(--board-light);
   border-color: var(--board-dark);
   box-shadow: none;
@@ -994,27 +991,26 @@ button, select { font: inherit; }
 .hints.is-hold .hint-btn.is-card.is-picked:hover,
 .hints.is-hold .hint-btn.is-card.is-picked.is-kbd,
 .hints.is-hold .hint-btn.is-card.is-picked:disabled {
-  opacity: 0.94;
   border-color: var(--green);
   box-shadow: 0 0 0 3px var(--green);
   transform: none;
 }
-.hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked):not(.empty) {
-  opacity: 0.42;
+.hints.is-hold.is-opp-replied .hint-btn.is-card:not(.empty) {
+  opacity: 0.48;
+  transition: opacity 0.18s ease;
 }
-.hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked,
-.hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked:hover,
-.hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked.is-kbd,
-.hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked:disabled {
+.hints.is-hold.is-opp-replied .hint-btn.is-card:not(.is-picked):not(.empty):hover,
+.hints.is-hold.is-opp-replied .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
+  opacity: 0.48;
+}
+.hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked,
+.hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked:hover,
+.hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked.is-kbd,
+.hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked:disabled {
   opacity: 0.94;
-  border-color: var(--green);
-  box-shadow: 0 0 0 3px var(--green);
-  transform: none;
-  background: var(--board-light);
 }
 .hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked):not(.empty):hover,
 .hints.is-hold.is-wait-opp .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
-  opacity: 0.42;
   transform: none;
   box-shadow: none;
 }
