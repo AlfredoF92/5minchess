@@ -630,8 +630,12 @@ button, select { font: inherit; }
   margin-top: 6px;
   margin-bottom: 8px;
 }
-.coach-col .side-dock {
-  margin: 0 0 6px;
+.board-col .side-dock {
+  position: static;
+  margin: 0 0 8px;
+}
+.board-col .panel {
+  margin-top: 0;
 }
 .hint-panel.is-waiting {
   opacity: 0;
