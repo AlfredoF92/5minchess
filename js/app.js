@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826dock";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826var";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1404,16 +1404,38 @@ function hintRankMap(pool = state.hintPool) {
   return kinds;
 }
 
+function hintPlaceMap(pool = state.hintPool) {
+  const map = new Map();
+  const items = (pool || [])
+    .filter((line) => line?.uci && !line.synthetic && Number.isFinite(hintScore(line)))
+    .sort((a, b) => hintScore(b) - hintScore(a) || String(a.uci).localeCompare(b.uci));
+  items.forEach((hint, i) => map.set(hint.uci, i + 1));
+  return map;
+}
+
+function formatPlace(n) {
+  const place = Number(n);
+  if (!place) return "";
+  if (getLang() === "it") return `${place}°`;
+  const j = place % 10;
+  const k = place % 100;
+  if (j === 1 && k !== 11) return `${place}st`;
+  if (j === 2 && k !== 12) return `${place}nd`;
+  if (j === 3 && k !== 13) return `${place}rd`;
+  return `${place}th`;
+}
+
 function hintRankKind(hint, pool = state.hintPool) {
   if (!hint || hint.synthetic || !hint.uci) return "";
   return hintRankMap(pool).get(hint.uci) || "";
 }
 
 function hintRankTag(hint, pool = state.hintPool) {
-  const kind = hintRankKind(hint, pool);
-  if (kind === "best") return t("hint.tag.best");
-  if (kind === "normal" || kind === "worst") return t("hint.tag.normal");
-  return "";
+  const place = hintPlaceMap(pool).get(hint?.uci);
+  if (!place) return "";
+  const ordinal = formatPlace(place);
+  if (place === 1) return t("hint.tag.bestPlace", { place: ordinal });
+  return t("hint.tag.variant", { place: ordinal });
 }
 
 function hintMixCounts(pool = state.hintPool) {
@@ -1482,13 +1504,13 @@ function hintEvalHtml(info) {
 }
 
 function hintTagHtml(hint, pool = state.hintPool) {
-  const kind = hintRankKind(hint, pool);
   const tag = hintRankTag(hint, pool);
   if (!tag) return "";
-  if (kind === "best") {
+  const place = hintPlaceMap(pool).get(hint?.uci);
+  if (place === 1) {
     return `<span class="hint-tag is-best"><span class="hint-star" aria-hidden="true">★</span>${escapeHtml(tag)}</span>`;
   }
-  return `<span class="hint-tag is-good"><span class="hint-up" aria-hidden="true">👍</span>${escapeHtml(tag)}</span>`;
+  return `<span class="hint-tag is-good">${escapeHtml(tag)}</span>`;
 }
 
 function evalClass(info) {
@@ -3454,10 +3476,11 @@ function renderHints() {
     }), san) : "";
     const picked = hold && hint.uci === state.trainPickedUci;
     const desc = played ? moveHeadline(played) : "";
-    const verdict = hold
+    const showLabel = hold && picked;
+    const verdict = showLabel
       ? `${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`
       : "";
-    const foot = !cards && hold ? `
+    const foot = !cards && showLabel ? `
           <span class="hint-foot">
             ${hintTagHtml(hint)}
             <span class="hint-divider" aria-hidden="true"></span>
