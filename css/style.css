@@ -959,16 +959,19 @@ button, select { font: inherit; }
   filter: grayscale(0.2);
   animation: hint-ghost 1.8s ease-in-out infinite;
 }
-.hints.is-hold .hint-btn.is-card:not(.empty) {
-  opacity: 0.5;
-  cursor: default;
+.hints.is-hold .hint-slot {
+  opacity: 0.48;
+  transition: opacity 0.18s ease;
 }
-.hints.is-hold .hint-btn.is-card:not(.is-picked):not(.empty) {
-  opacity: 0.42;
+.hints.is-hold .hint-slot:has(.is-picked) {
+  opacity: 0.56;
+}
+.hints.is-hold .hint-btn.is-card:not(.empty) {
+  opacity: 1;
+  cursor: default;
 }
 .hints.is-hold .hint-btn.is-card:not(.is-picked):not(.empty):hover,
 .hints.is-hold .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
-  opacity: 0.42;
   background: var(--board-light);
   border-color: var(--board-dark);
   box-shadow: none;
@@ -978,23 +981,15 @@ button, select { font: inherit; }
 .hints.is-hold .hint-btn.is-card.is-picked:hover,
 .hints.is-hold .hint-btn.is-card.is-picked.is-kbd,
 .hints.is-hold .hint-btn.is-card.is-picked:disabled {
-  opacity: 0.58;
   border-color: var(--green);
   box-shadow: 0 0 0 3px var(--green);
   transform: none;
 }
-.hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked):not(.empty) {
-  opacity: 0.38;
+.hints.is-hold.is-wait-opp .hint-slot {
+  opacity: 0.42;
 }
-.hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked,
-.hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked:hover,
-.hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked.is-kbd,
-.hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked:disabled {
-  opacity: 0.52;
-  border-color: var(--green);
-  box-shadow: 0 0 0 3px var(--green);
-  transform: none;
-  background: var(--board-light);
+.hints.is-hold.is-wait-opp .hint-slot:has(.is-picked) {
+  opacity: 0.5;
 }
 .hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked):not(.empty):hover,
 .hints.is-hold.is-wait-opp .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
@@ -1003,7 +998,6 @@ button, select { font: inherit; }
 }
 .hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked):hover,
 .hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked).is-kbd {
-  opacity: 0.4;
   border-color: var(--board-dark);
 }
 .train-actions {
@@ -1153,31 +1147,11 @@ button, select { font: inherit; }
 .hints.is-hold .hint-btn:not(.empty) {
   cursor: default;
 }
-.hints.is-hold .hint-btn:not(.is-picked):not(.empty) {
-  opacity: 0.78;
-}
 .hints.is-hold .hint-btn:not(.is-picked):not(.empty):hover,
 .hints.is-hold .hint-btn.is-kbd:not(.is-picked):not(.empty) {
-  opacity: 1;
-  border-color: #d0d0d0;
-  background: #f2f2f2;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-}
-.hints.is-hold.is-wait-opp .hint-btn:not(.empty) {
-  opacity: 0.58;
-}
-.hints.is-hold.is-wait-opp .hint-btn.is-picked,
-.hints.is-hold.is-wait-opp .hint-btn.is-picked:hover,
-.hints.is-hold.is-wait-opp .hint-btn.is-picked.is-kbd {
-  opacity: 0.7;
-  border-color: var(--green);
-}
-.hints.is-hold.is-wait-opp .hint-btn:not(.is-picked):not(.empty):hover,
-.hints.is-hold.is-wait-opp .hint-btn.is-kbd:not(.is-picked):not(.empty) {
-  opacity: 0.82;
-  border-color: #d0d0d0;
-  background: #f2f2f2;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  border-color: var(--board-dark);
+  background: var(--board-light);
+  box-shadow: none;
 }
 .hint-nav.is-wait-opp .more-hints:not(:disabled) {
   opacity: 0.65;
