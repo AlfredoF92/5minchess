@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826card5";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826board";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -3938,7 +3938,7 @@ els.promo.addEventListener("click", (event) => {
 
 els.hints.addEventListener("click", (event) => {
   const btn = event.target.closest(".hint-btn");
-  if (!btn || btn.disabled) return;
+  if (!btn || btn.disabled || isTrainHold()) return;
   playHintAt(Number(btn.dataset.index));
 });
 
