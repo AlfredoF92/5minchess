@@ -994,19 +994,19 @@ button, select { font: inherit; }
 .hints.is-hold .hint-btn.is-card.is-picked:hover,
 .hints.is-hold .hint-btn.is-card.is-picked.is-kbd,
 .hints.is-hold .hint-btn.is-card.is-picked:disabled {
-  opacity: 0.56;
+  opacity: 0.94;
   border-color: var(--green);
   box-shadow: 0 0 0 3px var(--green);
   transform: none;
 }
-.hints.is-hold.is-wait-opp .hint-btn.is-card:not(.empty) {
+.hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked):not(.empty) {
   opacity: 0.42;
 }
 .hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked,
 .hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked:hover,
 .hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked.is-kbd,
 .hints.is-hold.is-wait-opp .hint-btn.is-card.is-picked:disabled {
-  opacity: 0.5;
+  opacity: 0.94;
   border-color: var(--green);
   box-shadow: 0 0 0 3px var(--green);
   transform: none;
