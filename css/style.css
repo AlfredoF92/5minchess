@@ -592,9 +592,20 @@ button, select { font: inherit; }
 .king-finale[hidden] {
   display: none;
 }
-.hint-panel {
+.coach-col .train-actions {
+  margin-top: 8px;
+}
+.coach-col .hint-panel {
+  margin-top: 6px;
+}
+.coach-col .hints {
+  grid-template-columns: 1fr 1fr;
+}
+.coach-col .hints.is-cards.is-six {
+  grid-template-columns: 1fr 1fr;
+}
+.coach-col .king-talk {
   margin-top: 10px;
-  transition: opacity 0.4s ease;
 }
 .hint-panel.is-waiting {
   opacity: 0;
