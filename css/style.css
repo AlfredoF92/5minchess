@@ -1005,24 +1005,31 @@ button, select { font: inherit; }
 .train-actions {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 8px;
   margin: 10px 0 0;
 }
 .auto-continue {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: flex-end;
   gap: 8px;
+  align-self: flex-end;
+  max-width: min(100%, 34em);
   margin: 0;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
   color: #444;
+  text-align: right;
   cursor: pointer;
   user-select: none;
 }
 .auto-continue input {
   width: 16px;
   height: 16px;
-  margin: 0;
+  margin: 2px 0 0;
+  flex-shrink: 0;
   accent-color: #629924;
   cursor: pointer;
 }
@@ -1172,7 +1179,7 @@ button, select { font: inherit; }
   opacity: 0.65;
 }
 .opp-wait {
-  margin: 14px 0 0;
+  margin: 0;
   text-align: center;
   font-size: 15px;
   font-weight: 700;

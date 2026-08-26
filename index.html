@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BVChess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260826board">
+  <link rel="stylesheet" href="css/style.css?v=20260826cont">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -179,14 +179,14 @@
         <div id="hint-nav" class="hint-nav is-waiting">
           <button id="btn-more-hints" class="more-hints" type="button" disabled>See the other 6 moves</button>
         </div>
-        <p id="opp-wait" class="opp-wait" hidden data-i18n="hints.oppWait">In attesa dell'avversario...</p>
         </div>
         <div class="train-actions">
+          <p id="opp-wait" class="opp-wait" hidden data-i18n="hints.oppWait">In attesa dell'avversario...</p>
+          <button type="button" id="btn-train-continue" class="train-continue" hidden data-i18n="train.continue">Continue</button>
           <label class="auto-continue">
             <input type="checkbox" id="auto-continue">
-            <span data-i18n="train.autoContinue">Continua automaticamente</span>
+            <span data-i18n="train.autoContinue">Vai alle prossime mosse in automatico quando l'avversario risponde</span>
           </label>
-          <button type="button" id="btn-train-continue" class="train-continue" hidden data-i18n="train.continue">Continue</button>
         </div>
       </section>
     </main>
@@ -339,6 +339,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260826v2"></script>
+  <script type="module" src="js/app.js?v=20260826cont"></script>
 </body>
 </html>
