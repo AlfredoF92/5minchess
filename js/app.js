@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826cont";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826seeopp";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -2333,6 +2333,7 @@ function clearTrainHold() {
   state.trainLives = null;
   state.continueArmed = false;
   state.pendingOpp = null;
+  state.trainNext = null;
   state.oppSearchToken += 1;
 }
 
@@ -2350,17 +2351,18 @@ function syncTrainingModeUi() {
 
 function syncTrainContinue() {
   if (els.trainContinue) {
-    const waiting = isTrainHold() && state.continueArmed && !state.pendingOpp;
+    const hasNext = Boolean(state.trainNext);
+    const waiting = isTrainHold() && state.continueArmed && !hasNext;
     const show = isTrainHold() && !state.autoContinue && !waiting;
     els.trainContinue.hidden = !show;
     els.trainContinue.disabled = !show || state.busy;
-    els.trainContinue.textContent = state.pendingOpp ? t("train.reply") : t("train.continue");
+    els.trainContinue.textContent = hasNext ? t("train.reply") : t("train.continue");
   }
   syncOppWait();
 }
 
 function syncOppWait() {
-  const show = isTrainHold() && state.continueArmed && !state.pendingOpp;
+  const show = isTrainHold() && state.continueArmed && !state.trainNext;
   if (els.oppWait) {
     els.oppWait.hidden = !show;
     els.oppWait.textContent = t("hints.oppWait");
@@ -2382,8 +2384,8 @@ function setAutoContinue(on) {
   }
   syncAutoContinueUi();
   syncTrainContinue();
-  if (state.autoContinue && isTrainHold() && !state.busy && state.pendingOpp) {
-    applyPendingTrainOpp();
+  if (state.autoContinue && isTrainHold() && !state.busy && state.trainNext) {
+    revealTrainNext();
   }
 }
 
@@ -2428,8 +2430,8 @@ async function continueTrainMove({ afterTalk, keepSpeaking = false } = {}) {
     revealHintsIfReady();
     return;
   }
-  if (state.pendingOpp) {
-    await applyPendingTrainOpp();
+  if (state.trainNext) {
+    revealTrainNext();
     return;
   }
   state.continueArmed = true;
@@ -2999,6 +3001,7 @@ const state = {
   trainHold: false,
   continueArmed: false,
   pendingOpp: null,
+  trainNext: null,
   oppSearchToken: 0,
   kbdHint: null,
   trainPickedUci: "",
@@ -3838,38 +3841,81 @@ async function applyOppMove(resolved) {
   syncBoard({ keepArrows: true });
 }
 
-async function applyPendingTrainOpp() {
-  if (!state.pendingOpp || state.busy) return;
-  const resolved = state.pendingOpp;
-  state.pendingOpp = null;
-  state.continueArmed = false;
+async function playTrainOppOnBoard(resolved) {
+  const gameId = state.gameId;
+  const { fen, move, pool, oppKey, oppBand, beforeEval, firstEngine, nextBest, nextEval } = resolved;
+  if (state.game.fen() !== fen) return;
+
   state.busy = true;
   syncTrainContinue();
-  try {
-    await applyOppMove(resolved);
-  } catch (err) {
-    if (err.message === "aborted" || err.message === "Nessuna mossa dal motore") {
-      state.busy = false;
-      if (isTrainHold()) {
-        clearTrainHold();
-        hideHintPanel();
-        syncTrainContinue();
-      }
-      thawKingLives();
-      syncBoard();
-      return;
-    }
-    console.error(err);
-    setStatus(t("error"), t("king.engineFail"), "lose");
+  state.board.setArrows([]);
+  if (!firstEngine) await sleep(300);
+  if (gameId !== state.gameId || state.game.fen() !== fen) {
     state.busy = false;
-    if (isTrainHold()) {
-      clearTrainHold();
-      hideHintPanel();
-      syncTrainContinue();
-    }
-    thawKingLives();
-    syncBoard();
+    return;
   }
+
+  const played = state.game.move({
+    from: move.from,
+    to: move.to,
+    promotion: move.promotion || "q",
+  });
+  if (!played) throw new Error("Mossa motore illegale");
+
+  state.board.setLastMove(played.from, played.to);
+  await state.board.animateMove(played.from, played.to);
+  if (gameId !== state.gameId) {
+    state.busy = false;
+    return;
+  }
+  thawKingLives();
+  state.trainLives = null;
+  state.board.setPosition(state.game.fen());
+  flashThreatenedPieces(played);
+  renderHistory();
+  renderKingLives();
+
+  if (state.game.game_over()) {
+    clearTrainHold();
+    hideHintPanel();
+    state.busy = false;
+    finishGame();
+    return;
+  }
+
+  state.trainNext = { pool, nextBest, nextEval };
+  state.continueArmed = false;
+  state.pendingOpp = null;
+  state.busy = false;
+  syncTrainContinue();
+  if (oppBand && !firstEngine) showKingReact(oppBand);
+  const talk = kingComment(fen, played, true, oppKey, beforeEval);
+  state.lastKingTalk = talk;
+  state.kingReplay = { type: "opponent", beforeFen: fen, afterFen: state.game.fen(), move: { ...played }, feedbackKey: oppKey, reactBand: oppBand, beforeEval };
+  setStatus(t("turn.you"), `${youLabel()}. ${t("turn.make")}`, "play");
+  speakKing(talk, { calculating: false, html: true });
+  syncBoard({ keepArrows: true });
+}
+
+function revealTrainNext() {
+  if (!state.trainNext || state.busy) return;
+  const next = state.trainNext;
+  state.trainNext = null;
+  state.continueArmed = false;
+  clearTrainHold();
+  hideHintPanel();
+  adoptHintPool(next.pool);
+  if (Number.isFinite(next.nextBest)) state.hintBestScore = next.nextBest;
+  if (Number.isFinite(next.nextEval)) state.gameEval = next.nextEval;
+  state.hintPage = 0;
+  state.hintsUnlocked = 0;
+  prepareHintTalks();
+  state.pendingHintReveal = true;
+  state.allowHintsWhileSpeaking = true;
+  state.busy = false;
+  syncTrainContinue();
+  revealHintsIfReady();
+  syncBoard({ keepArrows: true });
 }
 
 async function startTrainOppReply({ afterTalk } = {}) {
@@ -3879,9 +3925,9 @@ async function startTrainOppReply({ afterTalk } = {}) {
   try {
     const resolved = await resolveOppMove(fen, { afterTalk });
     if (token !== state.oppSearchToken || gameId !== state.gameId || state.game.fen() !== fen) return;
-    state.pendingOpp = resolved;
-    syncTrainContinue();
-    if (state.autoContinue || state.continueArmed) await applyPendingTrainOpp();
+    await playTrainOppOnBoard(resolved);
+    if (token !== state.oppSearchToken || gameId !== state.gameId) return;
+    if (state.autoContinue && state.trainNext) revealTrainNext();
   } catch (err) {
     if (err.message === "aborted" || gameId !== state.gameId || token !== state.oppSearchToken) return;
     console.error(err);
@@ -3892,6 +3938,7 @@ async function startTrainOppReply({ afterTalk } = {}) {
       syncTrainContinue();
     }
     thawKingLives();
+    state.busy = false;
     syncBoard();
   }
 }
