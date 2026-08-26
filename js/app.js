@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827opplives";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827hearts3";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1973,12 +1973,11 @@ function evalForPlayer(score, game) {
 }
 
 function livesFromCp(cp) {
-  if (!Number.isFinite(cp) || cp >= 0) return 6;
-  if (cp >= -100) return 5;
-  if (cp >= -150) return 4;
-  if (cp >= -200) return 3;
-  if (cp >= -300) return 2;
-  return 1;
+  if (!Number.isFinite(cp) || cp >= -100) return 6;
+  if (cp >= -150) return 5;
+  if (cp >= -200) return 4;
+  if (cp >= -300) return 3;
+  return 2;
 }
 
 function kingLifeHalves() {
