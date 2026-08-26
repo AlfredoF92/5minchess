@@ -756,18 +756,11 @@ button, select { font: inherit; }
 .hint-verdict .hint-star {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
   color: #e6b000;
-  -webkit-text-stroke: 0.65px #5c4700;
-  paint-order: stroke fill;
-  border: 1.5px solid #8a7018;
-  border-radius: 50%;
 }
 .hint-verdict .hint-eval {
   display: inline-flex;
