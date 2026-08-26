@@ -2920,10 +2920,10 @@ function syncCoach() {
 }
 
 function setStatus(title, text, kind = "info") {
-  els.statusTitle.textContent = title;
-  els.statusText.textContent = text;
-  els.statusIcon.dataset.kind = kind;
-  els.turnBanner.textContent = title;
+  if (els.statusTitle) els.statusTitle.textContent = title;
+  if (els.statusText) els.statusText.textContent = text;
+  if (els.statusIcon) els.statusIcon.dataset.kind = kind;
+  if (els.turnBanner) els.turnBanner.textContent = title;
 }
 
 function openingAside() {

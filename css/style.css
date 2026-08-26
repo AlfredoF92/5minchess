@@ -206,17 +206,17 @@ button, select { font: inherit; }
 .board-col {
   display: flex;
   flex-direction: column;
-  width: min(78vh, calc(100vw - 340px), 640px);
+  width: min(78vh, calc(100vw - 500px), 640px);
   flex-shrink: 0;
 }
 
 .coach-col {
   display: flex;
   flex-direction: column;
-  flex: 0 0 300px;
-  width: 300px;
-  min-width: 260px;
-  max-width: 320px;
+  flex: 1 1 440px;
+  width: auto;
+  min-width: 380px;
+  max-width: 540px;
 }
 
 #board-root { width: 100%; }
@@ -1357,6 +1357,10 @@ button, select { font: inherit; }
   box-shadow: var(--shadow);
   overflow: hidden;
 }
+.card.is-compact {
+  overflow: visible;
+  max-height: 130px;
+}
 
 .player {
   display: flex;
@@ -1563,48 +1567,125 @@ body.is-local .vs-engine { display: none; }
   font-size: 12px;
 }
 
+.card.is-compact .dock-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 4px 6px 2px;
+}
 .card.is-compact .player {
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 4px 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.card.is-compact .player.you {
+  border-top: 0;
+  border-left: 1px solid var(--line);
+  flex: 0 1 auto;
 }
 .card.is-compact .dot { margin-top: 0; }
-.card.is-compact .name { font-size: 13px; line-height: 1.2; }
-.card.is-compact .rating { font-size: 11px; }
+.card.is-compact .name {
+  font-size: 12px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card.is-compact .rating {
+  font-size: 10px;
+  line-height: 1.1;
+}
+.card.is-compact .player-king {
+  width: 22px;
+  height: 22px;
+}
 .card.is-compact .toolbar {
-  padding: 1px 4px;
+  padding: 0;
+  border: 0;
+  flex-shrink: 0;
 }
 .card.is-compact .toolbar button {
-  width: 34px;
-  height: 28px;
-}
-.card.is-compact .toolbar svg {
-  width: 15px;
-  height: 15px;
-}
-.card.is-compact .status {
-  padding: 8px 10px 6px;
-  gap: 2px;
-}
-.card.is-compact .status-icon {
-  width: 28px;
-  height: 28px;
-  font-size: 15px;
-  border-width: 2px;
-}
-.card.is-compact .status-color { font-size: 11px; }
-.card.is-compact .status h2 { font-size: 15px; font-weight: 800; }
-.card.is-compact .review-bar { padding: 2px 8px; }
-.card.is-compact .review-nav button {
   width: 28px;
   height: 26px;
 }
-.card.is-compact .actions { padding: 4px 8px 6px; }
-.card.is-compact .actions button { font-size: 12px; }
-.card.is-compact .board-tools { padding: 6px 8px 8px; }
+.card.is-compact .toolbar svg {
+  width: 14px;
+  height: 14px;
+}
+.card.is-compact .review-bar {
+  padding: 0;
+  border: 0;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.card.is-compact .review-nav button {
+  width: 24px;
+  height: 24px;
+}
+.card.is-compact .review-live { font-size: 11px; }
+.card.is-compact .moves-acc {
+  position: relative;
+  border-top: 0;
+  flex-shrink: 0;
+}
+.card.is-compact .moves-acc > summary {
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.card.is-compact .moves-acc .moves {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 8;
+  width: min(260px, 70vw);
+  max-height: 180px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.14);
+}
+.card.is-compact .actions {
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.card.is-compact .actions button { font-size: 11px; }
+.card.is-compact .actions svg { width: 14px; height: 14px; }
+.card.is-compact .board-tools {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 6px;
+}
+.card.is-compact .legend-acc {
+  position: relative;
+  flex: 0 1 auto;
+}
+.card.is-compact .legend-acc .king-legend {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 8;
+  width: min(320px, 80vw);
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.14);
+}
+.card.is-compact .aid-bar {
+  flex: 1;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
 .card.is-compact .aid-bar button {
-  padding: 5px 6px;
-  font-size: 11px;
+  flex: 1 1 0;
+  padding: 4px 6px;
+  font-size: 10px;
+  white-space: nowrap;
 }
 
 .actions {
