@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BVChess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260825san">
+  <link rel="stylesheet" href="css/style.css?v=20260826dock">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
   <script>
     (function () {
@@ -76,11 +76,32 @@
         <div id="board-root"></div>
         <div id="grave-bottom" class="grave" data-i18n-aria="grave.aria" aria-label="Captured pieces"></div>
         <p id="turn-banner" class="turn-banner">Loading</p>
+        <div class="train-actions">
+          <label class="auto-continue">
+            <input type="checkbox" id="auto-continue">
+            <span data-i18n="train.autoContinue">Continua automaticamente</span>
+          </label>
+          <button type="button" id="btn-train-continue" class="train-continue" hidden data-i18n="train.continue">Continue</button>
+        </div>
+        <div id="hint-panel" class="hint-panel is-waiting">
+        <div id="move-clock" class="move-clock" hidden data-i18n-aria="clock.aria" aria-label="Move timer">
+          <span id="move-clock-num" class="move-clock-num">20</span>
+          <span class="move-clock-bar" aria-hidden="true"><i id="move-clock-fill"></i></span>
+        </div>
+        <div id="hints" class="hints is-waiting" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
+        <div id="hint-nav" class="hint-nav is-waiting">
+          <button id="btn-more-hints" class="more-hints" type="button" disabled>See the other 6 moves</button>
+        </div>
+        <p id="opp-wait" class="opp-wait" hidden data-i18n="hints.oppWait">In attesa dell'avversario...</p>
+        </div>
+      </section>
 
-        <aside class="panel">
-          <div class="card">
+      <section class="coach-col">
+        <aside class="panel side-dock">
+          <div class="card is-compact">
             <div class="player opponent" id="player-top">
               <span class="dot"></span>
+              <img id="opp-king" class="player-king" src="pieces/bK.svg" alt="">
               <div>
                 <div id="engine-label" class="name">Stockfish 1400 Elo</div>
                 <div id="player-rating-top" class="rating" data-i18n="you.rating">player</div>
@@ -116,7 +137,10 @@
               </div>
               <button id="btn-review-live" class="review-live" type="button" data-i18n="review.live" hidden>Torna live</button>
             </div>
-            <div id="moves" class="moves" data-i18n-aria="moves.aria" aria-label="Move list"></div>
+            <details class="moves-acc">
+              <summary data-i18n="moves.toggle">Moves</summary>
+              <div id="moves" class="moves" data-i18n-aria="moves.aria" aria-label="Move list"></div>
+            </details>
 
             <div class="actions">
               <button id="btn-resign" type="button" data-i18n-title="resign" title="Resign">
@@ -146,9 +170,7 @@
             </div>
           </div>
         </aside>
-      </section>
 
-      <section class="coach-col">
         <div class="king-talk">
           <div class="king-side">
             <img id="king-piece" src="pieces/wK.svg" alt="">
@@ -168,24 +190,6 @@
               </div>
             </div>
           </blockquote>
-        </div>
-        <div class="train-actions">
-          <label class="auto-continue">
-            <input type="checkbox" id="auto-continue">
-            <span data-i18n="train.autoContinue">Continua automaticamente</span>
-          </label>
-          <button type="button" id="btn-train-continue" class="train-continue" hidden data-i18n="train.continue">Continue</button>
-        </div>
-        <div id="hint-panel" class="hint-panel is-waiting">
-        <div id="move-clock" class="move-clock" hidden data-i18n-aria="clock.aria" aria-label="Move timer">
-          <span id="move-clock-num" class="move-clock-num">20</span>
-          <span class="move-clock-bar" aria-hidden="true"><i id="move-clock-fill"></i></span>
-        </div>
-        <div id="hints" class="hints is-waiting" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
-        <div id="hint-nav" class="hint-nav is-waiting">
-          <button id="btn-more-hints" class="more-hints" type="button" disabled>See the other 6 moves</button>
-        </div>
-        <p id="opp-wait" class="opp-wait" hidden data-i18n="hints.oppWait">In attesa dell'avversario...</p>
         </div>
       </section>
     </main>
@@ -344,6 +348,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260825white"></script>
+  <script type="module" src="js/app.js?v=20260826dock"></script>
 </body>
 </html>

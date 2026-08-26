@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260825white";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260826dock";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -2762,6 +2762,7 @@ const els = {
   playerName: document.getElementById("player-name"),
   playerRating: document.getElementById("player-rating"),
   playerRatingTop: document.getElementById("player-rating-top"),
+  oppKing: document.getElementById("opp-king"),
   kingPiece: document.getElementById("king-piece"),
   kingTitle: document.getElementById("king-title"),
   kingLives: document.getElementById("king-lives"),
@@ -2905,6 +2906,7 @@ function syncCoach() {
     if (els.playerRating) els.playerRating.textContent = t("player.local");
     els.playerTop?.classList.toggle("is-turn", state.game.turn() === topColor);
     els.playerYou?.classList.toggle("is-turn", state.game.turn() === botColor);
+    if (els.oppKing) els.oppKing.src = `pieces/${topColor}K.svg`;
   } else {
     if (els.engineLabel) els.engineLabel.textContent = engineLabelText(state.skill);
     if (els.playerRatingTop) els.playerRatingTop.hidden = true;
@@ -2912,6 +2914,7 @@ function syncCoach() {
     if (els.playerRating) els.playerRating.textContent = t("you.rating");
     els.playerTop?.classList.remove("is-turn");
     els.playerYou?.classList.toggle("is-turn", playerIsSideToMove());
+    if (els.oppKing) els.oppKing.src = `pieces/${state.playerColor === "w" ? "b" : "w"}K.svg`;
   }
   renderKingLives();
 }
