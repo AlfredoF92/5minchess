@@ -42,10 +42,16 @@ button, select { font: inherit; }
   height: 42px;
   display: grid;
   place-items: center;
-  background: #3d2b1f;
-  color: #f0d9b5;
+  background: transparent;
   border-radius: 10px;
-  font-size: 22px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+}
+.brand-mark img {
+  width: 42px;
+  height: 42px;
+  display: block;
 }
 .brand strong { display: block; font-size: 18px; letter-spacing: 0.02em; }
 .brand span { color: var(--muted); font-size: 13px; }

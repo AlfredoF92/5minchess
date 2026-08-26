@@ -1,7 +1,8 @@
 const STORAGE_KEY = "5minchess.uiLang";
 
 const it = {
-  "meta.title": "BVChess - Trova la mossa migliore!",
+  "meta.title": "BM Chess - Trova la mossa migliore!",
+  "brand.name": "BM Chess",
   "brand.tagline": "Trova la mossa migliore!",
   "lang.group": "Lingua",
   "lang.it": "Italiano",
@@ -695,7 +696,8 @@ const it = {
 };
 
 const en = {
-  "meta.title": "BVChess — Find the best move!",
+  "meta.title": "BM Chess — Find the best move!",
+  "brand.name": "BM Chess",
   "brand.tagline": "Find the best move!",
   "lang.group": "Language",
   "lang.it": "Italiano",

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BVChess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260826fade">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
+  <title>BM Chess — Trova la mossa migliore!</title>
+  <link rel="stylesheet" href="css/style.css?v=20260826bm">
+  <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
       var KEY = "5minchess.uiLang";
@@ -29,9 +29,11 @@
   <div class="page">
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark">♟</span>
+        <span class="brand-mark" aria-hidden="true">
+          <img src="img/logo.svg" alt="">
+        </span>
         <div>
-          <strong>BVChess</strong>
+          <strong data-i18n="brand.name">BM Chess</strong>
           <span data-i18n="brand.tagline">Trova la mossa migliore!</span>
         </div>
       </div>
@@ -339,6 +341,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260826seeopp"></script>
+  <script type="module" src="js/app.js?v=20260826bm"></script>
 </body>
 </html>
