@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827evalflip";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827fumetto";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -136,6 +136,21 @@ const WAR_W_KING_ART = {
   captureB: { file: "Re Bianco cattura Alfiere.png", title: "art.wking.captureB" },
   captureQ: { file: "Re Bianco Cattura Regina.png", title: "art.wking.captureQ" },
 };
+const FUMETTO_W_KNIGHT_DIR = "immagini-stile-fumetto/cavallobianco";
+const FUMETTO_W_PAWN_DIR = "immagini-stile-fumetto/pedonebianco";
+const FUMETTO_W_BISHOP_DIR = "immagini-stile-fumetto/alfierobianco";
+const FUMETTO_W_ROOK_DIR = "immagini-stile-fumetto/torrebianca";
+const FUMETTO_W_QUEEN_DIR = "immagini-stile-fumetto/reginabianca";
+const FUMETTO_W_KING_DIR = "immagini-stile-fumetto/rebianco";
+const FUMETTO_W_CASTLE_DIR = "immagini-stile-fumetto/arroccobianco";
+const FUMETTO_W_ROOK_ART = {
+  ...WAR_W_ROOK_ART,
+  captureQ: { file: "Torre Bianca Cattura Regina.png", title: "art.wrook.captureQ" },
+};
+const FUMETTO_W_KING_ART = {
+  ...WAR_W_KING_ART,
+  check: { file: "Re Bianco Fa scacco al RE.png", title: "art.wking.check" },
+};
 const CLOCK_OPTIONS = [0, 10, 30, 45, 60];
 const CLOCK_AUTO_BEST = new Set([10]);
 const HINT_RECALC_MS = 8000;
@@ -232,12 +247,27 @@ function readHintInfo() {
   }
 }
 
-function readStoryIcons() {
+function readCardStyle() {
   try {
-    return localStorage.getItem(STORY_ICONS_KEY) !== "0";
+    const saved = localStorage.getItem(STORY_ICONS_KEY);
+    if (saved === "0" || saved === "icons") return "icons";
+    if (saved === "fumetto") return "fumetto";
+    return "war";
   } catch {
-    return true;
+    return "war";
   }
+}
+
+function normalizeCardStyle(value) {
+  if (value === "0" || value === "icons" || value === false || value === 0) return "icons";
+  if (value === "fumetto") return "fumetto";
+  return "war";
+}
+
+function cardStyleShortKey() {
+  if (state.cardStyle === "fumetto") return "settings.storyIcons.fumettoShort";
+  if (state.cardStyle === "icons") return "settings.storyIcons.standardShort";
+  return "settings.storyIcons.warShort";
 }
 
 function moveClockSec() {
@@ -1776,7 +1806,7 @@ function blackRookWarArt(move, poseN) {
 
 function castlePoseMap(hints, side) {
   const map = new Map();
-  if (side !== "b") return map;
+  if (side !== "b" && side !== "w") return map;
   const ucis = [];
   for (const hint of hints || []) {
     if (!hint?.uci) continue;
@@ -1796,6 +1826,38 @@ function blackCastlePoseArt(n) {
     title: "art.castle.pose",
     n: pose,
   };
+}
+
+function whiteCastlePoseArt(n) {
+  const pose = ((Number(n || 1) - 1) % 9 + 9) % 9 + 1;
+  return {
+    file: `Re Bianco Arrocco ${pose}.png`,
+    title: "art.wcastle.pose",
+    n: pose,
+  };
+}
+
+function whiteIllustratedDir(piece) {
+  if (state.cardStyle === "fumetto") {
+    return {
+      n: FUMETTO_W_KNIGHT_DIR,
+      p: FUMETTO_W_PAWN_DIR,
+      b: FUMETTO_W_BISHOP_DIR,
+      r: FUMETTO_W_ROOK_DIR,
+      q: FUMETTO_W_QUEEN_DIR,
+      k: FUMETTO_W_KING_DIR,
+      castle: FUMETTO_W_CASTLE_DIR,
+    }[piece];
+  }
+  return {
+    n: WAR_W_KNIGHT_DIR,
+    p: WAR_W_PAWN_DIR,
+    b: WAR_W_BISHOP_DIR,
+    r: WAR_W_ROOK_DIR,
+    q: WAR_W_QUEEN_DIR,
+    k: WAR_W_KING_DIR,
+    castle: WAR_W_KING_DIR,
+  }[piece];
 }
 
 function blackKingPoseArt(n) {
@@ -1841,7 +1903,7 @@ function iconArtHtml(move, color) {
 }
 
 function hintArtHtml(move, color, poses = {}) {
-  if (state.storyIcons) return storyArtHtml(move || { piece: "n", san: "" }, color, poses);
+  if (state.cardStyle !== "icons") return storyArtHtml(move || { piece: "n", san: "" }, color, poses);
   return iconArtHtml(move, color);
 }
 
@@ -1858,25 +1920,30 @@ function storyArtHtml(move, color, poses = {}) {
     return warCardHtml(WAR_KING_DIR, blackKingWarArt(move, poses.k));
   }
   if (color === "w" && move?.piece === "n") {
-    return warCardHtml(WAR_W_KNIGHT_DIR, pickWarArt(WAR_W_KNIGHT_ART, whiteKnightPoseArt, move, poses.n));
+    return warCardHtml(whiteIllustratedDir("n"), pickWarArt(WAR_W_KNIGHT_ART, whiteKnightPoseArt, move, poses.n));
   }
   if (color === "w" && move?.piece === "p") {
-    return warCardHtml(WAR_W_PAWN_DIR, pickWarArt(WAR_W_PAWN_ART, whitePawnPoseArt, move, poses.p));
+    return warCardHtml(whiteIllustratedDir("p"), pickWarArt(WAR_W_PAWN_ART, whitePawnPoseArt, move, poses.p));
   }
   if (color === "w" && move?.piece === "b") {
-    return warCardHtml(WAR_W_BISHOP_DIR, pickWarArt(WAR_W_BISHOP_ART, whiteBishopPoseArt, move, poses.b));
+    return warCardHtml(whiteIllustratedDir("b"), pickWarArt(WAR_W_BISHOP_ART, whiteBishopPoseArt, move, poses.b));
   }
   if (color === "w" && move?.piece === "r") {
-    return warCardHtml(WAR_W_ROOK_DIR, pickWarArt(WAR_W_ROOK_ART, whiteRookPoseArt, move, poses.r));
+    const rookPack = state.cardStyle === "fumetto" ? FUMETTO_W_ROOK_ART : WAR_W_ROOK_ART;
+    return warCardHtml(whiteIllustratedDir("r"), pickWarArt(rookPack, whiteRookPoseArt, move, poses.r));
   }
   if (color === "w" && move?.piece === "q") {
-    return warCardHtml(WAR_W_QUEEN_DIR, pickWarArt(WAR_W_QUEEN_ART, whiteQueenPoseArt, move, poses.q));
+    return warCardHtml(whiteIllustratedDir("q"), pickWarArt(WAR_W_QUEEN_ART, whiteQueenPoseArt, move, poses.q));
   }
   if (color === "w" && move?.piece === "k") {
     if (String(move?.san || "").startsWith("O-O")) {
-      return warCardHtml(WAR_W_KING_DIR, whiteKingPoseArt(poses.castle || poses.k || moveHash(move) + 1));
+      if (state.cardStyle === "fumetto") {
+        return warCardHtml(whiteIllustratedDir("castle"), whiteCastlePoseArt(poses.castle || moveHash(move) + 1));
+      }
+      return warCardHtml(whiteIllustratedDir("k"), whiteKingPoseArt(poses.castle || poses.k || moveHash(move) + 1));
     }
-    return warCardHtml(WAR_W_KING_DIR, pickWarArt(WAR_W_KING_ART, whiteKingPoseArt, move, poses.k));
+    const kingPack = state.cardStyle === "fumetto" ? FUMETTO_W_KING_ART : WAR_W_KING_ART;
+    return warCardHtml(whiteIllustratedDir("k"), pickWarArt(kingPack, whiteKingPoseArt, move, poses.k));
   }
   const src = pieceIcon(move, color) || `pieces/${color || "w"}N.svg`;
   const title = escapeHtml(move ? pieceName(move.piece || "p") : t("hints.move"));
@@ -2972,7 +3039,7 @@ function syncAidButtons() {
 function syncStoryIconsButton() {
   fillCardStyleMenu();
   if (els.cardStyleBtn) {
-    els.cardStyleBtn.textContent = t(state.storyIcons ? "settings.storyIcons.warShort" : "settings.storyIcons.standardShort");
+    els.cardStyleBtn.textContent = t(cardStyleShortKey());
   }
 }
 
@@ -3090,10 +3157,11 @@ function toggleValueMenu(list, btn, fill) {
 
 function fillCardStyleMenu() {
   if (!els.cardStyleList) return;
-  const current = state.storyIcons ? "war" : "icons";
+  const current = state.cardStyle || "war";
   const items = [
     { id: "icons", key: "settings.storyIcons.standard" },
     { id: "war", key: "settings.storyIcons.war" },
+    { id: "fumetto", key: "settings.storyIcons.fumetto" },
   ];
   els.cardStyleList.innerHTML = items
     .map(
@@ -3328,7 +3396,7 @@ const state = {
   roundEval: readRoundEval(),
   evalView: readEvalView(),
   hintInfo: readHintInfo(),
-  storyIcons: readStoryIcons(),
+  cardStyle: readCardStyle(),
   hasGame: false,
   openingPly: 0,
   startOpening: START_OPENINGS[0],
@@ -4918,7 +4986,7 @@ function openNewGameDialog(tab = "train") {
   if (els.moveClockSelect) els.moveClockSelect.value = String(moveClockSec());
   if (els.roundEval) els.roundEval.value = state.roundEval ? "1" : "0";
   if (els.evalView) els.evalView.value = state.evalView === "abs" ? "abs" : "delta";
-  if (els.storyIcons) els.storyIcons.value = state.storyIcons ? "1" : "0";
+  if (els.storyIcons) els.storyIcons.value = state.cardStyle || "war";
   if (els.btnNewCancel) els.btnNewCancel.hidden = !state.hasGame;
   setNewGameTab(tab);
   if (els.newGame) els.newGame.hidden = false;
@@ -5081,10 +5149,11 @@ function fillRoundEvalSelect() {
 function fillStoryIconsSelect() {
   const select = els.storyIcons;
   if (!select) return;
-  const current = state.storyIcons ? "1" : "0";
+  const current = state.cardStyle || "war";
   select.innerHTML = [
-    `<option value="0"${current === "0" ? " selected" : ""}>${t("settings.storyIcons.standard")}</option>`,
-    `<option value="1"${current === "1" ? " selected" : ""}>${t("settings.storyIcons.war")}</option>`,
+    `<option value="icons"${current === "icons" ? " selected" : ""}>${t("settings.storyIcons.standard")}</option>`,
+    `<option value="war"${current === "war" ? " selected" : ""}>${t("settings.storyIcons.war")}</option>`,
+    `<option value="fumetto"${current === "fumetto" ? " selected" : ""}>${t("settings.storyIcons.fumetto")}</option>`,
   ].join("");
 }
 
@@ -5101,13 +5170,13 @@ function applyRoundEval(value) {
 }
 
 function applyStoryIcons(value) {
-  state.storyIcons = value === "1" || value === true || value === 1 || value === "war";
+  state.cardStyle = normalizeCardStyle(value);
   try {
-    localStorage.setItem(STORY_ICONS_KEY, state.storyIcons ? "1" : "0");
+    localStorage.setItem(STORY_ICONS_KEY, state.cardStyle);
   } catch {
     /* ignore */
   }
-  if (els.storyIcons) els.storyIcons.value = state.storyIcons ? "1" : "0";
+  if (els.storyIcons) els.storyIcons.value = state.cardStyle;
   syncStoryIconsButton();
   syncHintLayoutUi();
   renderHints();

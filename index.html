@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260827evalflip">
+  <link rel="stylesheet" href="css/style.css?v=20260827fumetto">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -374,11 +374,12 @@
         <label class="skill-wrap">
           <span data-i18n="settings.storyIcons">Stile cards</span>
           <select id="story-icons" data-i18n-aria="settings.storyIconsAria" aria-label="Stile delle carte delle mosse">
-            <option value="0">Standard - Icone</option>
-            <option value="1" selected>Stile war</option>
+            <option value="icons">Standard - Icone</option>
+            <option value="war" selected>Stile war</option>
+            <option value="fumetto">Stile fumetto</option>
           </select>
         </label>
-        <p class="new-game-soon" data-i18n="settings.storyIconsHint">Le carte hanno lo stesso formato. Cambia solo il contenuto: icone dei pezzi oppure scene illustrate.</p>
+        <p class="new-game-soon" data-i18n="settings.storyIconsHint">Le carte hanno lo stesso formato. Cambia solo il contenuto: icone, stile war oppure stile fumetto.</p>
         <p class="new-game-soon" data-i18n="settings.more">More settings will arrive here soon.</p>
       </div>
       <div class="new-game-actions">
@@ -388,6 +389,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260827evalflip"></script>
+  <script type="module" src="js/app.js?v=20260827fumetto"></script>
 </body>
 </html>
