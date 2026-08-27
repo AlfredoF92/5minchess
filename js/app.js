@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827inlay";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827pts";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1592,12 +1592,10 @@ function positionEvalNow() {
 }
 
 function formatSignedPawns(cp) {
-  const raw = cp / 100;
-  if (!Number.isFinite(raw)) return "—";
-  const shown = state.roundEval ? Math.round(raw * 10) / 10 : raw;
-  if (!shown) return state.roundEval ? "0.0" : "0.00";
-  const digits = state.roundEval ? Math.abs(shown).toFixed(1) : Math.abs(shown).toFixed(2);
-  return shown > 0 ? `+${digits}` : `-${digits}`;
+  if (!Number.isFinite(cp)) return "—";
+  const shown = state.roundEval ? Math.round(cp / 10) * 10 : Math.round(cp);
+  if (!shown) return "0p";
+  return shown > 0 ? `+${shown}p` : `${shown}p`;
 }
 
 function hintEvalShownCp(info) {
@@ -1613,8 +1611,7 @@ function hintEvalDir(info) {
   if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
-  const raw = cp / 100;
-  const shown = state.roundEval ? Math.round(raw * 10) / 10 : raw;
+  const shown = state.roundEval ? Math.round(cp / 10) * 10 : Math.round(cp);
   if (!Number.isFinite(shown)) return "";
   return shown < 0 ? "down" : "up";
 }
