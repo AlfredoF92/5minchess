@@ -1623,6 +1623,13 @@ function hintEvalShownCp(info) {
 function hintEvalDir(info) {
   if (!info || info.synthetic) return "";
   if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
+  if (isSwordEval()) {
+    const parts = swordSwingParts(info);
+    if (!parts) return "";
+    if ((evalShownPoints(parts.recovery) || 0) > 0 || (evalShownPoints(parts.damage) || 0) > 0) return "up";
+    if ((evalShownPoints(parts.heartLoss) || 0) > 0 || (evalShownPoints(parts.swordLoss) || 0) > 0) return "down";
+    return "up";
+  }
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
   const shown = evalShownPoints(cp);
@@ -1676,16 +1683,39 @@ function hintEvalHeartHtml() {
   return `<span class="hint-eval-heart" aria-hidden="true">♥</span>`;
 }
 
+function swordSwingParts(info) {
+  const next = hintMoveEval(info);
+  if (next == null) return null;
+  const prev = hintBaselineEval();
+  return {
+    recovery: Math.max(0, Math.min(0, next) - Math.min(0, prev)),
+    damage: Math.max(0, Math.max(0, next) - Math.max(0, prev)),
+    heartLoss: Math.max(0, Math.min(0, prev) - Math.min(0, next)),
+    swordLoss: Math.max(0, Math.max(0, prev) - Math.max(0, next)),
+  };
+}
+
+function hintSwordRowHtml(value, iconHtml, up) {
+  const n = evalShownPoints(value) || 0;
+  const score = n ? `${up ? "+" : "−"}${n}` : "0";
+  return `<span class="hint-sword-row">${score}${iconHtml}</span>`;
+}
+
 function hintSwordEvalHtml(info) {
   if (info.scoreType === "mate") return escapeHtml(formatHintDelta(info));
-  const moveEval = hintMoveEval(info);
-  if (moveEval == null) return "—";
-  const delta = moveEval - hintBaselineEval();
-  const shown = evalShownPoints(delta);
-  if (shown == null) return "—";
-  const score = escapeHtml(formatSignedPawns(delta));
-  if (shown > 0) return `${score}${evalSwordSvg()}`;
-  return `${score}${hintEvalHeartHtml()}`;
+  const parts = swordSwingParts(info);
+  if (!parts) return "—";
+  const rec = evalShownPoints(parts.recovery) || 0;
+  const dmg = evalShownPoints(parts.damage) || 0;
+  const hLoss = evalShownPoints(parts.heartLoss) || 0;
+  const sLoss = evalShownPoints(parts.swordLoss) || 0;
+  const heart = rec > 0
+    ? hintSwordRowHtml(rec, hintEvalHeartHtml(), true)
+    : hintSwordRowHtml(hLoss, hintEvalHeartHtml(), false);
+  const sword = dmg > 0
+    ? hintSwordRowHtml(dmg, evalSwordSvg(), true)
+    : hintSwordRowHtml(sLoss, evalSwordSvg(), false);
+  return `<span class="hint-sword-rows">${heart}${sword}</span>`;
 }
 
 function hintEvalHtml(info) {
