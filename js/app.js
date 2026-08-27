@@ -1673,7 +1673,7 @@ function isHintOverlayInternal() {
   return state.hintInfo?.overlay === "internal";
 }
 
-function hintCardPlaceOverlayHtml(hint) {
+function hintCardPlaceInnerHtml(hint) {
   if (!state.hintInfo?.place) return "";
   const place = hintPlaceMap().get(hint?.uci);
   if (!place) return "";
@@ -1683,13 +1683,15 @@ function hintCardPlaceOverlayHtml(hint) {
 
 function hintCardEvalOverlayHtml(hint) {
   if (!hint || hint.synthetic) return "";
+  const place = hintCardPlaceInnerHtml(hint);
   const inner = hintEvalHtml(hint);
-  if (!inner || inner === "—") return "";
-  return `<span class="hint-in-eval">${inner}</span>`;
+  const evalPart = inner && inner !== "—" ? inner : "";
+  if (!place && !evalPart) return "";
+  return `<span class="hint-in-eval">${place}${evalPart}</span>`;
 }
 
 function hintCardOverlayHtml(hint) {
-  return `${hintCardPlaceOverlayHtml(hint)}${hintCardEvalOverlayHtml(hint)}`;
+  return hintCardEvalOverlayHtml(hint);
 }
 
 function hintVerdictHtml(hint) {
@@ -4237,7 +4239,6 @@ function renderHints() {
     const desc = played ? moveHeadline(played) : "";
     const overlay = internal ? hintCardOverlayHtml(hint) : "";
     const verdict = hold && !internal ? hintVerdictHtml(hint) : "";
-    const hideRank = internal && Boolean(state.hintInfo.place);
     const media = hintCardMediaHtml(hintArtHtml(played || { piece: "n", san: "" }, side, {
       n: knightPoses.get(hint.uci),
       p: pawnPoses.get(hint.uci),
@@ -4248,7 +4249,7 @@ function renderHints() {
       castle: castlePoses.get(hint.uci),
     }), san, overlay);
     const btn = `
-      <button class="hint-btn is-card${picked ? " is-picked" : ""}${internal ? " is-inlay" : ""}${hideRank ? " is-inlay-place" : ""}" data-index="${i}" type="button">
+      <button class="hint-btn is-card${picked ? " is-picked" : ""}${internal ? " is-inlay" : ""}" data-index="${i}" type="button">
         ${media}
         <span class="hint-body">
           <span class="hint-rank">${rank}</span>
