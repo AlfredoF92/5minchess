@@ -70,6 +70,7 @@ export class Board {
     this.turnColor = "w";
     this.playerColor = "w";
     this.drag = null;
+    this.hoverDest = null;
 
     this.root.innerHTML = `
       <div class="board-frame">
@@ -348,7 +349,7 @@ export class Board {
 
   #paintSquares() {
     Object.entries(this.squareEls).forEach(([square, el]) => {
-      el.classList.remove("selected", "last", "check", "dest", "capture", "is-focus", "can-move");
+      el.classList.remove("selected", "last", "check", "dest", "capture", "is-focus", "can-move", "is-drop");
       const destOfSel = Boolean(this.selected && (this.dests[this.selected] || []).includes(square));
       const origin = this.#canSelect(square);
       el.classList.toggle("can-move", Boolean(this.interactive && (destOfSel || origin)));
@@ -365,6 +366,7 @@ export class Board {
         const target = this.squareEls[dest];
         if (!target) return;
         target.classList.add(this.pieces[dest] ? "capture" : "dest");
+        if (dest === this.hoverDest) target.classList.add("is-drop");
       });
     }
   }
@@ -555,6 +557,30 @@ export class Board {
       /* ignore */
     }
     this.drag = null;
+    this.#clearHoverDest();
+  }
+
+  #hoverFrom() {
+    return this.drag?.from || this.selected || null;
+  }
+
+  #updateHoverDest(event) {
+    const from = this.#hoverFrom();
+    if (!from) {
+      this.#clearHoverDest();
+      return;
+    }
+    const square = squareFromPoint(this.boardEl, event.clientX, event.clientY, this.orientation);
+    const next = square && square !== from && (this.dests[from] || []).includes(square) ? square : null;
+    if (next === this.hoverDest) return;
+    this.hoverDest = next;
+    this.#paintSquares();
+  }
+
+  #clearHoverDest() {
+    if (!this.hoverDest) return;
+    this.hoverDest = null;
+    this.#paintSquares();
   }
 
   #bind() {
@@ -604,8 +630,12 @@ export class Board {
     });
 
     this.boardEl.addEventListener("pointermove", (event) => {
-      if (!this.drag || event.pointerId !== this.drag.pointerId) return;
-      this.#moveGhost(event);
+      if (this.drag && event.pointerId === this.drag.pointerId) this.#moveGhost(event);
+      if (this.drag || this.selected) this.#updateHoverDest(event);
+    });
+    this.boardEl.addEventListener("pointerleave", () => {
+      if (this.drag) return;
+      this.#clearHoverDest();
     });
 
     const endDrag = (event) => {
