@@ -361,13 +361,11 @@ export class Board {
     if (this.check) this.squareEls[this.check]?.classList.add("check");
     if (this.selected) {
       this.squareEls[this.selected]?.classList.add("selected");
-      if (this.showDests) {
-        (this.dests[this.selected] || []).forEach((dest) => {
-          const target = this.squareEls[dest];
-          if (!target) return;
-          target.classList.add(this.pieces[dest] ? "capture" : "dest");
-        });
-      }
+      (this.dests[this.selected] || []).forEach((dest) => {
+        const target = this.squareEls[dest];
+        if (!target) return;
+        target.classList.add(this.pieces[dest] ? "capture" : "dest");
+      });
     }
   }
 
