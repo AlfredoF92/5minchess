@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827evalv";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827delta";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1519,6 +1519,14 @@ function hintMoveEval(info) {
   return evalForPlayer(hintScore(info), hintEvalGame());
 }
 
+function positionEvalNow() {
+  const game = hintEvalGame();
+  if (Number.isFinite(state.hintBestScore) && state.hintBestScore > -Infinity) {
+    return evalForPlayer(state.hintBestScore, game);
+  }
+  return Number.isFinite(state.gameEval) ? state.gameEval : 0;
+}
+
 function formatSignedPawns(cp) {
   const raw = cp / 100;
   if (!Number.isFinite(raw)) return "—";
@@ -1535,7 +1543,9 @@ function formatHintEval(info) {
     if (info.score < 0) return t("eval.mateIn", { n: Math.abs(info.score) });
     return t("eval.mate");
   }
-  return formatSignedPawns(info.score);
+  const moveEval = hintMoveEval(info);
+  if (moveEval == null) return "—";
+  return formatSignedPawns(moveEval);
 }
 
 function formatHintDelta(info) {
@@ -1547,14 +1557,14 @@ function formatHintDelta(info) {
   }
   const moveEval = hintMoveEval(info);
   if (moveEval == null) return "—";
-  const now = Number.isFinite(state.standEval) ? state.standEval : 0;
+  const now = positionEvalNow();
   return formatSignedPawns(moveEval - now);
 }
 
 function hintEvalDir(info) {
   const moveEval = hintMoveEval(info);
   if (moveEval == null) return "";
-  const now = Number.isFinite(state.standEval) ? state.standEval : 0;
+  const now = positionEvalNow();
   const step = state.roundEval ? 10 : 5;
   if (moveEval > now + step) return "up";
   if (moveEval < now - step) return "down";
