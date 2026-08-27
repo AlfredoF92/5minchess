@@ -984,7 +984,7 @@ button, select { font: inherit; }
   padding: 0 7px 0 1px;
   margin: 0 1px 0 0;
   border-right: 1px solid #e4e4e4;
-  font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", serif;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-style: italic;
   font-size: 18px;
   font-weight: 700;
