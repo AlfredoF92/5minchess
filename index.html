@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260827prevopp">
+  <link rel="stylesheet" href="css/style.css?v=20260827inlay">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -235,6 +235,11 @@
           <button type="button" id="btn-hint-score-mode" class="coach-switch coach-switch-value" aria-expanded="false" aria-haspopup="true" data-i18n-aria="tools.hintInfo.scoreAria" aria-label="Mostra il punteggio come numero o come cuori">Numero</button>
           <div id="hint-score-mode-list" class="style-menu-list" hidden role="menu"></div>
         </div>
+        <div id="hint-overlay-menu" class="coach-row style-menu is-drop-up">
+          <span class="coach-row-label" data-i18n="tools.hintInfo.overlay">Voglio visualizzare le info della valutazione delle cards dopo che ho scelto</span>
+          <button type="button" id="btn-hint-overlay" class="coach-switch coach-switch-value" aria-expanded="false" aria-haspopup="true" data-i18n-aria="tools.hintInfo.overlayAria" aria-label="Come mostrare le info di valutazione sulle carte dopo la scelta">Esterna</button>
+          <div id="hint-overlay-list" class="style-menu-list" hidden role="menu"></div>
+        </div>
       </div>
       <div class="quick-tools-actions">
         <button type="button" id="btn-quick-tools-close" data-i18n="tools.close">Chiudi</button>
@@ -390,6 +395,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260827prevopp"></script>
+  <script type="module" src="js/app.js?v=20260827inlay"></script>
 </body>
 </html>

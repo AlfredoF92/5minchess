@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827prevopp";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827inlay";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -252,11 +252,16 @@ function evalViewShortKey() {
   return "tools.hintInfo.eval.delta";
 }
 
+function hintOverlayShortKey() {
+  return isHintOverlayInternal() ? "tools.hintInfo.overlay.internal" : "tools.hintInfo.overlay.external";
+}
+
 function readHintInfo() {
   const fallback = {
     place: true,
     arrow: readEvalView() === "delta",
     score: "number",
+    overlay: "external",
   };
   try {
     const raw = JSON.parse(localStorage.getItem(HINT_INFO_KEY) || "null");
@@ -265,6 +270,7 @@ function readHintInfo() {
       place: raw.place !== false,
       arrow: raw.arrow !== false,
       score: raw.score === "hearts" ? "hearts" : "number",
+      overlay: raw.overlay === "internal" ? "internal" : "external",
     };
   } catch {
     return fallback;
@@ -1654,6 +1660,29 @@ function hintEvalHtml(info) {
   return `${arrow}${score}`;
 }
 
+function isHintOverlayInternal() {
+  return state.hintInfo?.overlay === "internal";
+}
+
+function hintCardPlaceOverlayHtml(hint) {
+  if (!state.hintInfo?.place) return "";
+  const place = hintPlaceMap().get(hint?.uci);
+  if (!place) return "";
+  const star = place === 1 ? `<span class="hint-star" aria-hidden="true">★</span>` : "";
+  return `<span class="hint-in-place">${escapeHtml(formatPlace(place))}${star}</span>`;
+}
+
+function hintCardEvalOverlayHtml(hint) {
+  if (!hint || hint.synthetic) return "";
+  const inner = hintEvalHtml(hint);
+  if (!inner || inner === "—") return "";
+  return `<span class="hint-in-eval">${inner}</span>`;
+}
+
+function hintCardOverlayHtml(hint) {
+  return `${hintCardPlaceOverlayHtml(hint)}${hintCardEvalOverlayHtml(hint)}`;
+}
+
 function hintVerdictHtml(hint) {
   const place = state.hintInfo?.place ? hintPlaceHtml(hint) : "";
   return `${place}${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`;
@@ -1949,8 +1978,8 @@ function hintCardSanHtml(san) {
   </svg>`;
 }
 
-function hintCardMediaHtml(art, san) {
-  return `<span class="hint-card-media">${art}${hintCardSanHtml(san)}</span>`;
+function hintCardMediaHtml(art, san, overlay = "") {
+  return `<span class="hint-card-media">${art}${hintCardSanHtml(san)}${overlay}</span>`;
 }
 
 function iconArtHtml(move, color) {
@@ -3151,6 +3180,7 @@ function persistHintInfo() {
       place: Boolean(state.hintInfo.place),
       arrow: Boolean(state.hintInfo.arrow),
       score: state.hintInfo.score === "hearts" ? "hearts" : "number",
+      overlay: state.hintInfo.overlay === "internal" ? "internal" : "external",
     }));
   } catch {
     /* ignore */
@@ -3201,6 +3231,28 @@ function fillHintEvalViewMenu() {
     .join("");
 }
 
+function applyHintOverlay(value) {
+  state.hintInfo.overlay = value === "internal" ? "internal" : "external";
+  persistHintInfo();
+  syncHintInfoUi();
+  renderHints();
+}
+
+function fillHintOverlayMenu() {
+  if (!els.hintOverlayList) return;
+  const current = isHintOverlayInternal() ? "internal" : "external";
+  const items = [
+    { id: "external", key: "tools.hintInfo.overlay.external" },
+    { id: "internal", key: "tools.hintInfo.overlay.internal" },
+  ];
+  els.hintOverlayList.innerHTML = items
+    .map(
+      (item) =>
+        `<button type="button" role="menuitem" class="style-menu-item${item.id === current ? " is-on" : ""}" data-hint-overlay="${item.id}">${t(item.key)}</button>`
+    )
+    .join("");
+}
+
 function fillHintScoreModeMenu() {
   if (!els.scoreModeList) return;
   const current = state.hintInfo.score === "hearts" ? "hearts" : "number";
@@ -3221,11 +3273,15 @@ function syncHintInfoUi() {
   syncHintSwitch(els.hintArrow, Boolean(state.hintInfo.arrow));
   fillHintEvalViewMenu();
   fillHintScoreModeMenu();
+  fillHintOverlayMenu();
   if (els.evalViewBtn) {
     els.evalViewBtn.textContent = t(evalViewShortKey());
   }
   if (els.scoreModeBtn) {
     els.scoreModeBtn.textContent = t(state.hintInfo.score === "hearts" ? "tools.hintInfo.score.hearts" : "tools.hintInfo.score.number");
+  }
+  if (els.hintOverlayBtn) {
+    els.hintOverlayBtn.textContent = t(hintOverlayShortKey());
   }
 }
 
@@ -3234,6 +3290,7 @@ function valueMenus() {
     { list: els.cardStyleList, btn: els.cardStyleBtn, root: els.cardStyleMenu },
     { list: els.evalViewList, btn: els.evalViewBtn, root: els.evalViewMenu },
     { list: els.scoreModeList, btn: els.scoreModeBtn, root: els.scoreModeMenu },
+    { list: els.hintOverlayList, btn: els.hintOverlayBtn, root: els.hintOverlayMenu },
   ];
 }
 
@@ -3454,6 +3511,9 @@ const els = {
   scoreModeBtn: document.getElementById("btn-hint-score-mode"),
   scoreModeList: document.getElementById("hint-score-mode-list"),
   scoreModeMenu: document.getElementById("hint-score-mode-menu"),
+  hintOverlayBtn: document.getElementById("btn-hint-overlay"),
+  hintOverlayList: document.getElementById("hint-overlay-list"),
+  hintOverlayMenu: document.getElementById("hint-overlay-menu"),
   quickTools: document.getElementById("quick-tools"),
   quickToolsOpen: document.getElementById("btn-quick-tools"),
   quickToolsClose: document.getElementById("btn-quick-tools-close"),
@@ -4123,7 +4183,9 @@ function syncBoard(options = {}) {
 
 function renderHints() {
   const hold = isTrainHold();
+  const internal = hold && isHintOverlayInternal();
   els.hints?.classList.toggle("is-hold", hold);
+  els.hints?.classList.toggle("is-inlay", internal);
   els.hints?.classList.toggle("is-opp-replied", hold && Boolean(state.trainNext));
   els.hintPanel?.classList.toggle("is-opp-replied", hold && Boolean(state.trainNext));
   if (hold) els.hints?.classList.remove("is-reveal");
@@ -4162,7 +4224,12 @@ function renderHints() {
     }
     const played = playedFromHint(hint);
     const san = played ? localizeSan(played.san) : hint.uci;
-    const art = hintCardMediaHtml(hintArtHtml(played || { piece: "n", san: "" }, side, {
+    const picked = hold && hint.uci === state.trainPickedUci;
+    const desc = played ? moveHeadline(played) : "";
+    const overlay = internal ? hintCardOverlayHtml(hint) : "";
+    const verdict = hold && !internal ? hintVerdictHtml(hint) : "";
+    const hideRank = internal && Boolean(state.hintInfo.place);
+    const media = hintCardMediaHtml(hintArtHtml(played || { piece: "n", san: "" }, side, {
       n: knightPoses.get(hint.uci),
       p: pawnPoses.get(hint.uci),
       b: bishopPoses.get(hint.uci),
@@ -4170,13 +4237,10 @@ function renderHints() {
       q: queenPoses.get(hint.uci),
       k: kingPoses.get(hint.uci),
       castle: castlePoses.get(hint.uci),
-    }), san);
-    const picked = hold && hint.uci === state.trainPickedUci;
-    const desc = played ? moveHeadline(played) : "";
-    const verdict = hold ? hintVerdictHtml(hint) : "";
+    }), san, overlay);
     const btn = `
-      <button class="hint-btn is-card${picked ? " is-picked" : ""}" data-index="${i}" type="button">
-        ${art}
+      <button class="hint-btn is-card${picked ? " is-picked" : ""}${internal ? " is-inlay" : ""}${hideRank ? " is-inlay-place" : ""}" data-index="${i}" type="button">
+        ${media}
         <span class="hint-body">
           <span class="hint-rank">${rank}</span>
           ${desc ? `<span class="hint-desc">${escapeHtml(desc)}</span>` : ""}
@@ -5685,6 +5749,16 @@ els.scoreModeList?.addEventListener("click", (event) => {
   const item = event.target.closest("[data-score-mode]");
   if (!item) return;
   applyHintScoreMode(item.getAttribute("data-score-mode"));
+  closeValueMenus();
+});
+els.hintOverlayBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleValueMenu(els.hintOverlayList, els.hintOverlayBtn, fillHintOverlayMenu);
+});
+els.hintOverlayList?.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-hint-overlay]");
+  if (!item) return;
+  applyHintOverlay(item.getAttribute("data-hint-overlay"));
   closeValueMenus();
 });
 els.trainingMode?.addEventListener("click", () => setTrainingMode(!state.trainingMode));
