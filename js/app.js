@@ -1709,13 +1709,17 @@ function hintSwordEvalHtml(info) {
   const dmg = evalShownPoints(parts.damage) || 0;
   const hLoss = evalShownPoints(parts.heartLoss) || 0;
   const sLoss = evalShownPoints(parts.swordLoss) || 0;
-  const heart = rec > 0
-    ? hintSwordRowHtml(rec, hintEvalHeartHtml(), true)
-    : hintSwordRowHtml(hLoss, hintEvalHeartHtml(), false);
-  const sword = dmg > 0
-    ? hintSwordRowHtml(dmg, evalSwordSvg(), true)
-    : hintSwordRowHtml(sLoss, evalSwordSvg(), false);
-  return `<span class="hint-sword-rows">${heart}${sword}</span>`;
+  const rows = [];
+  if (hLoss > 0 && sLoss > 0) {
+    rows.push(hintSwordRowHtml(hLoss + sLoss, hintEvalHeartHtml(), false));
+  } else {
+    if (rec > 0) rows.push(hintSwordRowHtml(rec, hintEvalHeartHtml(), true));
+    else if (hLoss > 0) rows.push(hintSwordRowHtml(hLoss, hintEvalHeartHtml(), false));
+    if (dmg > 0) rows.push(hintSwordRowHtml(dmg, evalSwordSvg(), true));
+    else if (sLoss > 0) rows.push(hintSwordRowHtml(sLoss, evalSwordSvg(), false));
+  }
+  if (!rows.length) return "";
+  return `<span class="hint-sword-rows">${rows.join("")}</span>`;
 }
 
 function hintEvalHtml(info) {
