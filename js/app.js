@@ -2477,8 +2477,23 @@ function evalCpForWhite() {
   return from === "w" ? cp : -cp;
 }
 
+function evalBarShownCp() {
+  if (isLocalVsHuman()) {
+    const cpWhite = evalCpForWhite();
+    return state.board?.orientation === "black" ? -cpWhite : cpWhite;
+  }
+  return Number.isFinite(state.gameEval) ? state.gameEval : 0;
+}
+
 function formatEvalBarScore(cp) {
-  if (state.game?.in_checkmate()) return state.game.turn() === "b" ? "M1" : "-M1";
+  if (state.game?.in_checkmate()) {
+    if (isLocalVsHuman()) {
+      const whiteWon = state.game.turn() === "b";
+      const bottomWon = state.board?.orientation === "black" ? !whiteWon : whiteWon;
+      return bottomWon ? "M1" : "-M1";
+    }
+    return state.game.turn() !== state.playerColor ? "M1" : "-M1";
+  }
   if (Math.abs(cp) >= 50000) {
     const n = Math.max(1, Math.round(100000 - Math.abs(cp)));
     return cp > 0 ? `M${n}` : `-M${n}`;
@@ -2497,9 +2512,9 @@ function paintEvalBar() {
   const label = els.evalBarScore;
   if (!fill && !label) return;
   const blackBottom = state.board?.orientation === "black";
-  const cp = evalCpForWhite();
-  const pct = Math.max(0, Math.min(100, whiteEvalShare(cp)));
-  const text = formatEvalBarScore(cp);
+  const cpWhite = evalCpForWhite();
+  const pct = Math.max(0, Math.min(100, whiteEvalShare(cpWhite)));
+  const text = formatEvalBarScore(evalBarShownCp());
   els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
   if (fill) {
     fill.style.height = "100%";
