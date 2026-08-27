@@ -1202,7 +1202,8 @@ button, select { font: inherit; }
 .hint-verdict .hint-sword-row {
   font-size: 16px;
 }
-.hint-in-eval .hint-sword-row .eval-sword {
+.hint-in-eval .hint-sword-row .eval-sword,
+.hint-in-eval .hint-sword-row .eval-opp-king {
   width: 18px;
   height: 18px;
 }
@@ -1231,7 +1232,8 @@ button, select { font: inherit; }
   font-size: 20px;
   margin-left: 2px;
 }
-.eval-sword {
+.eval-sword,
+.eval-opp-king {
   display: block;
   width: 18px;
   height: 18px;
@@ -1239,7 +1241,9 @@ button, select { font: inherit; }
   flex-shrink: 0;
 }
 .hint-eval .eval-sword,
-.hint-in-eval .eval-sword {
+.hint-in-eval .eval-sword,
+.hint-eval .eval-opp-king,
+.hint-in-eval .eval-opp-king {
   width: 22px;
   height: 22px;
   margin-left: 1px;

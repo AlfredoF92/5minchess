@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827twopp";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827twking";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1653,7 +1653,7 @@ function hintEvalDir(info) {
     const parts = twentiethsSwingParts(info);
     if (!parts) return "";
     if (parts.recovery > 0 || parts.damage > 0) return "up";
-    if (parts.heartLoss > 0) return "down";
+    if (parts.heartLoss > 0 || parts.swordLoss > 0) return "down";
     return "";
   }
   const cp = hintEvalShownCp(info);
@@ -1707,6 +1707,15 @@ function evalSwordSvg() {
 
 function hintEvalHeartHtml() {
   return `<span class="hint-eval-heart" aria-hidden="true">♥</span>`;
+}
+
+function oppKingPieceSrc() {
+  const me = isLocalVsHuman() ? (hintEvalGame()?.turn() || "w") : (state.playerColor || "w");
+  return `pieces/${me === "w" ? "b" : "w"}K.svg`;
+}
+
+function hintEvalOppKingHtml() {
+  return `<img class="eval-opp-king" src="${oppKingPieceSrc()}" alt="" aria-hidden="true">`;
 }
 
 function swordSwingParts(info) {
@@ -1790,6 +1799,7 @@ function hintTwentiethsEvalHtml(info) {
   if (parts.recovery > 0) rows.push(hintTwentiethsRowHtml(parts.recovery, hintEvalHeartHtml(), true));
   else if (parts.heartLoss > 0) rows.push(hintTwentiethsRowHtml(parts.heartLoss, hintEvalHeartHtml(), false));
   if (parts.damage > 0) rows.push(hintTwentiethsRowHtml(parts.damage, evalSwordSvg(), true));
+  if (parts.swordLoss > 0) rows.push(hintTwentiethsRowHtml(parts.swordLoss, hintEvalOppKingHtml(), true));
   if (!rows.length) return "";
   return `<span class="hint-sword-rows">${rows.join("")}</span>`;
 }
