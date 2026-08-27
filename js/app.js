@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827intro";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827intro2";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -6173,6 +6173,23 @@ function setOpeningIntroProgress(done, total) {
   }
 }
 
+function startOpeningIntroBar(ms) {
+  const fill = els.openingIntroFill;
+  if (!fill) return;
+  fill.style.transition = "none";
+  fill.style.width = "0%";
+  void fill.offsetWidth;
+  fill.style.transition = `width ${Math.max(400, ms)}ms linear`;
+  fill.style.width = "100%";
+}
+
+function resetOpeningIntroBar() {
+  const fill = els.openingIntroFill;
+  if (!fill) return;
+  fill.style.transition = "none";
+  fill.style.width = "0%";
+}
+
 function paintOpeningIntroName(text) {
   const el = els.openingIntroName;
   if (!el || el.textContent === text) return;
@@ -6187,7 +6204,7 @@ function hideOpeningIntro() {
   if (!root) return;
   root.hidden = true;
   root.classList.remove("is-out");
-  if (els.openingIntroFill) els.openingIntroFill.style.width = "0%";
+  if (els.openingIntroFill) resetOpeningIntroBar();
   if (els.openingIntroName) {
     els.openingIntroName.classList.remove("is-in");
     els.openingIntroName.textContent = "";
@@ -6207,8 +6224,12 @@ function showOpeningIntro(opening) {
   root.hidden = false;
   root.classList.remove("is-out");
   document.body.classList.add("is-opening-intro");
+  resetOpeningIntroBar();
   setOpeningIntroProgress(0, opening?.sans?.length || 12);
-  paintOpeningIntroName(openingIntroTitle(opening));
+  if (els.openingIntroName) {
+    els.openingIntroName.classList.remove("is-in");
+    els.openingIntroName.textContent = "";
+  }
   if (els.openingIntroLuck) {
     els.openingIntroLuck.hidden = true;
     els.openingIntroLuck.classList.remove("is-in");
@@ -6262,6 +6283,7 @@ async function playOpeningIntro(opening) {
   showOpeningIntro(opening);
   await sleep(350);
   if (gameId !== state.gameId) return;
+  startOpeningIntroBar(sans.length * 1000);
 
   for (let i = 0; i < sans.length; i += 1) {
     if (gameId !== state.gameId) return;
@@ -6274,14 +6296,16 @@ async function playOpeningIntro(opening) {
     state.board.setPosition(state.game.fen());
     renderHistory();
     renderGraveyard();
-    setOpeningIntroProgress(i + 1, sans.length);
-    paintOpeningIntroName(openingIntroTitle(opening));
     const wait = 1000 - (Date.now() - started);
     if (wait > 0) await sleep(wait);
   }
 
   if (gameId !== state.gameId) return;
   paintStartOpeningState(opening);
+  if (els.openingIntroFill) {
+    els.openingIntroFill.style.transition = "width 0.35s linear";
+    els.openingIntroFill.style.width = "100%";
+  }
   setOpeningIntroProgress(sans.length, sans.length);
   paintOpeningIntroName(openingIntroTitle(opening));
   await showOpeningIntroLuck();
