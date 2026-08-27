@@ -65,6 +65,7 @@ export class Board {
     this.danger = new Set();
     this.flash = new Set();
     this.arrows = [];
+    this.showDests = true;
     this.interactive = false;
     this.turnColor = "w";
     this.playerColor = "w";
@@ -186,10 +187,16 @@ export class Board {
     this.#drawArrows();
   }
 
+  setShowDests(on) {
+    this.showDests = Boolean(on);
+    this.#paintSquares();
+  }
+
   setInteractive(value) {
     this.interactive = Boolean(value);
     this.boardEl.classList.toggle("frozen", !this.interactive);
     if (!this.interactive) {
+      this.#dropGhost();
       this.selected = null;
       this.cursor = null;
       this.#paintSquares();
@@ -210,6 +217,7 @@ export class Board {
   }
 
   clearPlayFocus() {
+    this.#dropGhost();
     this.selected = null;
     this.cursor = null;
     this.#paintSquares();
@@ -353,11 +361,13 @@ export class Board {
     if (this.check) this.squareEls[this.check]?.classList.add("check");
     if (this.selected) {
       this.squareEls[this.selected]?.classList.add("selected");
-      (this.dests[this.selected] || []).forEach((dest) => {
-        const target = this.squareEls[dest];
-        if (!target) return;
-        target.classList.add(this.pieces[dest] ? "capture" : "dest");
-      });
+      if (this.showDests) {
+        (this.dests[this.selected] || []).forEach((dest) => {
+          const target = this.squareEls[dest];
+          if (!target) return;
+          target.classList.add(this.pieces[dest] ? "capture" : "dest");
+        });
+      }
     }
   }
 
@@ -502,6 +512,53 @@ export class Board {
     return Boolean(this.dests[square]?.length);
   }
 
+  #liftPieceFromEvent(square, event) {
+    this.#dropGhost();
+    const pieceEl = this.squareEls[square]?.querySelector(".piece");
+    if (!pieceEl) return;
+    const rect = pieceEl.getBoundingClientRect();
+    try {
+      this.boardEl.setPointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const ghost = pieceEl.cloneNode(true);
+    ghost.classList.add("piece-ghost", "dragging");
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    document.body.appendChild(ghost);
+    pieceEl.classList.add("dragging-source");
+    this.boardEl.classList.add("is-dragging");
+    this.drag = {
+      from: square,
+      pointerId: event.pointerId,
+      ghost,
+      dx: event.clientX - rect.left,
+      dy: event.clientY - rect.top,
+    };
+    this.#moveGhost(event);
+    event.preventDefault();
+  }
+
+  #moveGhost(event) {
+    if (!this.drag?.ghost) return;
+    this.drag.ghost.style.left = `${event.clientX - this.drag.dx}px`;
+    this.drag.ghost.style.top = `${event.clientY - this.drag.dy}px`;
+  }
+
+  #dropGhost() {
+    if (!this.drag) return;
+    this.drag.ghost?.remove();
+    this.squareEls[this.drag.from]?.querySelector(".piece")?.classList.remove("dragging-source");
+    this.boardEl.classList.remove("is-dragging");
+    try {
+      if (this.drag.pointerId != null) this.boardEl.releasePointerCapture(this.drag.pointerId);
+    } catch {
+      /* ignore */
+    }
+    this.drag = null;
+  }
+
   #bind() {
     this.boardEl.addEventListener("pointerdown", (event) => {
       if (!this.interactive) return;
@@ -516,6 +573,7 @@ export class Board {
 
       if (this.selected && (this.dests[this.selected] || []).includes(square)) {
         const from = this.selected;
+        this.#dropGhost();
         this.selected = null;
         this.cursor = null;
         this.#paintSquares();
@@ -526,6 +584,7 @@ export class Board {
 
       if (this.#canSelect(square)) {
         if (this.selected === square) {
+          this.#dropGhost();
           this.selected = null;
           this.cursor = null;
           this.#paintSquares();
@@ -536,20 +595,9 @@ export class Board {
         this.cursor = null;
         this.#paintSquares();
         this.onSelect(square);
-        const pieceEl = this.squareEls[square].querySelector(".piece");
-        if (!pieceEl) return;
-        this.boardEl.setPointerCapture(event.pointerId);
-        const rect = pieceEl.getBoundingClientRect();
-        this.drag = {
-          from: square,
-          pointerId: event.pointerId,
-          ghost: null,
-          dx: event.clientX - rect.left,
-          dy: event.clientY - rect.top,
-          moved: false,
-        };
-        event.preventDefault();
+        this.#liftPieceFromEvent(square, event);
       } else {
+        this.#dropGhost();
         this.selected = null;
         this.cursor = null;
         this.#paintSquares();
@@ -559,46 +607,20 @@ export class Board {
 
     this.boardEl.addEventListener("pointermove", (event) => {
       if (!this.drag || event.pointerId !== this.drag.pointerId) return;
-      const dist = Math.hypot(
-        event.clientX - (this.drag.originX || event.clientX),
-        event.clientY - (this.drag.originY || event.clientY)
-      );
-      if (!this.drag.originX) {
-        this.drag.originX = event.clientX;
-        this.drag.originY = event.clientY;
-      }
-      if (!this.drag.ghost && dist > 4) {
-        const pieceEl = this.squareEls[this.drag.from].querySelector(".piece");
-        if (!pieceEl) return;
-        const rect = pieceEl.getBoundingClientRect();
-        const ghost = pieceEl.cloneNode(true);
-        ghost.classList.add("piece-ghost", "dragging");
-        ghost.style.width = `${rect.width}px`;
-        ghost.style.height = `${rect.height}px`;
-        document.body.appendChild(ghost);
-        pieceEl.classList.add("dragging-source");
-        this.drag.ghost = ghost;
-        this.drag.moved = true;
-      }
-      if (this.drag.ghost) {
-        this.drag.ghost.style.left = `${event.clientX - this.drag.dx}px`;
-        this.drag.ghost.style.top = `${event.clientY - this.drag.dy}px`;
-      }
+      this.#moveGhost(event);
     });
 
     const endDrag = (event) => {
       if (!this.drag || event.pointerId !== this.drag.pointerId) return;
-      const { from, ghost, moved } = this.drag;
-      ghost?.remove();
-      this.squareEls[from]?.querySelector(".piece")?.classList.remove("dragging-source");
-      this.drag = null;
+      const from = this.drag.from;
+      this.#dropGhost();
       const to = squareFromPoint(
         this.boardEl,
         event.clientX,
         event.clientY,
         this.orientation
       );
-      if (moved && to && to !== from && (this.dests[from] || []).includes(to)) {
+      if (to && to !== from && (this.dests[from] || []).includes(to)) {
         this.selected = null;
         this.cursor = to;
         this.#paintSquares();

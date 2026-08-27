@@ -321,9 +321,42 @@ body.is-opening-intro .train-actions {
 }
 
 #board-root {
+  width: 100%;
+}
+.board-stage {
+  position: relative;
   flex: 1;
   min-width: 0;
   width: 100%;
+}
+.board-pick-note {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  z-index: 12;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 10px 14px;
+  max-width: 90%;
+  border-radius: 12px;
+  background: rgba(20, 20, 20, 0.88);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+.board-pick-note[hidden] {
+  display: none;
+}
+.board-pick-note.is-in {
+  animation: board-pick-in 0.25s ease;
+}
+@keyframes board-pick-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
 }
 
 .eval-bar {
@@ -489,8 +522,13 @@ body.is-opening-intro .train-actions {
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25);
 }
 .board:not(.frozen) { cursor: default; }
-.board:not(.frozen) .square.can-move { cursor: pointer; }
+.board:not(.frozen) .square.can-move { cursor: grab; }
 .board.frozen { cursor: default; }
+.board.is-dragging,
+.board.is-dragging .square,
+.board.is-dragging .square.can-move {
+  cursor: grabbing;
+}
 .square.is-focus {
   outline: 3px solid #2d6a12;
   outline-offset: -3px;
@@ -549,8 +587,7 @@ body.is-opening-intro .train-actions {
   pointer-events: none;
   filter: drop-shadow(1px 2px 1px rgba(0,0,0,0.25));
 }
-.piece.dragging-source { opacity: 0.25; }
-
+.piece.dragging-source { opacity: 0; }
 .piece-ghost {
   position: fixed;
   z-index: 50;
@@ -559,7 +596,11 @@ body.is-opening-intro .train-actions {
   transition: transform 0.42s cubic-bezier(0.22, 0.72, 0.28, 1);
   filter: drop-shadow(2px 8px 6px rgba(0, 0, 0, 0.32));
 }
-.piece-ghost.dragging { transition: none; }
+.piece-ghost.dragging {
+  transition: none;
+  cursor: grabbing;
+  z-index: 80;
+}
 .piece.is-captured {
   transition: opacity 0.38s ease;
   opacity: 0;

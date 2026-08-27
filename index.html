@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260827intro2">
+  <link rel="stylesheet" href="css/style.css?v=20260828grab">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -139,7 +139,10 @@
         </aside>
         <div id="grave-top" class="grave" data-i18n-aria="grave.aria" aria-label="Captured pieces"></div>
         <div class="board-with-eval">
-          <div id="board-root"></div>
+          <div class="board-stage">
+            <div id="board-root"></div>
+            <p id="board-pick-note" class="board-pick-note" hidden></p>
+          </div>
           <div id="eval-bar" class="eval-bar" data-i18n-aria="eval.bar" aria-label="Valutazione della posizione" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
             <div class="eval-bar-track" aria-hidden="true">
               <i id="eval-bar-fill" class="eval-bar-fill"></i>
@@ -231,7 +234,7 @@
           <button type="button" id="btn-recalc-hints" class="coach-switch" data-i18n-aria="hints.recalc" aria-label="Ricalcolami le mosse migliori" disabled>Vai</button>
         </div>
         <div class="coach-row">
-          <span class="coach-row-label" data-i18n="aid.moves">Evidenzia le mosse</span>
+          <span class="coach-row-label" data-i18n="aid.moves">Frecce sulla scacchiera</span>
           <button type="button" id="btn-aid-moves" class="coach-switch is-on" aria-pressed="true">On</button>
         </div>
         <div class="coach-row">
@@ -433,6 +436,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260827intro2"></script>
+  <script type="module" src="js/app.js?v=20260828grab"></script>
 </body>
 </html>

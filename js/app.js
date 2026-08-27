@@ -1,8 +1,8 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
-import { Board } from "./board.js?v=20260825sel";
+import { Board } from "./board.js?v=20260828grab";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827intro2";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828grab";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -10,6 +10,7 @@ const TRAIN_MODE_KEY = "5minchess.trainingMode";
 const AUTO_CONTINUE_KEY = "5minchess.autoContinue";
 const ADMIN_SOLUTIONS_KEY = "5minchess.adminSolutions";
 const AID_THREATS_KEY = "5minchess.aidThreats";
+const AID_MOVES_KEY = "5minchess.aidMoves";
 const HINT_FAKE_LOAD_MS = 3000;
 const OPP_REPLY_MIN_MS = 10000;
 const KING_TALK_HIDE = {
@@ -225,6 +226,14 @@ function readAidThreats() {
     return localStorage.getItem(AID_THREATS_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+function readAidMoves() {
+  try {
+    return localStorage.getItem(AID_MOVES_KEY) !== "0";
+  } catch {
+    return true;
   }
 }
 
@@ -3052,8 +3061,33 @@ function previewFromBoardCursor() {
 function playHintMove(from, to) {
   const index = hintIndexForSquares(from, to);
   const hint = index >= 0 ? state.hints[index] : null;
-  const promo = hint ? uciToMove(hint.uci).promotion : undefined;
+  if (!hint?.uci) {
+    showBoardPickNote();
+    return;
+  }
+  const promo = uciToMove(hint.uci).promotion;
   applyUserMove(from, to, promo, hint);
+}
+
+function showBoardPickNote() {
+  const el = els.boardPickNote;
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = t("board.pickHint");
+  el.classList.remove("is-in");
+  void el.offsetWidth;
+  el.classList.add("is-in");
+  clearTimeout(state.boardPickNoteTimer);
+  state.boardPickNoteTimer = setTimeout(() => {
+    hideBoardPickNote();
+  }, 2200);
+}
+
+function hideBoardPickNote() {
+  clearTimeout(state.boardPickNoteTimer);
+  if (!els.boardPickNote) return;
+  els.boardPickNote.classList.remove("is-in");
+  els.boardPickNote.hidden = true;
 }
 
 function syncHintBoardPlay() {
@@ -3063,7 +3097,8 @@ function syncHintBoardPlay() {
     state.board.setInteractive(false);
     return;
   }
-  state.board.setDests(visibleHintDests());
+  state.board.setShowDests(Boolean(state.aids.moves));
+  state.board.setDests(destsFromGame(state.game));
   state.board.setInteractive(true);
 }
 
@@ -3732,7 +3767,6 @@ function kingTurnAdvice() {
 }
 
 function clearBoardAids() {
-  state.aids.moves = true;
   if (state.board) {
     state.board.setArrows([]);
     paintActiveThreats();
@@ -3974,6 +4008,12 @@ function paintActiveThreats() {
 function showAid(kind) {
   if (kind === "moves") {
     state.aids.moves = !state.aids.moves;
+    try {
+      localStorage.setItem(AID_MOVES_KEY, state.aids.moves ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+    state.board?.setShowDests(Boolean(state.aids.moves));
     if (state.aids.moves) showHintArrows(null, { reveal: true });
     else state.board.setArrows([]);
     syncAidButtons();
@@ -4026,6 +4066,7 @@ function needsPromotion(game, from, to) {
 
 const els = {
   boardRoot: document.getElementById("board-root"),
+  boardPickNote: document.getElementById("board-pick-note"),
   hints: document.getElementById("hints"),
   statusTitle: document.getElementById("status-title"),
   statusText: document.getElementById("status-text"),
@@ -4185,12 +4226,13 @@ const state = {
   hasGame: false,
   openingPly: 0,
   startOpening: START_OPENINGS[0],
-  aids: { moves: true, threats: readAidThreats() },
+  aids: { moves: readAidMoves(), threats: readAidThreats() },
   aidTimer: null,
   aidToken: 0,
   flashToken: 0,
   pipUntil: 0,
   flashSquares: [],
+  boardPickNoteTimer: 0,
   lastKingTalk: "",
   speakToken: 0,
   kingSpeaking: false,
@@ -4882,8 +4924,8 @@ function renderHints() {
 }
 
 function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
-  if (isHintFakeLoad()) {
-    state.board.setArrows([]);
+  if (!state.aids.moves || isHintFakeLoad()) {
+    state.board?.setArrows([]);
     return;
   }
   if (!isTrainHold() && !hintPanelOpen()) {
@@ -6375,6 +6417,7 @@ function startGame(playerColor = state.playerColor) {
   state.recalcUsedThisTurn = false;
   stopRecalcProgress();
   hideOpeningIntro();
+  hideBoardPickNote();
   state.lastHintMix = "";
   hideKingFinale();
   if (els.hintMix) {
