@@ -2472,8 +2472,8 @@ function paintEvalBar() {
   const text = formatEvalBarScore(cp);
   els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
   if (fill) {
-    fill.style.width = "100%";
-    fill.style.height = `${pct.toFixed(2)}%`;
+    fill.style.height = "100%";
+    fill.style.width = `${pct.toFixed(2)}%`;
   }
   if (label) label.textContent = text;
   if (els.evalBar) {
