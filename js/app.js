@@ -1639,7 +1639,7 @@ function hintEvalDir(info) {
     const parts = twentiethsSwingParts(info);
     if (!parts) return "";
     if (parts.recovery > 0 || parts.damage > 0) return "up";
-    if (parts.heartLoss > 0 || parts.swordLoss > 0) return "down";
+    if (parts.heartLoss > 0) return "down";
     return "";
   }
   const cp = hintEvalShownCp(info);
@@ -1776,7 +1776,6 @@ function hintTwentiethsEvalHtml(info) {
   if (parts.recovery > 0) rows.push(hintTwentiethsRowHtml(parts.recovery, hintEvalHeartHtml(), true));
   else if (parts.heartLoss > 0) rows.push(hintTwentiethsRowHtml(parts.heartLoss, hintEvalHeartHtml(), false));
   if (parts.damage > 0) rows.push(hintTwentiethsRowHtml(parts.damage, evalSwordSvg(), true));
-  else if (parts.swordLoss > 0) rows.push(hintTwentiethsRowHtml(parts.swordLoss, evalSwordSvg(), false));
   if (!rows.length) return "";
   return `<span class="hint-sword-rows">${rows.join("")}</span>`;
 }
