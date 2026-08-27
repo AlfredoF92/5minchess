@@ -1091,7 +1091,8 @@ body.is-opening-intro .train-actions {
   height: auto;
 }
 .hint-slot:has(.hint-btn.is-card:hover:not(:disabled):not(.empty):not(.is-loading)),
-.hint-slot:has(.hint-btn.is-card.is-kbd:not(:disabled):not(.empty)) {
+.hint-slot:has(.hint-btn.is-card.is-kbd:not(:disabled):not(.empty)),
+.hint-slot:has(.hint-btn.is-card.is-picked) {
   z-index: 4;
 }
 .hint-slot > .hint-btn {
@@ -1216,8 +1217,10 @@ body.is-opening-intro .train-actions {
 .hint-btn.is-card.is-picked:disabled {
   border: 0;
   background: #fff;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1), 0 0 0 3px var(--green);
-  transform: none;
+  outline: 4px solid var(--green);
+  outline-offset: 2px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(98, 153, 36, 0.4);
+  transform: translateY(-3px);
   opacity: 1;
 }
 .hint-card-art {
@@ -1496,8 +1499,10 @@ body.is-opening-intro .train-actions {
 .hints.is-hold .hint-btn.is-card.is-picked:hover,
 .hints.is-hold .hint-btn.is-card.is-picked.is-kbd,
 .hints.is-hold .hint-btn.is-card.is-picked:disabled {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1), 0 0 0 3px var(--green);
-  transform: none;
+  outline: 4px solid var(--green);
+  outline-offset: 2px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(98, 153, 36, 0.4);
+  transform: translateY(-3px);
 }
 .hints.is-hold .hint-btn {
   animation: none !important;
@@ -1515,7 +1520,9 @@ body.is-opening-intro .train-actions {
 .hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked:hover,
 .hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked.is-kbd,
 .hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked:disabled {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  outline: 4px solid var(--green);
+  outline-offset: 2px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(98, 153, 36, 0.4);
 }
 .hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked):not(.empty):hover,
 .hints.is-hold.is-wait-opp .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
