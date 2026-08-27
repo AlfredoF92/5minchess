@@ -292,6 +292,9 @@ button, select { font: inherit; }
   flex-direction: column;
   justify-content: flex-end;
 }
+.eval-bar.is-black-bottom .eval-bar-track {
+  justify-content: flex-start;
+}
 .eval-bar-fill {
   display: block;
   width: 100%;

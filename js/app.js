@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827delta";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827evalflip";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -2197,9 +2197,11 @@ function paintEvalBar() {
   const fill = els.evalBarFill;
   const label = els.evalBarScore;
   if (!fill && !label) return;
+  const blackBottom = state.board?.orientation === "black";
   const cp = evalCpForWhite();
   const pct = Math.max(0, Math.min(100, whiteEvalShare(cp)));
   const text = formatEvalBarScore(cp);
+  els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
   if (fill) {
     fill.style.width = "100%";
     fill.style.height = `${pct.toFixed(2)}%`;
