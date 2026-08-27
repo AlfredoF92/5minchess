@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827twnum";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827prev10";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -261,6 +261,10 @@ function isSwordEval() {
 
 function isTwentiethsEval() {
   return state.evalView === "twentieths";
+}
+
+function evalBarHoldActive() {
+  return (isTwentiethsEval() || isPrevOppEval()) && !isLocalVsHuman();
 }
 
 function isAbsLikeEval() {
@@ -1616,6 +1620,7 @@ function positionEvalNow() {
 
 function evalShownPoints(cp) {
   if (!Number.isFinite(cp)) return null;
+  if (isPrevOppEval()) return Math.round(cp / 10);
   return state.roundEval ? Math.round(cp / 10) * 10 : Math.round(cp);
 }
 
@@ -2706,7 +2711,7 @@ function queueLifeLoss(next) {
 }
 
 function evalBarSourceCp() {
-  if (isTwentiethsEval() && !isLocalVsHuman()) {
+  if (evalBarHoldActive()) {
     return Number.isFinite(state.evalBarHold) ? state.evalBarHold : 0;
   }
   return Number.isFinite(state.gameEval) ? state.gameEval : 0;
@@ -2819,6 +2824,7 @@ function paintEvalBar() {
   const dir = nowPts > beforePts ? "up" : nowPts < beforePts ? "down" : "";
   els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
   els.evalBar?.classList.toggle("is-twentieths", isTwentiethsEval());
+  els.evalBar?.classList.toggle("is-prev-opp", isPrevOppEval());
   if (fill) {
     fill.style.height = "100%";
     fill.style.width = `${pct.toFixed(2)}%`;
@@ -5276,7 +5282,7 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   if (Number.isFinite(state.lastPlayerScore)) {
     state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
   }
-  if (isTwentiethsEval() && !isLocalVsHuman()) {
+  if (evalBarHoldActive()) {
     state.evalBarHold = Number.isFinite(state.gameEval) ? state.gameEval : 0;
   }
   if (isPrevOppEval() || isSwordEval()) freezeKingLives(kingLifeHalves());
@@ -5907,6 +5913,7 @@ function fillEvalViewSelect() {
 function applyEvalView(value) {
   const wasPrev = isPrevOppEval();
   const wasTwentieths = isTwentiethsEval();
+  const wasHold = (wasPrev || wasTwentieths) && !isLocalVsHuman();
   state.evalView = normalizeEvalView(value);
   try {
     localStorage.setItem(EVAL_VIEW_KEY, state.evalView);
@@ -5921,10 +5928,10 @@ function applyEvalView(value) {
     state.shownLives = null;
     state.shownTwentieths = null;
     state.shownOppTwentieths = null;
-    if (isTwentiethsEval()) {
-      state.evalBarHold = Number.isFinite(state.gameEval) ? state.gameEval : 0;
-      resetEvalBarHistory();
-    }
+  }
+  if (evalBarHoldActive() && !wasHold) {
+    state.evalBarHold = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+    resetEvalBarHistory();
   }
   syncHintInfoUi();
   renderHints();

@@ -708,6 +708,12 @@ button, select { font: inherit; }
 .eval-bar.is-twentieths .eval-bar-prev {
   font-size: 14px;
 }
+.eval-bar.is-prev-opp .eval-bar-score {
+  font-size: 22px;
+}
+.eval-bar.is-prev-opp .eval-bar-prev {
+  font-size: 14px;
+}
 .king-meters {
   display: flex;
   flex-direction: column;
