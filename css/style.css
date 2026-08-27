@@ -306,6 +306,25 @@ button, select { font: inherit; }
   width: 50%;
   background: #f3efe4;
   transition: width 0.45s ease;
+  position: relative;
+  z-index: 1;
+}
+.eval-bar-delta {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  transition: left 0.45s ease, width 0.45s ease, background-color 0.3s ease;
+}
+.eval-bar-delta.is-up { background: #2f9e44; }
+.eval-bar-delta.is-down { background: #c92a2a; }
+.eval-bar-scores {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
 }
 .eval-bar-score {
   position: relative;
@@ -324,6 +343,17 @@ button, select { font: inherit; }
   writing-mode: horizontal-tb;
   transform: none;
   box-shadow: none;
+  pointer-events: none;
+}
+.eval-bar-score.is-up { color: #2f9e44; }
+.eval-bar-score.is-down { color: #c92a2a; }
+.eval-bar-prev {
+  color: #6b6b6b;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
 

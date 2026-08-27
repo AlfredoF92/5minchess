@@ -2505,8 +2505,8 @@ function evalBarShownCp() {
   return Number.isFinite(state.gameEval) ? state.gameEval : 0;
 }
 
-function formatEvalBarScore(cp) {
-  if (state.game?.in_checkmate()) {
+function formatEvalBarScore(cp, { ignoreMate = false } = {}) {
+  if (!ignoreMate && state.game?.in_checkmate()) {
     if (isLocalVsHuman()) {
       const whiteWon = state.game.turn() === "b";
       const bottomWon = state.board?.orientation === "black" ? !whiteWon : whiteWon;
@@ -2521,8 +2521,40 @@ function formatEvalBarScore(cp) {
   return formatSignedPawns(cp);
 }
 
-function whiteEvalShare(cp) {
-  if (state.game?.in_checkmate()) return state.game.turn() === "b" ? 100 : 0;
+function evalCpForWhiteFromPlayer(playerCp) {
+  const cp = Number.isFinite(playerCp) ? playerCp : 0;
+  if (isLocalVsHuman()) {
+    const hist = state.game.history({ verbose: true });
+    const from = hist.length ? hist[hist.length - 1].color : "w";
+    return from === "w" ? cp : -cp;
+  }
+  return state.playerColor === "w" ? cp : -cp;
+}
+
+function evalBarShownFromPlayer(playerCp) {
+  const cp = Number.isFinite(playerCp) ? playerCp : 0;
+  if (isLocalVsHuman()) {
+    const cpWhite = evalCpForWhiteFromPlayer(cp);
+    return state.board?.orientation === "black" ? -cpWhite : cpWhite;
+  }
+  return cp;
+}
+
+function rememberEvalBarPrev(now) {
+  const next = Number.isFinite(now) ? now : 0;
+  if (!Number.isFinite(state.evalBarPainted) || Math.round(state.evalBarPainted) !== Math.round(next)) {
+    if (Number.isFinite(state.evalBarPainted)) state.evalBarBefore = state.evalBarPainted;
+    state.evalBarPainted = next;
+  }
+}
+
+function resetEvalBarHistory() {
+  state.evalBarPainted = null;
+  state.evalBarBefore = null;
+}
+
+function whiteEvalShare(cp, { ignoreMate = false } = {}) {
+  if (!ignoreMate && state.game?.in_checkmate()) return state.game.turn() === "b" ? 100 : 0;
   if (Math.abs(cp) >= 50000) return cp > 0 ? 100 : 0;
   return 50 + Math.tanh(cp / 400) * 50;
 }
@@ -2530,21 +2562,62 @@ function whiteEvalShare(cp) {
 function paintEvalBar() {
   const fill = els.evalBarFill;
   const label = els.evalBarScore;
+  const deltaEl = els.evalBarDelta;
+  const prevLabel = els.evalBarPrev;
   if (!fill && !label) return;
   const blackBottom = state.board?.orientation === "black";
+  rememberEvalBarPrev(state.gameEval);
+  const shown = evalBarShownCp();
   const cpWhite = evalCpForWhite();
   const pct = Math.max(0, Math.min(100, whiteEvalShare(cpWhite)));
-  const text = formatEvalBarScore(evalBarShownCp());
+  const text = formatEvalBarScore(shown);
+  const before = state.evalBarBefore;
+  const beforeShown = Number.isFinite(before) ? evalBarShownFromPlayer(before) : null;
+  const nowPts = evalShownPoints(shown) || 0;
+  const beforePts = Number.isFinite(beforeShown) ? (evalShownPoints(beforeShown) || 0) : nowPts;
+  const dir = nowPts > beforePts ? "up" : nowPts < beforePts ? "down" : "";
   els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
   if (fill) {
     fill.style.height = "100%";
     fill.style.width = `${pct.toFixed(2)}%`;
   }
-  if (label) label.textContent = text;
+  if (label) {
+    label.textContent = text;
+    label.classList.toggle("is-up", dir === "up");
+    label.classList.toggle("is-down", dir === "down");
+  }
+  if (prevLabel) {
+    const showPrev = Number.isFinite(beforeShown);
+    prevLabel.hidden = !showPrev;
+    if (showPrev) prevLabel.textContent = formatEvalBarScore(beforeShown, { ignoreMate: true });
+  }
+  if (deltaEl) {
+    if (!dir || !Number.isFinite(before)) {
+      deltaEl.hidden = true;
+    } else {
+      const prevPct = Math.max(0, Math.min(100, whiteEvalShare(evalCpForWhiteFromPlayer(before), { ignoreMate: true })));
+      const width = Math.abs(pct - prevPct);
+      if (width < 0.8) {
+        deltaEl.hidden = true;
+      } else {
+        const left = blackBottom ? 100 - Math.max(pct, prevPct) : Math.min(pct, prevPct);
+        deltaEl.hidden = false;
+        deltaEl.style.left = `${left.toFixed(2)}%`;
+        deltaEl.style.width = `${width.toFixed(2)}%`;
+        deltaEl.classList.toggle("is-up", dir === "up");
+        deltaEl.classList.toggle("is-down", dir === "down");
+      }
+    }
+  }
   if (els.evalBar) {
     els.evalBar.setAttribute("aria-valuenow", String(Math.round(pct)));
-    els.evalBar.setAttribute("title", text);
+    els.evalBar.setAttribute("title", showPrevTitle(text, beforeShown, dir));
   }
+}
+
+function showPrevTitle(text, beforeShown, dir) {
+  if (!Number.isFinite(beforeShown) || !dir) return text;
+  return `${text} · ${formatEvalBarScore(beforeShown, { ignoreMate: true })}`;
 }
 
 function stopSwordFlash() {
@@ -3668,6 +3741,8 @@ const els = {
   evalBar: document.getElementById("eval-bar"),
   evalBarFill: document.getElementById("eval-bar-fill"),
   evalBarScore: document.getElementById("eval-bar-score"),
+  evalBarDelta: document.getElementById("eval-bar-delta"),
+  evalBarPrev: document.getElementById("eval-bar-prev"),
   kingReact: document.getElementById("king-react"),
   kingLegend: document.getElementById("king-legend"),
   turnBanner: document.getElementById("turn-banner"),
@@ -3739,6 +3814,8 @@ const state = {
   lastHintMix: "",
   gameEval: 0,
   beforeOppEval: 0,
+  evalBarPainted: null,
+  evalBarBefore: null,
   standEval: 0,
   nextStandEval: null,
   livesForced: null,
@@ -5746,6 +5823,7 @@ function startGame(playerColor = state.playerColor) {
   }
   state.gameEval = 0;
   state.beforeOppEval = 0;
+  resetEvalBarHistory();
   state.standEval = 0;
   state.nextStandEval = null;
   state.livesForced = null;

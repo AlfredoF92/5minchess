@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260827srows">
+  <link rel="stylesheet" href="css/style.css?v=20260827ebdelta">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -143,8 +143,12 @@
           <div id="eval-bar" class="eval-bar" data-i18n-aria="eval.bar" aria-label="Valutazione della posizione" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
             <div class="eval-bar-track" aria-hidden="true">
               <i id="eval-bar-fill" class="eval-bar-fill"></i>
+              <i id="eval-bar-delta" class="eval-bar-delta" hidden></i>
             </div>
-            <span id="eval-bar-score" class="eval-bar-score">0.0</span>
+            <div class="eval-bar-scores">
+              <span id="eval-bar-score" class="eval-bar-score">0</span>
+              <span id="eval-bar-prev" class="eval-bar-prev" hidden></span>
+            </div>
           </div>
         </div>
         <div id="grave-bottom" class="grave" data-i18n-aria="grave.aria" aria-label="Captured pieces"></div>
@@ -399,6 +403,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260827swd0"></script>
+  <script type="module" src="js/app.js?v=20260827ebdelta"></script>
 </body>
 </html>
