@@ -614,10 +614,12 @@ button, select { font: inherit; }
   color: #e03131;
   overflow: hidden;
   width: 100%;
+  white-space: nowrap;
   transition: width 0.45s ease;
 }
 .king-heart.is-empty .heart-fg { width: 0; }
-.king-heart.is-half .heart-fg { width: 48%; }
+.king-heart.is-full .heart-fg { width: 100%; }
+.king-heart.is-half .heart-fg { width: 50%; }
 .king-lives.is-flash .king-heart {
   animation: king-heart-flash 0.3s ease-in-out 3;
 }

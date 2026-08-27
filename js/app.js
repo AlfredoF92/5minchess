@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827fumettob";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827hearts";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -686,12 +686,11 @@ function pickKey(keys, lastProp) {
 
 function pickLifeFeedbackKey(deltaHalves) {
   let bucket = "hold";
-  if (deltaHalves > 0) bucket = "gain";
-  else if (deltaHalves === -1) bucket = "lose05";
-  else if (deltaHalves === -2) bucket = "lose10";
-  else if (deltaHalves === -3) bucket = "lose15";
-  else if (deltaHalves === -4) bucket = "lose20";
-  else if (deltaHalves <= -5) bucket = "lose25";
+  if (deltaHalves > LIFE_EPS) bucket = "gain";
+  else if (deltaHalves < -LIFE_EPS) {
+    const lost = Math.min(5, Math.max(1, Math.round(-deltaHalves)));
+    bucket = ["", "lose05", "lose10", "lose15", "lose20", "lose25"][lost];
+  }
   return pickKey(LIFE_FEEDBACK_KEYS[bucket], "lastLifeFeedbackKey");
 }
 
@@ -1449,7 +1448,8 @@ function hintLifeDelta(hint) {
   const now = displayLifeHalves(nowHalves);
   const game = isTrainHold() && state.trainFen ? new Chess(state.trainFen) : state.game;
   const after = displayLifeHalves(livesFromCp(evalForPlayer(score, game)));
-  return after - now;
+  const delta = after - now;
+  return Math.abs(delta) < LIFE_EPS ? 0 : delta;
 }
 
 function hintRankMap(pool = state.hintPool) {
@@ -2079,12 +2079,33 @@ function evalForPlayer(score, game) {
   return stm === me ? score : -score;
 }
 
+const HEART_PARTS = 200;
+const HEART_COUNT = 3;
+const LIFE_MAX_HALVES = HEART_COUNT * 2;
+const LIFE_PARTS = HEART_COUNT * HEART_PARTS;
+const LIFE_EPS = LIFE_MAX_HALVES / LIFE_PARTS / 2;
+const LIFE_FLASH_HALVES = 1;
+const LIFE_BANDS = [
+  { cp: 0, halves: 6 },
+  { cp: -100, halves: 5 },
+  { cp: -150, halves: 4 },
+  { cp: -200, halves: 3 },
+  { cp: -300, halves: 2 },
+  { cp: -1000, halves: 0 },
+];
+
 function livesFromCp(cp) {
-  if (!Number.isFinite(cp) || cp >= -100) return 6;
-  if (cp >= -150) return 5;
-  if (cp >= -200) return 4;
-  if (cp >= -300) return 3;
-  return 2;
+  if (!Number.isFinite(cp) || cp >= 0) return LIFE_MAX_HALVES;
+  if (cp <= -1000) return 0;
+  for (let i = 1; i < LIFE_BANDS.length; i += 1) {
+    const from = LIFE_BANDS[i - 1];
+    const to = LIFE_BANDS[i];
+    if (cp >= to.cp) {
+      const t = (cp - from.cp) / (to.cp - from.cp);
+      return from.halves + t * (to.halves - from.halves);
+    }
+  }
+  return 0;
 }
 
 function kingLifeHalves() {
@@ -2099,31 +2120,32 @@ function kingLifeHalves() {
 function opponentReactBand(afterGame, beforeEval, feedbackKey) {
   if (afterGame.in_checkmate() || afterGame.in_check()) return "mateRisk";
   const lost = displayLifeHalves(livesFromCp(beforeEval)) - displayLifeHalves(livesFromCp(state.gameEval));
-  if (lost > 0) return "heartMany";
+  if (lost > LIFE_EPS) return "heartMany";
   return "";
 }
 
 function opponentSwingTalk(beforeEval, feedbackKey) {
   if (!Number.isFinite(beforeEval) || !Number.isFinite(state.gameEval)) return "";
   const visDelta = displayLifeHalves(livesFromCp(state.gameEval)) - displayLifeHalves(livesFromCp(beforeEval));
-  if (visDelta < 0) return t(pickLifeFeedbackKey(visDelta));
+  if (visDelta < -LIFE_EPS) return t(pickLifeFeedbackKey(visDelta));
   if (opponentRankKind(feedbackKey) === "worst") return "";
   if (beforeEval - state.gameEval >= 40) return t(pickKey(OPP_ADV_KEYS, "lastOppAdvKey"));
   return "";
 }
 
 function displayLifeHalves(halves = kingLifeHalves()) {
-  if (!Number.isFinite(halves)) return 6;
-  return Math.max(0, Math.min(6, halves));
+  if (!Number.isFinite(halves)) return LIFE_MAX_HALVES;
+  const clamped = Math.max(0, Math.min(LIFE_MAX_HALVES, halves));
+  return Math.round((clamped / LIFE_MAX_HALVES) * LIFE_PARTS) / LIFE_PARTS * LIFE_MAX_HALVES;
 }
 
 function visibleLifeHalves() {
-  if (Number.isInteger(state.livesHold)) return displayLifeHalves(state.livesHold);
+  if (Number.isFinite(state.livesHold)) return displayLifeHalves(state.livesHold);
   return displayLifeHalves();
 }
 
 function freezeKingLives(halves) {
-  if (!Number.isInteger(halves)) return;
+  if (!Number.isFinite(halves)) return;
   state.livesHold = halves;
 }
 
@@ -2131,23 +2153,38 @@ function thawKingLives() {
   state.livesHold = null;
 }
 
-function heartKind(halves, i) {
-  const left = halves - i * 2;
-  return left >= 2 ? "full" : left === 1 ? "half" : "empty";
+function heartFill(halves, i) {
+  const left = displayLifeHalves(halves) - i * 2;
+  return Math.max(0, Math.min(1, left / 2));
 }
 
-function hintHeartPiece(kind, tone) {
-  return `<span class="king-heart hint-heart is-${kind} is-${tone}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg">♥</span></span>`;
+function heartKind(halves, i) {
+  const fill = heartFill(halves, i);
+  if (fill >= 1 - 1 / HEART_PARTS) return "full";
+  if (fill <= 1 / HEART_PARTS) return "empty";
+  return "partial";
+}
+
+function heartPieceHtml(halves, i, extraClass = "") {
+  const fill = heartFill(halves, i);
+  const kind = heartKind(halves, i);
+  const cls = extraClass ? ` ${extraClass}` : "";
+  return `<span class="king-heart is-${kind}${cls}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg" style="width:${(fill * 100).toFixed(2)}%">♥</span></span>`;
+}
+
+function hintHeartPiece(fill, tone) {
+  const f = Math.max(0, Math.min(1, Number(fill) || 0));
+  const kind = f >= 1 - 1 / HEART_PARTS ? "full" : f <= 1 / HEART_PARTS ? "empty" : "partial";
+  return `<span class="king-heart hint-heart is-${kind} is-${tone}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg" style="width:${(f * 100).toFixed(2)}%">♥</span></span>`;
 }
 
 function hintDeltaHeartPieces(halves, tone) {
   const parts = [];
   let left = Math.abs(halves);
-  while (left >= 2) {
-    parts.push(hintHeartPiece("full", tone));
+  for (let i = 0; i < HEART_COUNT && left > LIFE_EPS; i += 1) {
+    parts.push(hintHeartPiece(Math.min(1, left / 2), tone));
     left -= 2;
   }
-  if (left === 1) parts.push(hintHeartPiece("half", tone));
   return parts.join("");
 }
 
@@ -2157,7 +2194,7 @@ function hintLivesRowHtml(hint) {
   if (!Number.isFinite(score)) return "—";
   const halves = displayLifeHalves(livesFromCp(evalForPlayer(score, hintEvalGame())));
   const label = t(hintLifeDelta(hint) < 0 ? "hint.lives.lose" : hintLifeDelta(hint) > 0 ? "hint.lives.gain" : "hint.lives.hold");
-  const hearts = [0, 1, 2].map((i) => hintHeartPiece(heartKind(halves, i), "hold")).join("");
+  const hearts = [0, 1, 2].map((i) => hintHeartPiece(heartFill(halves, i), "hold")).join("");
   return `<span class="hint-hearts is-hold" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${hearts}</span>`;
 }
 
@@ -2187,12 +2224,7 @@ function stopLivesAnim() {
 
 function heartsMarkup(halves) {
   const shown = displayLifeHalves(halves);
-  return [0, 1, 2]
-    .map((i) => {
-      const kind = heartKind(shown, i);
-      return `<span class="king-heart is-${kind}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg">♥</span></span>`;
-    })
-    .join("");
+  return [0, 1, 2].map((i) => heartPieceHtml(shown, i)).join("");
 }
 
 function oppLifeHalves() {
@@ -2228,11 +2260,14 @@ function applyHeartKinds(halves, { drop = false } = {}) {
     return;
   }
   [...root.children].forEach((el, i) => {
+    const fill = heartFill(shown, i);
     const kind = heartKind(shown, i);
-    const prev = el.classList.contains("is-full") ? "full" : el.classList.contains("is-half") ? "half" : "empty";
-    el.classList.remove("is-full", "is-half", "is-empty", "is-drop");
+    const fg = el.querySelector(".heart-fg");
+    const prev = Math.max(0, Math.min(1, parseFloat(fg?.style.width) / 100 || (el.classList.contains("is-full") ? 1 : el.classList.contains("is-half") ? 0.5 : 0)));
+    el.classList.remove("is-full", "is-half", "is-empty", "is-partial", "is-drop");
     el.classList.add(`is-${kind}`);
-    if (drop && prev !== kind) {
+    if (fg) fg.style.width = `${(fill * 100).toFixed(2)}%`;
+    if (drop && fill < prev - 1 / HEART_PARTS) {
       el.classList.add("is-drop");
       el.addEventListener("animationend", () => el.classList.remove("is-drop"), { once: true });
     }
@@ -2243,7 +2278,7 @@ function applyHeartKinds(halves, { drop = false } = {}) {
 
 function queueLifeLoss(next) {
   next = displayLifeHalves(next);
-  state.pendingLives = Number.isInteger(state.pendingLives) ? Math.min(state.pendingLives, next) : next;
+  state.pendingLives = Number.isFinite(state.pendingLives) ? Math.min(state.pendingLives, next) : next;
   if (state.livesAnimating) return;
   const root = els.kingLives;
   if (!root) return;
@@ -2253,14 +2288,14 @@ function queueLifeLoss(next) {
   root.classList.add("is-flash");
   state.livesAnimTimer = setTimeout(() => {
     root.classList.remove("is-flash");
-    const to = Number.isInteger(state.pendingLives) ? state.pendingLives : next;
+    const to = Number.isFinite(state.pendingLives) ? state.pendingLives : next;
     state.pendingLives = null;
     applyHeartKinds(to, { drop: true });
     state.livesAnimTimer = setTimeout(() => {
       state.livesAnimating = false;
       const latest = visibleLifeHalves();
-      if (latest < state.shownLives) queueLifeLoss(latest);
-      else if (latest !== state.shownLives) paintKingHearts(latest);
+      if (latest < state.shownLives - LIFE_EPS) queueLifeLoss(latest);
+      else if (Math.abs(latest - state.shownLives) > LIFE_EPS) paintKingHearts(latest);
     }, 480);
   }, 900);
 }
@@ -2316,14 +2351,19 @@ function renderKingLives() {
   const root = els.kingLives;
   if (!root) return;
   const next = visibleLifeHalves();
-  if (!root.children.length || !Number.isInteger(state.shownLives)) {
+  if (!root.children.length || !Number.isFinite(state.shownLives)) {
     paintKingHearts(next);
     return;
   }
-  if (next === state.shownLives && !state.livesAnimating) return;
-  if (next >= state.shownLives) {
+  if (Math.abs(next - state.shownLives) <= LIFE_EPS && !state.livesAnimating) return;
+  if (next + LIFE_EPS >= state.shownLives) {
     stopLivesAnim();
-    paintKingHearts(next);
+    applyHeartKinds(next);
+    return;
+  }
+  if (state.shownLives - next < LIFE_FLASH_HALVES) {
+    stopLivesAnim();
+    applyHeartKinds(next);
     return;
   }
   queueLifeLoss(next);
@@ -4551,7 +4591,7 @@ async function applyUserMove(from, to, promotion, chosenHint) {
     state.kbdHint = null;
     paintKbdHint();
   }
-  showKingReact(visDelta < 0 ? "heartMany" : band);
+  showKingReact(visDelta < -LIFE_EPS ? "heartMany" : band);
   const played = state.game.move({ from, to, promotion: promotion || undefined });
   if (!played) {
     clearTrainHold();
