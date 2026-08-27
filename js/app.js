@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827twking";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827intro";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1423,7 +1423,7 @@ const SKILL_LEVELS = {
 };
 
 function skillSettings(skill) {
-  return SKILL_LEVELS[Number(skill)] || SKILL_LEVELS[1];
+  return SKILL_LEVELS[Number(skill)] || SKILL_LEVELS[2];
 }
 
 function engineLabelText(skill) {
@@ -4076,6 +4076,11 @@ const els = {
   evalBarPrev: document.getElementById("eval-bar-prev"),
   evalBarPrevWrap: document.getElementById("eval-bar-prev-wrap"),
   evalBarPrevLabel: document.getElementById("eval-bar-prev-label"),
+  openingIntro: document.getElementById("opening-intro"),
+  openingIntroBar: document.getElementById("opening-intro-bar"),
+  openingIntroFill: document.getElementById("opening-intro-fill"),
+  openingIntroName: document.getElementById("opening-intro-name"),
+  openingIntroLuck: document.getElementById("opening-intro-luck"),
   kingReact: document.getElementById("king-react"),
   kingLegend: document.getElementById("king-legend"),
   turnBanner: document.getElementById("turn-banner"),
@@ -4139,6 +4144,8 @@ const state = {
   playColorPref: "random",
   startKind: "custom",
   startOpeningId: "random",
+  pendingOpeningIntro: false,
+  openingIntro: false,
   busy: false,
   recalcHints: false,
   recalcUsedThisTurn: false,
@@ -5846,14 +5853,14 @@ function applyQuickTrainSettings(moves = 0) {
   fillClockSelect();
   fillStartOpeningSelect();
   if (els.playMode) els.playMode.value = "engine";
-  if (els.skill) els.skill.value = "1";
+  if (els.skill) els.skill.value = "2";
   if (els.playColor) els.playColor.value = "random";
   if (els.hintLayout) els.hintLayout.value = "6x1";
   if (els.moveClockSelect) els.moveClockSelect.value = "0";
   applyHintLayout("6x1");
   applyMoveClock(0);
   state.mode = "engine";
-  state.skill = 1;
+  state.skill = 2;
   state.playColorPref = "random";
   if (moves > 0) {
     const opening = pickOpeningByMoves(moves);
@@ -5872,6 +5879,7 @@ function startQuickTraining(moves = 0) {
   setAppMenuOpen(false);
   applyQuickTrainSettings(moves);
   closeNewGameDialog();
+  state.pendingOpeningIntro = moves === 12;
   startGame(Math.random() < 0.5 ? "w" : "b");
 }
 
@@ -6131,15 +6139,157 @@ function applyStartOpening() {
   for (const san of opening.sans) {
     if (!state.game.move(san)) break;
   }
+  paintStartOpeningState(opening);
+}
+
+function paintStartOpeningState(opening = state.startOpening) {
   state.openingPly = state.game.history().length;
   const hist = state.game.history({ verbose: true });
   const last = hist[hist.length - 1];
   state.board.setLastMove(last ? last.from : null, last ? last.to : null);
   if (els.openingLine) {
-    els.openingLine.textContent = opening.sans.length
+    els.openingLine.textContent = opening?.sans?.length
       ? formatOpeningLine(state.game)
       : t("opening.startPos");
   }
+}
+
+function openingIntroTitle(opening) {
+  const info = describePosition(state.game.history(), state.game);
+  if (info?.title && info.title !== t("opening.choose")) {
+    return info.variant ? `${info.title} (${info.variant})` : info.title;
+  }
+  if (opening?.id && opening.id !== "start") return t(`opening.${opening.id}`);
+  return opening?.name || "";
+}
+
+function setOpeningIntroProgress(done, total) {
+  const max = Math.max(1, total);
+  const pct = Math.max(0, Math.min(100, (done / max) * 100));
+  if (els.openingIntroFill) els.openingIntroFill.style.width = `${pct}%`;
+  if (els.openingIntroBar) {
+    els.openingIntroBar.setAttribute("aria-valuemax", String(max));
+    els.openingIntroBar.setAttribute("aria-valuenow", String(done));
+  }
+}
+
+function paintOpeningIntroName(text) {
+  const el = els.openingIntroName;
+  if (!el || el.textContent === text) return;
+  el.textContent = text;
+  el.classList.remove("is-in");
+  void el.offsetWidth;
+  el.classList.add("is-in");
+}
+
+function hideOpeningIntro() {
+  const root = els.openingIntro;
+  if (!root) return;
+  root.hidden = true;
+  root.classList.remove("is-out");
+  if (els.openingIntroFill) els.openingIntroFill.style.width = "0%";
+  if (els.openingIntroName) {
+    els.openingIntroName.classList.remove("is-in");
+    els.openingIntroName.textContent = "";
+  }
+  if (els.openingIntroLuck) {
+    els.openingIntroLuck.hidden = true;
+    els.openingIntroLuck.classList.remove("is-in");
+    els.openingIntroLuck.textContent = "";
+  }
+  document.body.classList.remove("is-opening-intro");
+  state.openingIntro = false;
+}
+
+function showOpeningIntro(opening) {
+  const root = els.openingIntro;
+  if (!root) return;
+  root.hidden = false;
+  root.classList.remove("is-out");
+  document.body.classList.add("is-opening-intro");
+  setOpeningIntroProgress(0, opening?.sans?.length || 12);
+  paintOpeningIntroName(openingIntroTitle(opening));
+  if (els.openingIntroLuck) {
+    els.openingIntroLuck.hidden = true;
+    els.openingIntroLuck.classList.remove("is-in");
+    els.openingIntroLuck.textContent = "";
+  }
+}
+
+async function showOpeningIntroLuck() {
+  const el = els.openingIntroLuck;
+  if (!el) {
+    await sleep(400);
+    return;
+  }
+  el.hidden = false;
+  el.textContent = t("king.hello");
+  el.classList.remove("is-in");
+  void el.offsetWidth;
+  el.classList.add("is-in");
+  await sleep(1600);
+}
+
+async function hideOpeningIntroAnimated() {
+  const root = els.openingIntro;
+  if (!root || root.hidden) return;
+  root.classList.add("is-out");
+  await sleep(450);
+  hideOpeningIntro();
+}
+
+async function playOpeningIntro(opening) {
+  const gameId = state.gameId;
+  const sans = opening?.sans || [];
+  state.openingIntro = true;
+  state.busy = true;
+  hideHintPanel();
+  clearHints();
+  renderHints();
+  if (els.kingNote) {
+    els.kingNote.classList.remove("is-typing");
+    els.kingNote.innerHTML = "";
+  }
+  hideKingFinale();
+  setStatus(t("status.preparing"), t("opening.intro.aria"), "think");
+  state.board.setInteractive(false);
+  state.board.setArrows([]);
+  state.board.setLastMove(null, null);
+  state.board.setPosition(state.game.fen());
+  syncCoach();
+  renderHistory();
+  renderGraveyard();
+  showOpeningIntro(opening);
+  await sleep(350);
+  if (gameId !== state.gameId) return;
+
+  for (let i = 0; i < sans.length; i += 1) {
+    if (gameId !== state.gameId) return;
+    const started = Date.now();
+    const played = state.game.move(sans[i]);
+    if (!played) break;
+    state.board.setLastMove(played.from, played.to);
+    await state.board.animateMove(played.from, played.to);
+    if (gameId !== state.gameId) return;
+    state.board.setPosition(state.game.fen());
+    renderHistory();
+    renderGraveyard();
+    setOpeningIntroProgress(i + 1, sans.length);
+    paintOpeningIntroName(openingIntroTitle(opening));
+    const wait = 1000 - (Date.now() - started);
+    if (wait > 0) await sleep(wait);
+  }
+
+  if (gameId !== state.gameId) return;
+  paintStartOpeningState(opening);
+  setOpeningIntroProgress(sans.length, sans.length);
+  paintOpeningIntroName(openingIntroTitle(opening));
+  await showOpeningIntroLuck();
+  if (gameId !== state.gameId) return;
+  await hideOpeningIntroAnimated();
+  if (gameId !== state.gameId) return;
+  state.openingIntro = false;
+  finishStartGame();
 }
 
 function startOpeningTalk() {
@@ -6163,7 +6313,28 @@ function startFirstVisitGame() {
   startQuickTraining(0);
 }
 
+function finishStartGame() {
+  if (isLocalVsHuman()) state.playerColor = state.game.turn();
+  state.busy = false;
+  syncCoach();
+  renderHints();
+  renderHistory();
+  syncBoard({ keepArrows: true });
+  setStatus(
+    isLocalVsHuman() || playerIsSideToMove() ? t("turn.you") : t("turn.opp"),
+    youLabel(),
+    "play"
+  );
+  const talk = startOpeningTalk();
+  state.lastKingTalk = talk;
+  state.kingReplay = { type: "opening" };
+  speakKing(talk, { calculating: playerIsSideToMove() });
+  computerMove();
+}
+
 function startGame(playerColor = state.playerColor) {
+  const animateIntro = Boolean(state.pendingOpeningIntro);
+  state.pendingOpeningIntro = false;
   state.hasGame = true;
   state.gameId += 1;
   state.oppWaitStartedAt = 0;
@@ -6172,13 +6343,14 @@ function startGame(playerColor = state.playerColor) {
   state.engine.stop();
   state.game.reset();
   state.mode = els.playMode?.value === "local" ? "local" : "engine";
-  state.skill = Number(els.skill?.value || state.skill || 1);
+  state.skill = Number(els.skill?.value || state.skill || 2);
   state.busy = false;
   state.reviewPly = null;
   document.body.classList.remove("is-review");
   state.recalcHints = false;
   state.recalcUsedThisTurn = false;
   stopRecalcProgress();
+  hideOpeningIntro();
   state.lastHintMix = "";
   hideKingFinale();
   if (els.hintMix) {
@@ -6214,22 +6386,16 @@ function startGame(playerColor = state.playerColor) {
     state.playerColor = playerColor;
     state.board.setOrientation(playerColor === "w" ? "white" : "black");
   }
+  if (animateIntro) {
+    const opening = selectedStartOpening();
+    state.startOpening = opening;
+    if (opening?.sans?.length) {
+      void playOpeningIntro(opening);
+      return;
+    }
+  }
   applyStartOpening();
-  if (isLocalVsHuman()) state.playerColor = state.game.turn();
-  syncCoach();
-  renderHints();
-  renderHistory();
-  syncBoard({ keepArrows: true });
-  setStatus(
-    isLocalVsHuman() || playerIsSideToMove() ? t("turn.you") : t("turn.opp"),
-    youLabel(),
-    "play"
-  );
-  const talk = startOpeningTalk();
-  state.lastKingTalk = talk;
-  state.kingReplay = { type: "opening" };
-  speakKing(talk, { calculating: playerIsSideToMove() });
-  computerMove();
+  finishStartGame();
 }
 
 function undoFullTurn() {

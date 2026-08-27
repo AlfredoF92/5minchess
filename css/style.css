@@ -250,6 +250,62 @@ button, select { font: inherit; }
   gap: 8px;
   min-width: 0;
 }
+.opening-intro {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 2px 4px;
+  text-align: center;
+}
+.opening-intro[hidden] {
+  display: none;
+}
+.opening-intro.is-out {
+  animation: opening-intro-out 0.45s ease forwards;
+}
+.opening-intro-bar {
+  height: 8px;
+  border-radius: 99px;
+  background: #ececec;
+  overflow: hidden;
+}
+.opening-intro-bar i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--green);
+  border-radius: 99px;
+  transition: width 0.45s ease;
+}
+.opening-intro-name {
+  margin: 10px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #1a1a1a;
+  line-height: 1.25;
+  min-height: 1.25em;
+}
+.opening-intro-luck {
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #3d6b1e;
+}
+.opening-intro-name.is-in,
+.opening-intro-luck.is-in {
+  animation: opening-intro-in 0.55s ease;
+}
+@keyframes opening-intro-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes opening-intro-out {
+  to { opacity: 0; transform: translateY(-6px); }
+}
+body.is-opening-intro .hint-panel,
+body.is-opening-intro .train-actions {
+  pointer-events: none;
+}
 
 .board-col > #grave-bottom {
   grid-column: 1;

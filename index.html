@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260827twking">
+  <link rel="stylesheet" href="css/style.css?v=20260827intro">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -152,6 +152,13 @@
                 <span id="eval-bar-prev" class="eval-bar-prev"></span>
               </div>
             </div>
+          </div>
+          <div id="opening-intro" class="opening-intro" hidden>
+            <div id="opening-intro-bar" class="opening-intro-bar" role="progressbar" data-i18n-aria="opening.intro.aria" aria-label="Caricamento della partita" aria-valuemin="0" aria-valuemax="12" aria-valuenow="0">
+              <i id="opening-intro-fill"></i>
+            </div>
+            <p id="opening-intro-name" class="opening-intro-name"></p>
+            <p id="opening-intro-luck" class="opening-intro-luck" hidden></p>
           </div>
         </div>
         <div id="grave-bottom" class="grave" data-i18n-aria="grave.aria" aria-label="Captured pieces"></div>
@@ -426,6 +433,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260827twking"></script>
+  <script type="module" src="js/app.js?v=20260827intro"></script>
 </body>
 </html>
