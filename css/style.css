@@ -651,11 +651,11 @@ button, select { font: inherit; }
 }
 .twentieths-lives {
   display: flex;
-  align-items: stretch;
-  justify-content: stretch;
+  align-items: flex-end;
+  justify-content: space-between;
   width: 100%;
   box-sizing: border-box;
-  gap: 2px;
+  gap: 12px;
   margin: 0 0 8px;
   padding: 2px 0 4px;
   line-height: 1;
@@ -663,19 +663,44 @@ button, select { font: inherit; }
 .twentieths-lives[hidden] {
   display: none;
 }
-.twentieths-lives .king-heart {
-  flex: 1 1 0;
+.twentieths-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
-  width: auto;
-  height: 20px;
-  margin: 0;
-  font-size: 20px;
 }
-.twentieths-lives.is-flash .king-heart {
+.twentieths-meter.is-you { align-items: flex-start; }
+.twentieths-meter.is-opp { align-items: flex-end; }
+.twentieths-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b6b6b;
+}
+.twentieths-count {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #1a1a1a;
+  white-space: nowrap;
+}
+.twentieths-heart {
+  color: #e03131;
+  margin-left: 4px;
+  font-size: 0.85em;
+}
+.twentieths-meter.is-flash .twentieths-count,
+.player-lives.is-flash .twentieths-count {
   animation: king-heart-flash 0.3s ease-in-out 3;
 }
-.twentieths-lives.is-flash .king-heart .heart-fg {
-  transition: none;
+.player-lives.is-twentieths-count {
+  margin-top: 2px;
+  display: flex;
+  justify-content: center;
+}
+.player-lives.is-twentieths-count .twentieths-count {
+  font-size: 18px;
 }
 .eval-bar.is-twentieths .eval-bar-score {
   font-size: 22px;

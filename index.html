@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260827admin">
+  <link rel="stylesheet" href="css/style.css?v=20260827twnum">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -176,7 +176,16 @@
             </div>
           </blockquote>
         </div>
-        <div id="twentieths-lives" class="twentieths-lives" hidden data-i18n-aria="king.lives" aria-label="How the game stands"></div>
+        <div id="twentieths-lives" class="twentieths-lives" hidden>
+          <div class="twentieths-meter is-you">
+            <span class="twentieths-label" data-i18n="you">You</span>
+            <span id="twentieths-you-count" class="twentieths-count" aria-live="polite" aria-atomic="true">20<span class="twentieths-heart">♥</span></span>
+          </div>
+          <div id="twentieths-opp-meter" class="twentieths-meter is-opp">
+            <span class="twentieths-label" data-i18n="opp">Opponent</span>
+            <span id="twentieths-opp-count" class="twentieths-count" aria-live="polite" aria-atomic="true">20<span class="twentieths-heart">♥</span></span>
+          </div>
+        </div>
         <div id="hint-panel" class="hint-panel is-waiting">
         <div id="move-clock" class="move-clock" hidden data-i18n-aria="clock.aria" aria-label="Move timer">
           <span id="move-clock-num" class="move-clock-num">20</span>
@@ -417,6 +426,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260827admin"></script>
+  <script type="module" src="js/app.js?v=20260827twnum"></script>
 </body>
 </html>
