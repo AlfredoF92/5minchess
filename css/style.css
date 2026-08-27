@@ -649,17 +649,33 @@ button, select { font: inherit; }
   margin-top: 4px;
   line-height: 1;
 }
-.king-lives.is-twentieths {
-  flex-wrap: nowrap;
-  justify-content: center;
-  max-width: 100%;
-  gap: 0;
+.twentieths-lives {
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding: 2px 0 4px;
+  line-height: 1;
 }
-.king-lives.is-twentieths .king-heart {
-  width: 11px;
-  height: 12px;
-  margin: 0 -1px;
-  font-size: 12px;
+.twentieths-lives[hidden] {
+  display: none;
+}
+.twentieths-lives .king-heart {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  height: 20px;
+  margin: 0;
+  font-size: 20px;
+}
+.twentieths-lives.is-flash .king-heart {
+  animation: king-heart-flash 0.3s ease-in-out 3;
+}
+.twentieths-lives.is-flash .king-heart .heart-fg {
+  transition: none;
 }
 .eval-bar.is-twentieths .eval-bar-score {
   font-size: 22px;
@@ -674,6 +690,9 @@ button, select { font: inherit; }
   justify-content: center;
   gap: 2px;
   margin-top: 4px;
+}
+.king-meters[hidden] {
+  display: none;
 }
 .king-meters .king-lives {
   margin-top: 0;

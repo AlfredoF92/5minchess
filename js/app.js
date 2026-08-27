@@ -1640,7 +1640,7 @@ function hintEvalDir(info) {
     if (!parts) return "";
     if (parts.recovery > 0 || parts.damage > 0) return "up";
     if (parts.heartLoss > 0 || parts.swordLoss > 0) return "down";
-    return "up";
+    return "";
   }
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
@@ -1783,10 +1783,16 @@ function hintTwentiethsEvalHtml(info) {
 
 function hintEvalHtml(info) {
   if (!info || info.synthetic) return "—";
+  if (isTwentiethsEval()) {
+    const html = hintTwentiethsEvalHtml(info);
+    if (!html) return "";
+    const dir = state.hintInfo?.arrow ? hintEvalDir(info) : "";
+    const arrow = dir ? hintEvalArrowSvg(dir) : "";
+    return `${arrow}${html}`;
+  }
   const dir = state.hintInfo?.arrow ? hintEvalDir(info) : "";
   const arrow = dir ? hintEvalArrowSvg(dir) : "";
   if (isSwordEval()) return `${arrow}${hintSwordEvalHtml(info)}`;
-  if (isTwentiethsEval()) return `${arrow}${hintTwentiethsEvalHtml(info)}`;
   if (state.hintInfo?.score === "hearts") {
     const hearts = isAbsLikeEval() ? hintLivesRowHtml(info) : hintHeartsHtml(info);
     return `${arrow}${hearts}`;
@@ -1828,7 +1834,9 @@ function hintCardOverlayHtml(hint) {
 
 function hintVerdictHtml(hint) {
   const place = state.hintInfo?.place ? hintPlaceHtml(hint) : "";
-  return `${place}${hintTagHtml(hint)}<span class="hint-eval">${hintEvalHtml(hint)}</span>`;
+  const evalHtml = hintEvalHtml(hint);
+  const evalPart = evalHtml && evalHtml !== "—" ? `<span class="hint-eval">${evalHtml}</span>` : "";
+  return `${place}${hintTagHtml(hint)}${evalPart}`;
 }
 
 function hintPlaceHtml(hint, pool = state.hintPool) {
@@ -2506,11 +2514,25 @@ function paintOppHearts() {
   root.innerHTML = heartsMarkup(oppLifeHalves());
 }
 
+function twentiethsLivesRoot() {
+  return els.twentiethsLives || els.kingLives;
+}
+
+function syncTwentiethsMeterUi() {
+  const on = isTwentiethsEval();
+  if (els.twentiethsLives) els.twentiethsLives.hidden = !on;
+  if (els.kingLives) {
+    els.kingLives.hidden = on;
+    if (on) els.kingLives.classList.remove("is-twentieths");
+  }
+  const meters = els.kingLives?.closest(".king-meters");
+  if (meters) meters.hidden = on;
+}
+
 function paintTwentiethsHearts(count) {
-  const root = els.kingLives;
+  const root = twentiethsLivesRoot();
   if (!root) return;
   const shown = Math.max(0, Math.min(TWENTIETHS, Number.isFinite(count) ? count : TWENTIETHS));
-  root.classList.add("is-twentieths");
   root.classList.remove("is-flash");
   root.innerHTML = Array.from({ length: TWENTIETHS }, (_, i) => {
     const fill = twentiethsHeartFill(shown, i);
@@ -2521,7 +2543,7 @@ function paintTwentiethsHearts(count) {
 }
 
 function applyTwentiethsHeartKinds(count, { drop = false } = {}) {
-  const root = els.kingLives;
+  const root = twentiethsLivesRoot();
   const shown = Math.max(0, Math.min(TWENTIETHS, Number.isFinite(count) ? count : TWENTIETHS));
   if (!root || root.children.length !== TWENTIETHS) {
     paintTwentiethsHearts(shown);
@@ -2544,7 +2566,7 @@ function applyTwentiethsHeartKinds(count, { drop = false } = {}) {
 }
 
 function renderTwentiethsHearts() {
-  const root = els.kingLives;
+  const root = twentiethsLivesRoot();
   if (!root) return;
   const next = visibleTwentiethsHearts();
   if (root.children.length !== TWENTIETHS || !Number.isFinite(state.shownTwentieths)) {
@@ -2570,6 +2592,7 @@ function paintKingHearts(halves) {
     return;
   }
   root.classList.remove("is-twentieths");
+  root.hidden = false;
   const shown = displayLifeHalves(halves);
   root.classList.remove("is-flash");
   root.innerHTML = heartsMarkup(shown);
@@ -2838,12 +2861,13 @@ function renderKingLives() {
   paintEvalBar();
   paintOppHearts();
   paintKingSword();
-  const root = els.kingLives;
-  if (!root) return;
+  syncTwentiethsMeterUi();
   if (isTwentiethsEval()) {
     renderTwentiethsHearts();
     return;
   }
+  const root = els.kingLives;
+  if (!root) return;
   root.classList.remove("is-twentieths");
   const next = visibleLifeHalves();
   if (!root.children.length || root.children.length === TWENTIETHS || !Number.isFinite(state.shownLives)) {
@@ -3908,6 +3932,7 @@ const els = {
   kingPiece: document.getElementById("king-piece"),
   kingTitle: document.getElementById("king-title"),
   kingLives: document.getElementById("king-lives"),
+  twentiethsLives: document.getElementById("twentieths-lives"),
   kingSword: document.getElementById("king-sword"),
   oppLives: document.getElementById("opp-lives"),
   evalBar: document.getElementById("eval-bar"),
