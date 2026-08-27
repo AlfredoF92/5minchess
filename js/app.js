@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260828dots";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828grab";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828click";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -11,6 +11,7 @@ const AUTO_CONTINUE_KEY = "5minchess.autoContinue";
 const ADMIN_SOLUTIONS_KEY = "5minchess.adminSolutions";
 const AID_THREATS_KEY = "5minchess.aidThreats";
 const AID_MOVES_KEY = "5minchess.aidMoves";
+const CARD_CLICK_KEY = "5minchess.cardClick";
 const HINT_FAKE_LOAD_MS = 3000;
 const OPP_REPLY_MIN_MS = 10000;
 const KING_TALK_HIDE = {
@@ -232,6 +233,14 @@ function readAidThreats() {
 function readAidMoves() {
   try {
     return localStorage.getItem(AID_MOVES_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function readCardClick() {
+  try {
+    return localStorage.getItem(CARD_CLICK_KEY) !== "0";
   } catch {
     return true;
   }
@@ -3787,7 +3796,28 @@ function syncAidButtons() {
     els.aidThreats.classList.toggle("is-on", on);
     els.aidThreats.setAttribute("aria-pressed", on ? "true" : "false");
   }
+  syncCardClickUi();
   syncStoryIconsButton();
+}
+
+function syncCardClickUi() {
+  const on = state.cardClick !== false;
+  if (els.cardClick) {
+    els.cardClick.textContent = switchLabel(on);
+    els.cardClick.classList.toggle("is-on", on);
+    els.cardClick.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  els.hints?.classList.toggle("is-no-click", !on);
+}
+
+function setCardClick(on) {
+  state.cardClick = Boolean(on);
+  try {
+    localStorage.setItem(CARD_CLICK_KEY, state.cardClick ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  syncCardClickUi();
 }
 
 function syncStoryIconsButton() {
@@ -4146,6 +4176,7 @@ const els = {
   graveBottom: document.getElementById("grave-bottom"),
   aidMoves: document.getElementById("btn-aid-moves"),
   aidThreats: document.getElementById("btn-aid-threats"),
+  cardClick: document.getElementById("btn-card-click"),
   cardStyleBtn: document.getElementById("btn-card-style"),
   cardStyleList: document.getElementById("card-style-list"),
   cardStyleMenu: document.getElementById("card-style-menu"),
@@ -4227,6 +4258,7 @@ const state = {
   openingPly: 0,
   startOpening: START_OPENINGS[0],
   aids: { moves: readAidMoves(), threats: readAidThreats() },
+  cardClick: readCardClick(),
   aidTimer: null,
   aidToken: 0,
   flashToken: 0,
@@ -4924,7 +4956,7 @@ function renderHints() {
 }
 
 function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
-  if (!state.aids.moves || isHintFakeLoad()) {
+  if (isHintFakeLoad() || !state.aids.moves && !onlyActive) {
     state.board?.setArrows([]);
     return;
   }
@@ -5492,7 +5524,7 @@ els.promo.addEventListener("click", (event) => {
 
 els.hints.addEventListener("click", (event) => {
   const btn = event.target.closest(".hint-btn");
-  if (!btn || btn.disabled || isTrainHold() || isHintFakeLoad()) return;
+  if (!btn || btn.disabled || isTrainHold() || isHintFakeLoad() || !state.cardClick) return;
   playHintAt(Number(btn.dataset.index));
 });
 
@@ -5590,7 +5622,7 @@ els.hints.addEventListener("pointerover", (event) => {
     state.kbdHint = null;
     paintKbdHint();
   }
-  if (isTrainHold()) showHintArrows(index, { reveal: true, onlyActive: true });
+  if (isTrainHold() || !state.aids.moves) showHintArrows(index, { reveal: true, onlyActive: true });
   else showHintArrows(index, { reveal: true });
 });
 
@@ -6595,6 +6627,7 @@ els.quickTools?.addEventListener("click", (event) => {
 });
 els.aidMoves.addEventListener("click", () => showAid("moves"));
 els.aidThreats?.addEventListener("click", () => showAid("threats"));
+els.cardClick?.addEventListener("click", () => setCardClick(!state.cardClick));
 els.cardStyleBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleCardStyleMenu();

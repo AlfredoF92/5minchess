@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260828dots">
+  <link rel="stylesheet" href="css/style.css?v=20260828click">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -238,6 +238,10 @@
           <button type="button" id="btn-aid-moves" class="coach-switch is-on" aria-pressed="true">On</button>
         </div>
         <div class="coach-row">
+          <span class="coach-row-label" data-i18n="aid.cardClick">Click sulle cards</span>
+          <button type="button" id="btn-card-click" class="coach-switch is-on" aria-pressed="true" data-i18n-aria="aid.cardClickAria" aria-label="Scegli le mosse cliccando le cards">On</button>
+        </div>
+        <div class="coach-row">
           <span class="coach-row-label" data-i18n="aid.threats">Evidenzia i pezzi minacciati</span>
           <button type="button" id="btn-aid-threats" class="coach-switch" aria-pressed="false">Off</button>
         </div>
@@ -436,6 +440,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260828dots"></script>
+  <script type="module" src="js/app.js?v=20260828click"></script>
 </body>
 </html>

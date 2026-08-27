@@ -1195,6 +1195,9 @@ body.is-opening-intro .train-actions {
   overflow: hidden;
   transition: box-shadow 0.12s ease, transform 0.12s ease;
 }
+.hints.is-no-click .hint-btn.is-card:not(.empty):not(:disabled) {
+  cursor: default;
+}
 .hint-btn.is-card:hover:not(:disabled):not(.empty):not(.is-loading):not(.is-picked),
 .hint-btn.is-card.is-kbd:not(:disabled):not(.empty):not(.is-picked) {
   box-shadow: 0 8px 16px rgba(0,0,0,0.1), 0 0 0 2px #b7d48a;
