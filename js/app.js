@@ -1671,25 +1671,31 @@ function isHintOverlayInternal() {
   return state.hintInfo?.overlay === "internal";
 }
 
-function hintCardPlaceInnerHtml(hint) {
+function hintCardPlaceOverlayHtml(hint) {
   if (!state.hintInfo?.place) return "";
   const place = hintPlaceMap().get(hint?.uci);
   if (!place) return "";
-  const star = place === 1 ? `<span class="hint-star" aria-hidden="true">★</span>` : "";
-  return `<span class="hint-in-place">${escapeHtml(formatPlace(place))}${star}</span>`;
+  const text = formatPlace(place);
+  const fontSize = 40;
+  const strokeW = 5.2;
+  const pad = strokeW + 2;
+  const w = Math.ceil(text.length * fontSize * 0.72 + pad * 2);
+  const h = Math.ceil(fontSize + pad * 2);
+  const star = place === 1 ? `<span class="hint-in-place-star" aria-hidden="true">★</span>` : "";
+  return `<span class="hint-in-place"><svg class="hint-in-place-num" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <text x="${pad.toFixed(1)}" y="${(h / 2).toFixed(1)}" text-anchor="start" dominant-baseline="middle" dy="0.08" fill="#fff" stroke="#111" stroke-width="${strokeW.toFixed(2)}" stroke-linejoin="round" paint-order="stroke" font-size="${fontSize}" font-weight="800" font-family='"Segoe UI", "Trebuchet MS", Arial, sans-serif'>${escapeHtml(text)}</text>
+  </svg>${star}</span>`;
 }
 
 function hintCardEvalOverlayHtml(hint) {
   if (!hint || hint.synthetic) return "";
-  const place = hintCardPlaceInnerHtml(hint);
   const inner = hintEvalHtml(hint);
-  const evalPart = inner && inner !== "—" ? inner : "";
-  if (!place && !evalPart) return "";
-  return `<span class="hint-in-eval">${place}${evalPart}</span>`;
+  if (!inner || inner === "—") return "";
+  return `<span class="hint-in-eval">${inner}</span>`;
 }
 
 function hintCardOverlayHtml(hint) {
-  return hintCardEvalOverlayHtml(hint);
+  return `${hintCardPlaceOverlayHtml(hint)}${hintCardEvalOverlayHtml(hint)}`;
 }
 
 function hintVerdictHtml(hint) {
@@ -4237,6 +4243,7 @@ function renderHints() {
     const desc = played ? moveHeadline(played) : "";
     const overlay = internal ? hintCardOverlayHtml(hint) : "";
     const verdict = hold && !internal ? hintVerdictHtml(hint) : "";
+    const hideRank = internal && Boolean(state.hintInfo.place);
     const media = hintCardMediaHtml(hintArtHtml(played || { piece: "n", san: "" }, side, {
       n: knightPoses.get(hint.uci),
       p: pawnPoses.get(hint.uci),
@@ -4247,7 +4254,7 @@ function renderHints() {
       castle: castlePoses.get(hint.uci),
     }), san, overlay);
     const btn = `
-      <button class="hint-btn is-card${picked ? " is-picked" : ""}${internal ? " is-inlay" : ""}" data-index="${i}" type="button">
+      <button class="hint-btn is-card${picked ? " is-picked" : ""}${internal ? " is-inlay" : ""}${hideRank ? " is-inlay-place" : ""}" data-index="${i}" type="button">
         ${media}
         <span class="hint-body">
           <span class="hint-rank">${rank}</span>
