@@ -1620,33 +1620,9 @@ function hintEvalShownCp(info) {
   return isAbsLikeEval() ? moveEval : moveEval - hintBaselineEval();
 }
 
-function swordPrevEval() {
-  if (isTrainHold() && Number.isFinite(state.trainStandEval)) return state.trainStandEval;
-  return Number.isFinite(state.gameEval) ? state.gameEval : 0;
-}
-
-function swordSwingParts(info) {
-  const next = hintMoveEval(info);
-  if (next == null) return null;
-  const prev = swordPrevEval();
-  return {
-    prev,
-    next,
-    recovery: Math.max(0, Math.min(0, next) - Math.min(0, prev)),
-    damage: Math.max(0, Math.max(0, next) - Math.max(0, prev)),
-  };
-}
-
 function hintEvalDir(info) {
   if (!info || info.synthetic) return "";
   if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
-  if (isSwordEval()) {
-    const parts = swordSwingParts(info);
-    if (!parts) return "";
-    if ((evalShownPoints(parts.recovery) || 0) > 0 || (evalShownPoints(parts.damage) || 0) > 0) return "up";
-    const drop = evalShownPoints(parts.next - parts.prev);
-    return drop < 0 ? "down" : "up";
-  }
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
   const shown = evalShownPoints(cp);
@@ -1702,15 +1678,13 @@ function hintEvalHeartHtml() {
 
 function hintSwordEvalHtml(info) {
   if (info.scoreType === "mate") return escapeHtml(formatHintEval(info));
-  const parts = swordSwingParts(info);
-  if (!parts) return "—";
-  const rec = evalShownPoints(parts.recovery) || 0;
-  const dmg = evalShownPoints(parts.damage) || 0;
-  const bits = [];
-  if (rec > 0) bits.push(`<span class="hint-sword-part">+${rec}${hintEvalHeartHtml()}</span>`);
-  if (dmg > 0) bits.push(`<span class="hint-sword-part">+${dmg}${evalSwordSvg()}</span>`);
-  if (bits.length) return bits.join("");
-  return `${escapeHtml(formatSignedPawns(parts.next - parts.prev))}${hintEvalHeartHtml()}`;
+  const moveEval = hintMoveEval(info);
+  if (moveEval == null) return "—";
+  const shown = evalShownPoints(moveEval);
+  if (shown == null) return "—";
+  const score = escapeHtml(formatSignedPawns(moveEval));
+  if (shown > 0) return `${score}${evalSwordSvg()}`;
+  return `${score}${hintEvalHeartHtml()}`;
 }
 
 function hintEvalHtml(info) {
@@ -2489,10 +2463,7 @@ function stopSwordFlash() {
 function paintKingSword({ flash = false } = {}) {
   const root = els.kingSword;
   if (!root) return;
-  const prev = Number.isFinite(state.trainStandEval) ? state.trainStandEval : 0;
-  const next = Number.isFinite(state.gameEval) ? state.gameEval : 0;
-  const damage = Math.max(0, Math.max(0, next) - Math.max(0, prev));
-  const shown = evalShownPoints(damage) || 0;
+  const shown = evalShownPoints(Number.isFinite(state.gameEval) ? state.gameEval : 0) || 0;
   if (!isSwordEval() || !isTrainHold() || shown <= 0) {
     stopSwordFlash();
     root.hidden = true;
@@ -2789,7 +2760,6 @@ function clearTrainHold() {
   state.trainFen = "";
   state.trainColor = "";
   state.trainLives = null;
-  state.trainStandEval = null;
   state.continueArmed = false;
   state.pendingOpp = null;
   state.trainNext = null;
@@ -3714,7 +3684,6 @@ const state = {
   trainFen: "",
   trainColor: "",
   trainLives: null,
-  trainStandEval: null,
 };
 
 function isLocalVsHuman() {
@@ -4781,7 +4750,6 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   const rankKind = hintRankKind(chosen, poolSnap) || "normal";
   const band = rankReactBand(rankKind);
   const livesBefore = kingLifeHalves();
-  state.trainStandEval = Number.isFinite(state.gameEval) ? state.gameEval : 0;
   state.lastPlayerScore = chosen && !chosen.synthetic ? hintScore(chosen) : -Infinity;
   if (Number.isFinite(state.lastPlayerScore)) {
     state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
