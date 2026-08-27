@@ -1636,10 +1636,11 @@ function hintEvalDir(info) {
     return shownNext < shownPrev ? "down" : "up";
   }
   if (isTwentiethsEval()) {
-    const next = hintMoveEval(info);
-    if (next == null) return "";
-    const d = signedTwentieths(next) - signedTwentieths(positionEvalNow());
-    return d < 0 ? "down" : "up";
+    const parts = twentiethsSwingParts(info);
+    if (!parts) return "";
+    if (parts.recovery > 0 || parts.damage > 0) return "up";
+    if (parts.heartLoss > 0 || parts.swordLoss > 0) return "down";
+    return "up";
   }
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
@@ -1661,7 +1662,7 @@ function formatHintEval(info) {
 }
 
 function hintBaselineEval() {
-  if (isPrevOppEval()) {
+  if (isPrevOppEval() || isTwentiethsEval()) {
     return Number.isFinite(state.beforeOppEval) ? state.beforeOppEval : 0;
   }
   return positionEvalNow();
@@ -1749,14 +1750,35 @@ function hintSwordEvalHtml(info) {
   return `<span class="hint-sword-rows">${rows.join("")}</span>`;
 }
 
+function twentiethsSwingParts(info) {
+  const nextCp = hintMoveEval(info);
+  if (nextCp == null) return null;
+  const next = signedTwentieths(nextCp);
+  const prev = signedTwentieths(Number.isFinite(state.beforeOppEval) ? state.beforeOppEval : 0);
+  return {
+    recovery: Math.max(0, Math.min(0, next) - Math.min(0, prev)),
+    damage: Math.max(0, Math.max(0, next) - Math.max(0, prev)),
+    heartLoss: Math.max(0, Math.min(0, prev) - Math.min(0, next)),
+    swordLoss: Math.max(0, Math.max(0, prev) - Math.max(0, next)),
+  };
+}
+
+function hintTwentiethsRowHtml(n, iconHtml, up) {
+  if (!n) return "";
+  return `<span class="hint-sword-row">${up ? "+" : "−"}${n}${iconHtml}</span>`;
+}
+
 function hintTwentiethsEvalHtml(info) {
   if (info.scoreType === "mate") return escapeHtml(formatHintDelta(info));
-  const next = hintMoveEval(info);
-  if (next == null) return "—";
-  const d = signedTwentieths(next) - signedTwentieths(positionEvalNow());
-  if (!d) return "";
-  if (d > 0) return `<span class="hint-sword-row">+${d}${evalSwordSvg()}</span>`;
-  return `<span class="hint-sword-row">−${-d}${hintEvalHeartHtml()}</span>`;
+  const parts = twentiethsSwingParts(info);
+  if (!parts) return "—";
+  const rows = [];
+  if (parts.recovery > 0) rows.push(hintTwentiethsRowHtml(parts.recovery, hintEvalHeartHtml(), true));
+  else if (parts.heartLoss > 0) rows.push(hintTwentiethsRowHtml(parts.heartLoss, hintEvalHeartHtml(), false));
+  if (parts.damage > 0) rows.push(hintTwentiethsRowHtml(parts.damage, evalSwordSvg(), true));
+  else if (parts.swordLoss > 0) rows.push(hintTwentiethsRowHtml(parts.swordLoss, evalSwordSvg(), false));
+  if (!rows.length) return "";
+  return `<span class="hint-sword-rows">${rows.join("")}</span>`;
 }
 
 function hintEvalHtml(info) {
@@ -2603,8 +2625,15 @@ function queueLifeLoss(next) {
   }, 900);
 }
 
+function evalBarSourceCp() {
+  if (isTwentiethsEval() && !isLocalVsHuman()) {
+    return Number.isFinite(state.evalBarHold) ? state.evalBarHold : 0;
+  }
+  return Number.isFinite(state.gameEval) ? state.gameEval : 0;
+}
+
 function evalCpForWhite() {
-  const cp = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+  const cp = evalBarSourceCp();
   let from = state.playerColor;
   if (isLocalVsHuman()) {
     const hist = state.game.history({ verbose: true });
@@ -2618,7 +2647,7 @@ function evalBarShownCp() {
     const cpWhite = evalCpForWhite();
     return state.board?.orientation === "black" ? -cpWhite : cpWhite;
   }
-  return Number.isFinite(state.gameEval) ? state.gameEval : 0;
+  return evalBarSourceCp();
 }
 
 function formatEvalBarScore(cp, { ignoreMate = false } = {}) {
@@ -2698,7 +2727,7 @@ function paintEvalBar() {
   const prevWrap = els.evalBarPrevWrap;
   if (!fill && !label) return;
   const blackBottom = state.board?.orientation === "black";
-  rememberEvalBarPrev(state.gameEval);
+  rememberEvalBarPrev(evalBarSourceCp());
   const shown = evalBarShownCp();
   const cpWhite = evalCpForWhite();
   const pct = Math.max(0, Math.min(100, whiteEvalShare(cpWhite)));
@@ -3961,6 +3990,7 @@ const state = {
   beforeOppEval: 0,
   evalBarPainted: null,
   evalBarBefore: null,
+  evalBarHold: 0,
   standEval: 0,
   nextStandEval: null,
   livesForced: null,
@@ -5093,6 +5123,9 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   if (Number.isFinite(state.lastPlayerScore)) {
     state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
   }
+  if (isTwentiethsEval() && !isLocalVsHuman()) {
+    state.evalBarHold = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+  }
   if (isPrevOppEval() || isSwordEval()) freezeKingLives(kingLifeHalves());
   else if (!isLocalVsHuman()) freezeKingLives(isTwentiethsEval() ? twBefore : halvesBefore);
   const lifeKey = pickLifeFeedbackKey(kingLifeHalves() - halvesBefore);
@@ -5734,6 +5767,10 @@ function applyEvalView(value) {
     stopLivesAnim();
     state.shownLives = null;
     state.shownTwentieths = null;
+    if (isTwentiethsEval()) {
+      state.evalBarHold = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+      resetEvalBarHistory();
+    }
   }
   syncHintInfoUi();
   renderHints();
@@ -5978,6 +6015,7 @@ function startGame(playerColor = state.playerColor) {
   }
   state.gameEval = 0;
   state.beforeOppEval = 0;
+  state.evalBarHold = 0;
   resetEvalBarHistory();
   state.standEval = 0;
   state.nextStandEval = null;
