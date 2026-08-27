@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827sword";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827swordd";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -251,7 +251,7 @@ function isSwordEval() {
 }
 
 function isAbsLikeEval() {
-  return state.evalView === "abs" || isSwordEval();
+  return state.evalView === "abs";
 }
 
 function evalViewShortKey() {
@@ -1643,7 +1643,7 @@ function formatHintEval(info) {
 }
 
 function hintBaselineEval() {
-  if (isPrevOppEval()) {
+  if (isPrevOppEval() || isSwordEval()) {
     return Number.isFinite(state.beforeOppEval) ? state.beforeOppEval : 0;
   }
   return positionEvalNow();
@@ -1677,12 +1677,13 @@ function hintEvalHeartHtml() {
 }
 
 function hintSwordEvalHtml(info) {
-  if (info.scoreType === "mate") return escapeHtml(formatHintEval(info));
+  if (info.scoreType === "mate") return escapeHtml(formatHintDelta(info));
   const moveEval = hintMoveEval(info);
   if (moveEval == null) return "—";
-  const shown = evalShownPoints(moveEval);
+  const delta = moveEval - hintBaselineEval();
+  const shown = evalShownPoints(delta);
   if (shown == null) return "—";
-  const score = escapeHtml(formatSignedPawns(moveEval));
+  const score = escapeHtml(formatSignedPawns(delta));
   if (shown > 0) return `${score}${evalSwordSvg()}`;
   return `${score}${hintEvalHeartHtml()}`;
 }
