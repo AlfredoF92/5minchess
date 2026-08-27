@@ -1015,6 +1015,19 @@ button, select { font: inherit; }
   height: 17px;
   font-size: 18px;
 }
+.hint-eval-heart {
+  display: inline-block;
+  color: #e03131;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 1px;
+  transform: translateY(1px);
+}
+.hint-in-eval .hint-eval-heart {
+  font-size: 20px;
+  margin-left: 2px;
+}
 .hint-card-art.is-icon {
   padding: 20px 45px 0;
   background: var(--card-art);

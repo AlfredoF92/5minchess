@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827pts";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827heartp";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1594,8 +1594,8 @@ function positionEvalNow() {
 function formatSignedPawns(cp) {
   if (!Number.isFinite(cp)) return "—";
   const shown = state.roundEval ? Math.round(cp / 10) * 10 : Math.round(cp);
-  if (!shown) return "0p";
-  return shown > 0 ? `+${shown}p` : `${shown}p`;
+  if (!shown) return "0";
+  return shown > 0 ? `+${shown}` : `${shown}`;
 }
 
 function hintEvalShownCp(info) {
@@ -1663,7 +1663,8 @@ function hintEvalHtml(info) {
     return `${arrow}${hearts}`;
   }
   const score = escapeHtml(state.evalView === "abs" ? formatHintEval(info) : formatHintDelta(info));
-  return `${arrow}${score}`;
+  const heart = info.scoreType === "mate" ? "" : `<span class="hint-eval-heart" aria-hidden="true">♥</span>`;
+  return `${arrow}${score}${heart}`;
 }
 
 function isHintOverlayInternal() {
