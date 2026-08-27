@@ -1198,9 +1198,14 @@ body.is-opening-intro .train-actions {
 .hints.is-no-click .hint-btn.is-card:not(.empty):not(:disabled) {
   cursor: default;
 }
-.hint-btn.is-card:hover:not(:disabled):not(.empty):not(.is-loading):not(.is-picked),
-.hint-btn.is-card.is-kbd:not(:disabled):not(.empty):not(.is-picked) {
+.hint-btn.is-card:hover:not(:disabled):not(.empty):not(.is-loading):not(.is-picked):not(.is-kbd) {
   box-shadow: 0 8px 16px rgba(0,0,0,0.1), 0 0 0 2px #b7d48a;
+  transform: translateY(-2px);
+}
+.hint-btn.is-card.is-kbd:not(:disabled):not(.empty):not(.is-picked) {
+  outline: 4px solid var(--green);
+  outline-offset: 2px;
+  box-shadow: 0 8px 18px rgba(98, 153, 36, 0.28);
   transform: translateY(-2px);
 }
 .hint-btn.is-card.is-picked,
