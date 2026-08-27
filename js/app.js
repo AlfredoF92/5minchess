@@ -1669,7 +1669,7 @@ function hintEvalArrowSvg(dir) {
 }
 
 function evalSwordSvg() {
-  return `<svg class="eval-sword" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11.15 1.4h1.7l.65 12.7h3.05v1.7h-3.2V21c0 .9-.7 1.6-1.55 1.6S10.2 21.9 10.2 21v-5.2H7v-1.7h3.05L11.15 1.4z"/></svg>`;
+  return `<img class="eval-sword" src="img/eval-sword.svg" alt="" aria-hidden="true">`;
 }
 
 function hintEvalHeartHtml() {
@@ -2212,6 +2212,11 @@ function livesFromCp(cp) {
   return 0;
 }
 
+function swordsFromCp(cp) {
+  if (!Number.isFinite(cp) || cp <= 0) return 0;
+  return LIFE_MAX_HALVES - livesFromCp(-cp);
+}
+
 function kingLifeHalves() {
   if (Number.isFinite(state.livesForced)) return state.livesForced;
   if (state.game.in_checkmate()) {
@@ -2279,6 +2284,28 @@ function heartPieceHtml(halves, i, extraClass = "") {
   const kind = heartKind(halves, i);
   const cls = extraClass ? ` ${extraClass}` : "";
   return `<span class="king-heart is-${kind}${cls}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg" style="width:${(fill * 100).toFixed(2)}%">♥</span></span>`;
+}
+
+function kingSwordHalves() {
+  if (state.game.in_checkmate()) {
+    return state.game.turn() !== state.playerColor ? LIFE_MAX_HALVES : 0;
+  }
+  return swordsFromCp(Number.isFinite(state.gameEval) ? state.gameEval : 0);
+}
+
+function visibleSwordHalves() {
+  return displayLifeHalves(kingSwordHalves());
+}
+
+function swordPieceHtml(halves, i) {
+  const fill = heartFill(halves, i);
+  const kind = heartKind(halves, i);
+  return `<span class="king-sword-piece is-${kind}" aria-hidden="true"><img class="sword-bg" src="img/eval-sword.svg" alt=""><span class="sword-fg" style="width:${(fill * 100).toFixed(2)}%"><img src="img/eval-sword.svg" alt=""></span></span>`;
+}
+
+function swordsMarkup(halves) {
+  const shown = displayLifeHalves(halves);
+  return [0, 1, 2].map((i) => swordPieceHtml(shown, i)).join("");
 }
 
 function hintHeartPiece(fill, tone) {
@@ -2463,16 +2490,36 @@ function stopSwordFlash() {
 function paintKingSword({ flash = false } = {}) {
   const root = els.kingSword;
   if (!root) return;
-  const shown = evalShownPoints(Number.isFinite(state.gameEval) ? state.gameEval : 0) || 0;
-  if (!isSwordEval() || !isTrainHold() || shown <= 0) {
+  if (!isSwordEval()) {
     stopSwordFlash();
+    state.swordFlashPending = false;
     root.hidden = true;
     root.setAttribute("aria-hidden", "true");
+    root.innerHTML = "";
+    state.shownSwords = null;
     return;
   }
+  const doFlash = flash || state.swordFlashPending;
+  state.swordFlashPending = false;
+  const next = visibleSwordHalves();
+  const prev = Number.isFinite(state.shownSwords) ? state.shownSwords : 0;
+  const grew = next > prev + LIFE_EPS;
   root.hidden = false;
   root.setAttribute("aria-hidden", "false");
-  if (!flash) return;
+  if (!root.children.length) {
+    root.innerHTML = swordsMarkup(next);
+  } else {
+    [...root.children].forEach((el, i) => {
+      const fill = heartFill(next, i);
+      const kind = heartKind(next, i);
+      const fg = el.querySelector(".sword-fg");
+      el.classList.remove("is-full", "is-empty", "is-partial");
+      el.classList.add(`is-${kind}`);
+      if (fg) fg.style.width = `${(fill * 100).toFixed(2)}%`;
+    });
+  }
+  state.shownSwords = next;
+  if (!doFlash || !grew) return;
   stopSwordFlash();
   void root.offsetWidth;
   root.classList.add("is-flash");
@@ -3630,10 +3677,12 @@ const state = {
   nextStandEval: null,
   livesForced: null,
   shownLives: null,
+  shownSwords: null,
   livesHold: null,
   livesAnimating: false,
   livesAnimTimer: null,
   swordFlashTimer: 0,
+  swordFlashPending: false,
   pendingLives: null,
   hintLayout: readHintLayout(),
   moveClockSec: readMoveClock(),
@@ -4754,7 +4803,7 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   if (Number.isFinite(state.lastPlayerScore)) {
     state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
   }
-  if (isPrevOppEval()) freezeKingLives(kingLifeHalves());
+  if (isPrevOppEval() || isSwordEval()) freezeKingLives(kingLifeHalves());
   else if (!isLocalVsHuman()) freezeKingLives(livesBefore);
   const lifeKey = pickLifeFeedbackKey(kingLifeHalves() - livesBefore);
   const visDelta = displayLifeHalves(kingLifeHalves()) - displayLifeHalves(livesBefore);
@@ -4804,8 +4853,8 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   state.board.setPosition(state.game.fen());
   flashThreatenedPieces(played);
   renderHistory();
+  if (isSwordEval()) state.swordFlashPending = true;
   renderKingLives();
-  if (isSwordEval()) paintKingSword({ flash: true });
   if (trainReview) {
     state.busy = false;
     syncTrainContinue();
@@ -5637,6 +5686,7 @@ function startGame(playerColor = state.playerColor) {
   thawKingLives();
   stopLivesAnim();
   state.shownLives = null;
+  state.shownSwords = null;
   clearKingReact();
   clearHints();
   clearTimeout(state.aidTimer);

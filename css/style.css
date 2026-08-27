@@ -597,32 +597,54 @@ button, select { font: inherit; }
 }
 .king-meters {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 2px;
   margin-top: 4px;
 }
 .king-meters .king-lives {
   margin-top: 0;
 }
-.king-sword {
-  display: inline-flex;
+.king-swords {
+  display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 3px;
+  gap: 0;
   line-height: 1;
-  color: #3d4f66;
 }
-.king-sword[hidden] {
+.king-swords[hidden] {
   display: none;
 }
-.king-sword-score {
-  display: none;
+.king-sword-piece {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  margin: 0 -1px;
+  overflow: hidden;
 }
-.king-sword .eval-sword {
-  width: 22px;
-  height: 22px;
+.king-sword-piece img {
+  display: block;
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
 }
-.king-sword.is-flash {
+.king-sword-piece .sword-bg {
+  opacity: 0.2;
+  filter: grayscale(0.35);
+}
+.king-sword-piece .sword-fg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: width 0.45s ease;
+}
+.king-sword-piece.is-empty .sword-fg { width: 0; }
+.king-sword-piece.is-full .sword-fg { width: 100%; }
+.king-swords.is-flash .king-sword-piece {
   animation: king-sword-flash 0.3s ease-in-out 3;
 }
 @keyframes king-sword-flash {
@@ -1064,10 +1086,10 @@ button, select { font: inherit; }
 }
 .eval-sword {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
   flex-shrink: 0;
-  color: #3d4f66;
 }
 .hint-eval .eval-sword,
 .hint-in-eval .eval-sword {
