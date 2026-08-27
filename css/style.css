@@ -595,6 +595,43 @@ button, select { font: inherit; }
   margin-top: 4px;
   line-height: 1;
 }
+.king-meters {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.king-meters .king-lives {
+  margin-top: 0;
+}
+.king-sword {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  line-height: 1;
+  color: #3d4f66;
+}
+.king-sword[hidden] {
+  display: none;
+}
+.king-sword-score {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #2a3340;
+}
+.king-sword .eval-sword {
+  width: 22px;
+  height: 22px;
+}
+.king-sword.is-flash {
+  animation: king-sword-flash 0.3s ease-in-out 3;
+}
+@keyframes king-sword-flash {
+  0%, 100% { opacity: 1; transform: scale(1); filter: none; }
+  50% { opacity: 0.2; transform: scale(1.16); filter: drop-shadow(0 0 6px #c9a227); }
+}
 .king-heart {
   position: relative;
   width: 28px;
@@ -1027,6 +1064,19 @@ button, select { font: inherit; }
 .hint-in-eval .hint-eval-heart {
   font-size: 20px;
   margin-left: 2px;
+}
+.eval-sword {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #3d4f66;
+}
+.hint-eval .eval-sword,
+.hint-in-eval .eval-sword {
+  width: 22px;
+  height: 22px;
+  margin-left: 1px;
 }
 .hint-card-art.is-icon {
   padding: 20px 45px 0;

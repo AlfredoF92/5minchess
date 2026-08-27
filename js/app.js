@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827heartp";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827sword";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -230,7 +230,7 @@ function readRoundEval() {
 function readEvalView() {
   try {
     const saved = localStorage.getItem(EVAL_VIEW_KEY);
-    if (saved === "abs" || saved === "prevOpp") return saved;
+    if (saved === "abs" || saved === "prevOpp" || saved === "sword") return saved;
     return "delta";
   } catch {
     return "delta";
@@ -238,7 +238,7 @@ function readEvalView() {
 }
 
 function normalizeEvalView(value) {
-  if (value === "abs" || value === "prevOpp") return value;
+  if (value === "abs" || value === "prevOpp" || value === "sword") return value;
   return "delta";
 }
 
@@ -246,9 +246,18 @@ function isPrevOppEval() {
   return state.evalView === "prevOpp";
 }
 
+function isSwordEval() {
+  return state.evalView === "sword";
+}
+
+function isAbsLikeEval() {
+  return state.evalView === "abs" || isSwordEval();
+}
+
 function evalViewShortKey() {
   if (state.evalView === "abs") return "tools.hintInfo.eval.abs";
   if (state.evalView === "prevOpp") return "tools.hintInfo.eval.prevOpp";
+  if (isSwordEval()) return "tools.hintInfo.eval.sword";
   return "tools.hintInfo.eval.delta";
 }
 
@@ -1591,9 +1600,14 @@ function positionEvalNow() {
   return Number.isFinite(state.gameEval) ? state.gameEval : 0;
 }
 
+function evalShownPoints(cp) {
+  if (!Number.isFinite(cp)) return null;
+  return state.roundEval ? Math.round(cp / 10) * 10 : Math.round(cp);
+}
+
 function formatSignedPawns(cp) {
-  if (!Number.isFinite(cp)) return "—";
-  const shown = state.roundEval ? Math.round(cp / 10) * 10 : Math.round(cp);
+  const shown = evalShownPoints(cp);
+  if (shown == null) return "—";
   if (!shown) return "0";
   return shown > 0 ? `+${shown}` : `${shown}`;
 }
@@ -1603,7 +1617,7 @@ function hintEvalShownCp(info) {
   if (info.scoreType === "mate") return null;
   const moveEval = hintMoveEval(info);
   if (moveEval == null) return null;
-  return state.evalView === "abs" ? moveEval : moveEval - hintBaselineEval();
+  return isAbsLikeEval() ? moveEval : moveEval - hintBaselineEval();
 }
 
 function hintEvalDir(info) {
@@ -1611,8 +1625,8 @@ function hintEvalDir(info) {
   if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
-  const shown = state.roundEval ? Math.round(cp / 10) * 10 : Math.round(cp);
-  if (!Number.isFinite(shown)) return "";
+  const shown = evalShownPoints(cp);
+  if (shown == null) return "";
   return shown < 0 ? "down" : "up";
 }
 
@@ -1654,17 +1668,29 @@ function hintEvalArrowSvg(dir) {
   return `<svg class="hint-eval-dir is-${dir}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${path}"/></svg>`;
 }
 
+function evalSwordSvg() {
+  return `<svg class="eval-sword" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11.15 1.4h1.7l.65 12.7h3.05v1.7h-3.2V21c0 .9-.7 1.6-1.55 1.6S10.2 21.9 10.2 21v-5.2H7v-1.7h3.05L11.15 1.4z"/></svg>`;
+}
+
+function hintEvalMarkHtml(info) {
+  if (!info || info.scoreType === "mate") return "";
+  if (isSwordEval()) {
+    const shown = evalShownPoints(hintEvalShownCp(info));
+    if (shown > 0) return evalSwordSvg();
+  }
+  return `<span class="hint-eval-heart" aria-hidden="true">♥</span>`;
+}
+
 function hintEvalHtml(info) {
   if (!info || info.synthetic) return "—";
   const dir = state.hintInfo?.arrow ? hintEvalDir(info) : "";
   const arrow = dir ? hintEvalArrowSvg(dir) : "";
   if (state.hintInfo?.score === "hearts") {
-    const hearts = state.evalView === "abs" ? hintLivesRowHtml(info) : hintHeartsHtml(info);
+    const hearts = isAbsLikeEval() ? hintLivesRowHtml(info) : hintHeartsHtml(info);
     return `${arrow}${hearts}`;
   }
-  const score = escapeHtml(state.evalView === "abs" ? formatHintEval(info) : formatHintDelta(info));
-  const heart = info.scoreType === "mate" ? "" : `<span class="hint-eval-heart" aria-hidden="true">♥</span>`;
-  return `${arrow}${score}${heart}`;
+  const score = escapeHtml(isAbsLikeEval() ? formatHintEval(info) : formatHintDelta(info));
+  return `${arrow}${score}${hintEvalMarkHtml(info)}`;
 }
 
 function isHintOverlayInternal() {
@@ -2421,9 +2447,40 @@ function paintEvalBar() {
   }
 }
 
+function stopSwordFlash() {
+  clearTimeout(state.swordFlashTimer);
+  state.swordFlashTimer = 0;
+  els.kingSword?.classList.remove("is-flash");
+}
+
+function paintKingSword({ flash = false } = {}) {
+  const root = els.kingSword;
+  const scoreEl = els.kingSwordScore;
+  if (!root) return;
+  const shown = evalShownPoints(Number.isFinite(state.gameEval) ? state.gameEval : 0) || 0;
+  if (!isSwordEval() || shown <= 0) {
+    stopSwordFlash();
+    root.hidden = true;
+    root.setAttribute("aria-hidden", "true");
+    return;
+  }
+  root.hidden = false;
+  root.setAttribute("aria-hidden", "false");
+  if (scoreEl) scoreEl.textContent = `+${shown}`;
+  if (!flash) return;
+  stopSwordFlash();
+  void root.offsetWidth;
+  root.classList.add("is-flash");
+  state.swordFlashTimer = setTimeout(() => {
+    root.classList.remove("is-flash");
+    state.swordFlashTimer = 0;
+  }, 950);
+}
+
 function renderKingLives() {
   paintEvalBar();
   paintOppHearts();
+  paintKingSword();
   const root = els.kingLives;
   if (!root) return;
   const next = visibleLifeHalves();
@@ -3237,6 +3294,7 @@ function fillHintEvalViewMenu() {
     { id: "abs", key: "settings.evalView.abs" },
     { id: "delta", key: "settings.evalView.delta" },
     { id: "prevOpp", key: "settings.evalView.prevOpp" },
+    { id: "sword", key: "settings.evalView.sword" },
   ];
   els.evalViewList.innerHTML = items
     .map(
@@ -3487,6 +3545,8 @@ const els = {
   kingPiece: document.getElementById("king-piece"),
   kingTitle: document.getElementById("king-title"),
   kingLives: document.getElementById("king-lives"),
+  kingSword: document.getElementById("king-sword"),
+  kingSwordScore: document.getElementById("king-sword-score"),
   oppLives: document.getElementById("opp-lives"),
   evalBar: document.getElementById("eval-bar"),
   evalBarFill: document.getElementById("eval-bar-fill"),
@@ -3569,6 +3629,7 @@ const state = {
   livesHold: null,
   livesAnimating: false,
   livesAnimTimer: null,
+  swordFlashTimer: 0,
   pendingLives: null,
   hintLayout: readHintLayout(),
   moveClockSec: readMoveClock(),
@@ -4740,6 +4801,7 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   flashThreatenedPieces(played);
   renderHistory();
   renderKingLives();
+  if (isSwordEval()) paintKingSword({ flash: (evalShownPoints(state.gameEval) || 0) > 0 });
   if (trainReview) {
     state.busy = false;
     syncTrainContinue();
@@ -5308,6 +5370,7 @@ function fillEvalViewSelect() {
     `<option value="abs"${current === "abs" ? " selected" : ""}>${t("settings.evalView.abs")}</option>`,
     `<option value="delta"${current === "delta" ? " selected" : ""}>${t("settings.evalView.delta")}</option>`,
     `<option value="prevOpp"${current === "prevOpp" ? " selected" : ""}>${t("settings.evalView.prevOpp")}</option>`,
+    `<option value="sword"${current === "sword" ? " selected" : ""}>${t("settings.evalView.sword")}</option>`,
   ].join("");
 }
 
