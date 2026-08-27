@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827swordd";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827venti";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -230,7 +230,7 @@ function readRoundEval() {
 function readEvalView() {
   try {
     const saved = localStorage.getItem(EVAL_VIEW_KEY);
-    if (saved === "abs" || saved === "prevOpp" || saved === "sword") return saved;
+    if (saved === "abs" || saved === "prevOpp" || saved === "sword" || saved === "twentieths") return saved;
     return "delta";
   } catch {
     return "delta";
@@ -238,7 +238,7 @@ function readEvalView() {
 }
 
 function normalizeEvalView(value) {
-  if (value === "abs" || value === "prevOpp" || value === "sword") return value;
+  if (value === "abs" || value === "prevOpp" || value === "sword" || value === "twentieths") return value;
   return "delta";
 }
 
@@ -250,6 +250,10 @@ function isSwordEval() {
   return state.evalView === "sword";
 }
 
+function isTwentiethsEval() {
+  return state.evalView === "twentieths";
+}
+
 function isAbsLikeEval() {
   return state.evalView === "abs";
 }
@@ -258,6 +262,7 @@ function evalViewShortKey() {
   if (state.evalView === "abs") return "tools.hintInfo.eval.abs";
   if (state.evalView === "prevOpp") return "tools.hintInfo.eval.prevOpp";
   if (isSwordEval()) return "tools.hintInfo.eval.sword";
+  if (isTwentiethsEval()) return "tools.hintInfo.eval.twentieths";
   return "tools.hintInfo.eval.delta";
 }
 
@@ -1630,6 +1635,12 @@ function hintEvalDir(info) {
     const shownPrev = evalShownPoints(positionEvalNow()) || 0;
     return shownNext < shownPrev ? "down" : "up";
   }
+  if (isTwentiethsEval()) {
+    const next = hintMoveEval(info);
+    if (next == null) return "";
+    const d = signedTwentieths(next) - signedTwentieths(positionEvalNow());
+    return d < 0 ? "down" : "up";
+  }
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
   const shown = evalShownPoints(cp);
@@ -1738,15 +1749,26 @@ function hintSwordEvalHtml(info) {
   return `<span class="hint-sword-rows">${rows.join("")}</span>`;
 }
 
+function hintTwentiethsEvalHtml(info) {
+  if (info.scoreType === "mate") return escapeHtml(formatHintDelta(info));
+  const next = hintMoveEval(info);
+  if (next == null) return "—";
+  const d = signedTwentieths(next) - signedTwentieths(positionEvalNow());
+  if (!d) return "";
+  if (d > 0) return `<span class="hint-sword-row">+${d}${evalSwordSvg()}</span>`;
+  return `<span class="hint-sword-row">−${-d}${hintEvalHeartHtml()}</span>`;
+}
+
 function hintEvalHtml(info) {
   if (!info || info.synthetic) return "—";
   const dir = state.hintInfo?.arrow ? hintEvalDir(info) : "";
   const arrow = dir ? hintEvalArrowSvg(dir) : "";
+  if (isSwordEval()) return `${arrow}${hintSwordEvalHtml(info)}`;
+  if (isTwentiethsEval()) return `${arrow}${hintTwentiethsEvalHtml(info)}`;
   if (state.hintInfo?.score === "hearts") {
     const hearts = isAbsLikeEval() ? hintLivesRowHtml(info) : hintHeartsHtml(info);
     return `${arrow}${hearts}`;
   }
-  if (isSwordEval()) return `${arrow}${hintSwordEvalHtml(info)}`;
   const score = escapeHtml(isAbsLikeEval() ? formatHintEval(info) : formatHintDelta(info));
   return `${arrow}${score}${hintEvalHeartHtml()}`;
 }
@@ -2240,6 +2262,9 @@ const LIFE_MAX_HALVES = HEART_COUNT * 2;
 const LIFE_PARTS = HEART_COUNT * HEART_PARTS;
 const LIFE_EPS = LIFE_MAX_HALVES / LIFE_PARTS / 2;
 const LIFE_FLASH_HALVES = 1;
+const TWENTIETHS = 20;
+const TWENTIETHS_CP = 1000;
+const TWENTIETHS_STEP = TWENTIETHS_CP / TWENTIETHS;
 const LIFE_BANDS = [
   { cp: 0, halves: 6 },
   { cp: -100, halves: 5 },
@@ -2248,6 +2273,36 @@ const LIFE_BANDS = [
   { cp: -300, halves: 2 },
   { cp: -1000, halves: 0 },
 ];
+
+function signedTwentieths(cp) {
+  if (!Number.isFinite(cp)) return 0;
+  if (Math.abs(cp) >= 50000) return cp > 0 ? TWENTIETHS : -TWENTIETHS;
+  return Math.max(-TWENTIETHS, Math.min(TWENTIETHS, Math.round(cp / TWENTIETHS_STEP)));
+}
+
+function formatTwentiethsSigned(n) {
+  if (!n) return "0";
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
+function twentiethsHeartsFromCp(cp) {
+  if (!Number.isFinite(cp) || cp >= 0) return TWENTIETHS;
+  if (cp <= -TWENTIETHS_CP) return 0;
+  return TWENTIETHS * (TWENTIETHS_CP + cp) / TWENTIETHS_CP;
+}
+
+function visibleTwentiethsHearts() {
+  if (Number.isFinite(state.livesHold)) return Math.max(0, Math.min(TWENTIETHS, state.livesHold));
+  if (state.game?.in_checkmate()) {
+    return state.game.turn() !== state.playerColor ? TWENTIETHS : 0;
+  }
+  if (state.game?.game_over()) return TWENTIETHS;
+  return twentiethsHeartsFromCp(Number.isFinite(state.gameEval) ? state.gameEval : 0);
+}
+
+function twentiethsHeartFill(count, i) {
+  return Math.max(0, Math.min(1, count - i));
+}
 
 function livesFromCp(cp) {
   if (!Number.isFinite(cp) || cp >= 0) return LIFE_MAX_HALVES;
@@ -2429,9 +2484,70 @@ function paintOppHearts() {
   root.innerHTML = heartsMarkup(oppLifeHalves());
 }
 
+function paintTwentiethsHearts(count) {
+  const root = els.kingLives;
+  if (!root) return;
+  const shown = Math.max(0, Math.min(TWENTIETHS, Number.isFinite(count) ? count : TWENTIETHS));
+  root.classList.add("is-twentieths");
+  root.classList.remove("is-flash");
+  root.innerHTML = Array.from({ length: TWENTIETHS }, (_, i) => {
+    const fill = twentiethsHeartFill(shown, i);
+    const kind = fill >= 1 - 0.02 ? "full" : fill <= 0.02 ? "empty" : "partial";
+    return `<span class="king-heart is-${kind}" aria-hidden="true"><span class="heart-bg">♥</span><span class="heart-fg" style="width:${(fill * 100).toFixed(2)}%">♥</span></span>`;
+  }).join("");
+  state.shownTwentieths = shown;
+}
+
+function applyTwentiethsHeartKinds(count, { drop = false } = {}) {
+  const root = els.kingLives;
+  const shown = Math.max(0, Math.min(TWENTIETHS, Number.isFinite(count) ? count : TWENTIETHS));
+  if (!root || root.children.length !== TWENTIETHS) {
+    paintTwentiethsHearts(shown);
+    return;
+  }
+  [...root.children].forEach((el, i) => {
+    const fill = twentiethsHeartFill(shown, i);
+    const kind = fill >= 1 - 0.02 ? "full" : fill <= 0.02 ? "empty" : "partial";
+    const fg = el.querySelector(".heart-fg");
+    const prev = Math.max(0, Math.min(1, parseFloat(fg?.style.width) / 100 || 0));
+    el.classList.remove("is-full", "is-half", "is-empty", "is-partial", "is-drop");
+    el.classList.add(`is-${kind}`);
+    if (fg) fg.style.width = `${(fill * 100).toFixed(2)}%`;
+    if (drop && fill < prev - 0.02) {
+      el.classList.add("is-drop");
+      el.addEventListener("animationend", () => el.classList.remove("is-drop"), { once: true });
+    }
+  });
+  state.shownTwentieths = shown;
+}
+
+function renderTwentiethsHearts() {
+  const root = els.kingLives;
+  if (!root) return;
+  const next = visibleTwentiethsHearts();
+  if (root.children.length !== TWENTIETHS || !Number.isFinite(state.shownTwentieths)) {
+    paintTwentiethsHearts(next);
+    return;
+  }
+  if (Math.abs(next - state.shownTwentieths) < 0.02 && !state.livesAnimating) return;
+  const lost = state.shownTwentieths - next;
+  if (lost >= 1) {
+    root.classList.remove("is-flash");
+    void root.offsetWidth;
+    root.classList.add("is-flash");
+  }
+  applyTwentiethsHeartKinds(next, { drop: lost > 0.02 });
+}
+
 function paintKingHearts(halves) {
   const root = els.kingLives;
   if (!root) return;
+  if (isTwentiethsEval()) {
+    paintTwentiethsHearts(visibleTwentiethsHearts());
+    paintOppHearts();
+    return;
+  }
+  root.classList.remove("is-twentieths");
   const shown = displayLifeHalves(halves);
   root.classList.remove("is-flash");
   root.innerHTML = heartsMarkup(shown);
@@ -2521,6 +2637,21 @@ function formatEvalBarScore(cp, { ignoreMate = false } = {}) {
   return formatSignedPawns(cp);
 }
 
+function formatEvalBarDisplay(cp, opts = {}) {
+  const raw = formatEvalBarScore(cp, opts);
+  if (!isTwentiethsEval()) return raw;
+  if (!opts.ignoreMate && state.game?.in_checkmate()) {
+    const n = state.game.turn() !== state.playerColor ? TWENTIETHS : -TWENTIETHS;
+    if (isLocalVsHuman()) {
+      const whiteWon = state.game.turn() === "b";
+      const bottomWon = state.board?.orientation === "black" ? !whiteWon : whiteWon;
+      return `${bottomWon ? `+${TWENTIETHS}` : `−${TWENTIETHS}`} (${raw}p)`;
+    }
+    return `${formatTwentiethsSigned(n)} (${raw}p)`;
+  }
+  return `${formatTwentiethsSigned(signedTwentieths(cp))} (${raw}p)`;
+}
+
 function evalCpForWhiteFromPlayer(playerCp) {
   const cp = Number.isFinite(playerCp) ? playerCp : 0;
   if (isLocalVsHuman()) {
@@ -2570,13 +2701,14 @@ function paintEvalBar() {
   const shown = evalBarShownCp();
   const cpWhite = evalCpForWhite();
   const pct = Math.max(0, Math.min(100, whiteEvalShare(cpWhite)));
-  const text = formatEvalBarScore(shown);
+  const text = formatEvalBarDisplay(shown);
   const before = state.evalBarBefore;
   const beforeShown = Number.isFinite(before) ? evalBarShownFromPlayer(before) : null;
   const nowPts = evalShownPoints(shown) || 0;
   const beforePts = Number.isFinite(beforeShown) ? (evalShownPoints(beforeShown) || 0) : nowPts;
   const dir = nowPts > beforePts ? "up" : nowPts < beforePts ? "down" : "";
   els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
+  els.evalBar?.classList.toggle("is-twentieths", isTwentiethsEval());
   if (fill) {
     fill.style.height = "100%";
     fill.style.width = `${pct.toFixed(2)}%`;
@@ -2589,7 +2721,7 @@ function paintEvalBar() {
   if (prevLabel) {
     const showPrev = Number.isFinite(beforeShown);
     prevLabel.hidden = !showPrev;
-    if (showPrev) prevLabel.textContent = formatEvalBarScore(beforeShown, { ignoreMate: true });
+    if (showPrev) prevLabel.textContent = formatEvalBarDisplay(beforeShown, { ignoreMate: true });
   }
   if (deltaEl) {
     if (!dir || !Number.isFinite(before)) {
@@ -2617,7 +2749,7 @@ function paintEvalBar() {
 
 function showPrevTitle(text, beforeShown, dir) {
   if (!Number.isFinite(beforeShown) || !dir) return text;
-  return `${text} · ${formatEvalBarScore(beforeShown, { ignoreMate: true })}`;
+  return `${text} · ${formatEvalBarDisplay(beforeShown, { ignoreMate: true })}`;
 }
 
 function stopSwordFlash() {
@@ -2674,8 +2806,13 @@ function renderKingLives() {
   paintKingSword();
   const root = els.kingLives;
   if (!root) return;
+  if (isTwentiethsEval()) {
+    renderTwentiethsHearts();
+    return;
+  }
+  root.classList.remove("is-twentieths");
   const next = visibleLifeHalves();
-  if (!root.children.length || !Number.isFinite(state.shownLives)) {
+  if (!root.children.length || root.children.length === TWENTIETHS || !Number.isFinite(state.shownLives)) {
     paintKingHearts(next);
     return;
   }
@@ -3486,6 +3623,7 @@ function fillHintEvalViewMenu() {
     { id: "delta", key: "settings.evalView.delta" },
     { id: "prevOpp", key: "settings.evalView.prevOpp" },
     { id: "sword", key: "settings.evalView.sword" },
+    { id: "twentieths", key: "settings.evalView.twentieths" },
   ];
   els.evalViewList.innerHTML = items
     .map(
@@ -3820,6 +3958,7 @@ const state = {
   nextStandEval: null,
   livesForced: null,
   shownLives: null,
+  shownTwentieths: null,
   shownSwords: null,
   livesHold: null,
   livesAnimating: false,
@@ -4941,15 +5080,16 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   const poolSnap = (state.hintPool || []).slice();
   const rankKind = hintRankKind(chosen, poolSnap) || "normal";
   const band = rankReactBand(rankKind);
-  const livesBefore = kingLifeHalves();
+  const halvesBefore = kingLifeHalves();
+  const twBefore = twentiethsHeartsFromCp(Number.isFinite(state.gameEval) ? state.gameEval : 0);
   state.lastPlayerScore = chosen && !chosen.synthetic ? hintScore(chosen) : -Infinity;
   if (Number.isFinite(state.lastPlayerScore)) {
     state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
   }
   if (isPrevOppEval() || isSwordEval()) freezeKingLives(kingLifeHalves());
-  else if (!isLocalVsHuman()) freezeKingLives(livesBefore);
-  const lifeKey = pickLifeFeedbackKey(kingLifeHalves() - livesBefore);
-  const visDelta = displayLifeHalves(kingLifeHalves()) - displayLifeHalves(livesBefore);
+  else if (!isLocalVsHuman()) freezeKingLives(isTwentiethsEval() ? twBefore : halvesBefore);
+  const lifeKey = pickLifeFeedbackKey(kingLifeHalves() - halvesBefore);
+  const visDelta = displayLifeHalves(kingLifeHalves()) - displayLifeHalves(halvesBefore);
   state.busy = true;
   syncHintBoardPlay();
   const fen = state.game.fen();
@@ -4959,7 +5099,7 @@ async function applyUserMove(from, to, promotion, chosenHint) {
     state.trainPickedUci = chosen?.uci || `${from}${to}${promotion || ""}`;
     state.trainFen = fen;
     state.trainColor = state.game.turn();
-    state.trainLives = livesBefore;
+    state.trainLives = halvesBefore;
     hideKingFinale();
     state.kbdHint = null;
     paintKbdHint();
@@ -5567,11 +5707,13 @@ function fillEvalViewSelect() {
     `<option value="delta"${current === "delta" ? " selected" : ""}>${t("settings.evalView.delta")}</option>`,
     `<option value="prevOpp"${current === "prevOpp" ? " selected" : ""}>${t("settings.evalView.prevOpp")}</option>`,
     `<option value="sword"${current === "sword" ? " selected" : ""}>${t("settings.evalView.sword")}</option>`,
+    `<option value="twentieths"${current === "twentieths" ? " selected" : ""}>${t("settings.evalView.twentieths")}</option>`,
   ].join("");
 }
 
 function applyEvalView(value) {
   const wasPrev = isPrevOppEval();
+  const wasTwentieths = isTwentiethsEval();
   state.evalView = normalizeEvalView(value);
   try {
     localStorage.setItem(EVAL_VIEW_KEY, state.evalView);
@@ -5580,6 +5722,12 @@ function applyEvalView(value) {
   }
   if (els.evalView) els.evalView.value = state.evalView;
   if (wasPrev && !isPrevOppEval()) thawKingLives();
+  if (wasTwentieths !== isTwentiethsEval()) {
+    thawKingLives();
+    stopLivesAnim();
+    state.shownLives = null;
+    state.shownTwentieths = null;
+  }
   syncHintInfoUi();
   renderHints();
   renderKingLives();
@@ -5830,6 +5978,7 @@ function startGame(playerColor = state.playerColor) {
   thawKingLives();
   stopLivesAnim();
   state.shownLives = null;
+  state.shownTwentieths = null;
   state.shownSwords = null;
   clearKingReact();
   clearHints();

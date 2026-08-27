@@ -630,6 +630,24 @@ button, select { font: inherit; }
   margin-top: 4px;
   line-height: 1;
 }
+.king-lives.is-twentieths {
+  flex-wrap: nowrap;
+  justify-content: center;
+  max-width: 100%;
+  gap: 0;
+}
+.king-lives.is-twentieths .king-heart {
+  width: 11px;
+  height: 12px;
+  margin: 0 -1px;
+  font-size: 12px;
+}
+.eval-bar.is-twentieths .eval-bar-score {
+  font-size: 22px;
+}
+.eval-bar.is-twentieths .eval-bar-prev {
+  font-size: 14px;
+}
 .king-meters {
   display: flex;
   flex-direction: column;
