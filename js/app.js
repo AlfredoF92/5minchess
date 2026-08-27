@@ -1624,11 +1624,11 @@ function hintEvalDir(info) {
   if (!info || info.synthetic) return "";
   if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
   if (isSwordEval()) {
-    const parts = swordSwingParts(info);
-    if (!parts) return "";
-    if ((evalShownPoints(parts.recovery) || 0) > 0 || (evalShownPoints(parts.damage) || 0) > 0) return "up";
-    if ((evalShownPoints(parts.heartLoss) || 0) > 0 || (evalShownPoints(parts.swordLoss) || 0) > 0) return "down";
-    return "up";
+    const next = hintMoveEval(info);
+    if (next == null) return "";
+    const shownNext = evalShownPoints(next) || 0;
+    const shownPrev = evalShownPoints(positionEvalNow()) || 0;
+    return shownNext < shownPrev ? "down" : "up";
   }
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
@@ -1650,7 +1650,7 @@ function formatHintEval(info) {
 }
 
 function hintBaselineEval() {
-  if (isPrevOppEval() || isSwordEval()) {
+  if (isPrevOppEval()) {
     return Number.isFinite(state.beforeOppEval) ? state.beforeOppEval : 0;
   }
   return positionEvalNow();
@@ -1686,12 +1686,28 @@ function hintEvalHeartHtml() {
 function swordSwingParts(info) {
   const next = hintMoveEval(info);
   if (next == null) return null;
-  const prev = hintBaselineEval();
+  const prev = positionEvalNow();
+  if (next > 0) {
+    return {
+      recovery: Math.max(0, -Math.min(0, prev)),
+      damage: next,
+      heartLoss: 0,
+      swordLoss: 0,
+    };
+  }
+  if (next < 0) {
+    return {
+      recovery: 0,
+      damage: 0,
+      heartLoss: prev > 0 ? prev - next : -next,
+      swordLoss: 0,
+    };
+  }
   return {
-    recovery: Math.max(0, Math.min(0, next) - Math.min(0, prev)),
-    damage: Math.max(0, Math.max(0, next) - Math.max(0, prev)),
-    heartLoss: Math.max(0, Math.min(0, prev) - Math.min(0, next)),
-    swordLoss: Math.max(0, Math.max(0, prev) - Math.max(0, next)),
+    recovery: Math.max(0, -prev),
+    damage: 0,
+    heartLoss: 0,
+    swordLoss: Math.max(0, prev),
   };
 }
 
