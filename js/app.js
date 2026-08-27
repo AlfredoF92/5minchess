@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827venti";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827prevl";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -2695,6 +2695,7 @@ function paintEvalBar() {
   const label = els.evalBarScore;
   const deltaEl = els.evalBarDelta;
   const prevLabel = els.evalBarPrev;
+  const prevWrap = els.evalBarPrevWrap;
   if (!fill && !label) return;
   const blackBottom = state.board?.orientation === "black";
   rememberEvalBarPrev(state.gameEval);
@@ -2718,10 +2719,14 @@ function paintEvalBar() {
     label.classList.toggle("is-up", dir === "up");
     label.classList.toggle("is-down", dir === "down");
   }
-  if (prevLabel) {
+  if (prevLabel || prevWrap) {
     const showPrev = Number.isFinite(beforeShown);
-    prevLabel.hidden = !showPrev;
-    if (showPrev) prevLabel.textContent = formatEvalBarDisplay(beforeShown, { ignoreMate: true });
+    if (prevWrap) prevWrap.hidden = !showPrev;
+    if (prevLabel) {
+      prevLabel.hidden = !showPrev;
+      if (showPrev) prevLabel.textContent = formatEvalBarDisplay(beforeShown, { ignoreMate: true });
+    }
+    if (els.evalBarPrevLabel) els.evalBarPrevLabel.textContent = t("eval.bar.prev");
   }
   if (deltaEl) {
     if (!dir || !Number.isFinite(before)) {
@@ -3881,6 +3886,8 @@ const els = {
   evalBarScore: document.getElementById("eval-bar-score"),
   evalBarDelta: document.getElementById("eval-bar-delta"),
   evalBarPrev: document.getElementById("eval-bar-prev"),
+  evalBarPrevWrap: document.getElementById("eval-bar-prev-wrap"),
+  evalBarPrevLabel: document.getElementById("eval-bar-prev-label"),
   kingReact: document.getElementById("king-react"),
   kingLegend: document.getElementById("king-legend"),
   turnBanner: document.getElementById("turn-banner"),

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260827venti">
+  <link rel="stylesheet" href="css/style.css?v=20260827prevl">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -147,7 +147,10 @@
             </div>
             <div class="eval-bar-scores">
               <span id="eval-bar-score" class="eval-bar-score">0</span>
-              <span id="eval-bar-prev" class="eval-bar-prev" hidden></span>
+              <div id="eval-bar-prev-wrap" class="eval-bar-prev-wrap" hidden>
+                <span id="eval-bar-prev-label" class="eval-bar-prev-label" data-i18n="eval.bar.prev">Previous move</span>
+                <span id="eval-bar-prev" class="eval-bar-prev"></span>
+              </div>
             </div>
           </div>
         </div>
@@ -404,6 +407,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260827venti"></script>
+  <script type="module" src="js/app.js?v=20260827prevl"></script>
 </body>
 </html>
