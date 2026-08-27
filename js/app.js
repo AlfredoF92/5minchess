@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827evalbar";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827evalv";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -2190,7 +2190,10 @@ function paintEvalBar() {
   const cp = evalCpForWhite();
   const pct = Math.max(0, Math.min(100, whiteEvalShare(cp)));
   const text = formatEvalBarScore(cp);
-  if (fill) fill.style.width = `${pct.toFixed(2)}%`;
+  if (fill) {
+    fill.style.width = "100%";
+    fill.style.height = `${pct.toFixed(2)}%`;
+  }
   if (label) label.textContent = text;
   if (els.evalBar) {
     els.evalBar.setAttribute("aria-valuenow", String(Math.round(pct)));
