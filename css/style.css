@@ -616,10 +616,7 @@ button, select { font: inherit; }
   display: none;
 }
 .king-sword-score {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: #2a3340;
+  display: none;
 }
 .king-sword .eval-sword {
   width: 22px;
@@ -1077,6 +1074,15 @@ button, select { font: inherit; }
   width: 22px;
   height: 22px;
   margin-left: 1px;
+}
+.hint-sword-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.hint-eval .hint-sword-part + .hint-sword-part,
+.hint-in-eval .hint-sword-part + .hint-sword-part {
+  margin-left: 4px;
 }
 .hint-card-art.is-icon {
   padding: 20px 45px 0;

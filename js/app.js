@@ -1620,9 +1620,33 @@ function hintEvalShownCp(info) {
   return isAbsLikeEval() ? moveEval : moveEval - hintBaselineEval();
 }
 
+function swordPrevEval() {
+  if (isTrainHold() && Number.isFinite(state.trainStandEval)) return state.trainStandEval;
+  return Number.isFinite(state.gameEval) ? state.gameEval : 0;
+}
+
+function swordSwingParts(info) {
+  const next = hintMoveEval(info);
+  if (next == null) return null;
+  const prev = swordPrevEval();
+  return {
+    prev,
+    next,
+    recovery: Math.max(0, Math.min(0, next) - Math.min(0, prev)),
+    damage: Math.max(0, Math.max(0, next) - Math.max(0, prev)),
+  };
+}
+
 function hintEvalDir(info) {
   if (!info || info.synthetic) return "";
   if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
+  if (isSwordEval()) {
+    const parts = swordSwingParts(info);
+    if (!parts) return "";
+    if ((evalShownPoints(parts.recovery) || 0) > 0 || (evalShownPoints(parts.damage) || 0) > 0) return "up";
+    const drop = evalShownPoints(parts.next - parts.prev);
+    return drop < 0 ? "down" : "up";
+  }
   const cp = hintEvalShownCp(info);
   if (cp == null) return "";
   const shown = evalShownPoints(cp);
@@ -1672,13 +1696,21 @@ function evalSwordSvg() {
   return `<svg class="eval-sword" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11.15 1.4h1.7l.65 12.7h3.05v1.7h-3.2V21c0 .9-.7 1.6-1.55 1.6S10.2 21.9 10.2 21v-5.2H7v-1.7h3.05L11.15 1.4z"/></svg>`;
 }
 
-function hintEvalMarkHtml(info) {
-  if (!info || info.scoreType === "mate") return "";
-  if (isSwordEval()) {
-    const shown = evalShownPoints(hintEvalShownCp(info));
-    if (shown > 0) return evalSwordSvg();
-  }
+function hintEvalHeartHtml() {
   return `<span class="hint-eval-heart" aria-hidden="true">♥</span>`;
+}
+
+function hintSwordEvalHtml(info) {
+  if (info.scoreType === "mate") return escapeHtml(formatHintEval(info));
+  const parts = swordSwingParts(info);
+  if (!parts) return "—";
+  const rec = evalShownPoints(parts.recovery) || 0;
+  const dmg = evalShownPoints(parts.damage) || 0;
+  const bits = [];
+  if (rec > 0) bits.push(`<span class="hint-sword-part">+${rec}${hintEvalHeartHtml()}</span>`);
+  if (dmg > 0) bits.push(`<span class="hint-sword-part">+${dmg}${evalSwordSvg()}</span>`);
+  if (bits.length) return bits.join("");
+  return `${escapeHtml(formatSignedPawns(parts.next - parts.prev))}${hintEvalHeartHtml()}`;
 }
 
 function hintEvalHtml(info) {
@@ -1689,8 +1721,9 @@ function hintEvalHtml(info) {
     const hearts = isAbsLikeEval() ? hintLivesRowHtml(info) : hintHeartsHtml(info);
     return `${arrow}${hearts}`;
   }
+  if (isSwordEval()) return `${arrow}${hintSwordEvalHtml(info)}`;
   const score = escapeHtml(isAbsLikeEval() ? formatHintEval(info) : formatHintDelta(info));
-  return `${arrow}${score}${hintEvalMarkHtml(info)}`;
+  return `${arrow}${score}${hintEvalHeartHtml()}`;
 }
 
 function isHintOverlayInternal() {
@@ -2455,10 +2488,12 @@ function stopSwordFlash() {
 
 function paintKingSword({ flash = false } = {}) {
   const root = els.kingSword;
-  const scoreEl = els.kingSwordScore;
   if (!root) return;
-  const shown = evalShownPoints(Number.isFinite(state.gameEval) ? state.gameEval : 0) || 0;
-  if (!isSwordEval() || shown <= 0) {
+  const prev = Number.isFinite(state.trainStandEval) ? state.trainStandEval : 0;
+  const next = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+  const damage = Math.max(0, Math.max(0, next) - Math.max(0, prev));
+  const shown = evalShownPoints(damage) || 0;
+  if (!isSwordEval() || !isTrainHold() || shown <= 0) {
     stopSwordFlash();
     root.hidden = true;
     root.setAttribute("aria-hidden", "true");
@@ -2466,7 +2501,6 @@ function paintKingSword({ flash = false } = {}) {
   }
   root.hidden = false;
   root.setAttribute("aria-hidden", "false");
-  if (scoreEl) scoreEl.textContent = `+${shown}`;
   if (!flash) return;
   stopSwordFlash();
   void root.offsetWidth;
@@ -2755,6 +2789,7 @@ function clearTrainHold() {
   state.trainFen = "";
   state.trainColor = "";
   state.trainLives = null;
+  state.trainStandEval = null;
   state.continueArmed = false;
   state.pendingOpp = null;
   state.trainNext = null;
@@ -3546,7 +3581,6 @@ const els = {
   kingTitle: document.getElementById("king-title"),
   kingLives: document.getElementById("king-lives"),
   kingSword: document.getElementById("king-sword"),
-  kingSwordScore: document.getElementById("king-sword-score"),
   oppLives: document.getElementById("opp-lives"),
   evalBar: document.getElementById("eval-bar"),
   evalBarFill: document.getElementById("eval-bar-fill"),
@@ -3680,6 +3714,7 @@ const state = {
   trainFen: "",
   trainColor: "",
   trainLives: null,
+  trainStandEval: null,
 };
 
 function isLocalVsHuman() {
@@ -4746,6 +4781,7 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   const rankKind = hintRankKind(chosen, poolSnap) || "normal";
   const band = rankReactBand(rankKind);
   const livesBefore = kingLifeHalves();
+  state.trainStandEval = Number.isFinite(state.gameEval) ? state.gameEval : 0;
   state.lastPlayerScore = chosen && !chosen.synthetic ? hintScore(chosen) : -Infinity;
   if (Number.isFinite(state.lastPlayerScore)) {
     state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
@@ -4801,7 +4837,7 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   flashThreatenedPieces(played);
   renderHistory();
   renderKingLives();
-  if (isSwordEval()) paintKingSword({ flash: (evalShownPoints(state.gameEval) || 0) > 0 });
+  if (isSwordEval()) paintKingSword({ flash: true });
   if (trainReview) {
     state.busy = false;
     syncTrainContinue();
