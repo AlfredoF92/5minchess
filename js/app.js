@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827hearts3";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827evalbar";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -2158,7 +2158,48 @@ function queueLifeLoss(next) {
   }, 900);
 }
 
+function evalCpForWhite() {
+  const cp = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+  let from = state.playerColor;
+  if (isLocalVsHuman()) {
+    const hist = state.game.history({ verbose: true });
+    from = hist.length ? hist[hist.length - 1].color : "w";
+  }
+  return from === "w" ? cp : -cp;
+}
+
+function formatEvalBarScore(cp) {
+  if (state.game?.in_checkmate()) return state.game.turn() === "b" ? "M1" : "-M1";
+  if (Math.abs(cp) >= 50000) {
+    const n = Math.max(1, Math.round(100000 - Math.abs(cp)));
+    return cp > 0 ? `M${n}` : `-M${n}`;
+  }
+  return formatSignedPawns(cp);
+}
+
+function whiteEvalShare(cp) {
+  if (state.game?.in_checkmate()) return state.game.turn() === "b" ? 100 : 0;
+  if (Math.abs(cp) >= 50000) return cp > 0 ? 100 : 0;
+  return 50 + Math.tanh(cp / 400) * 50;
+}
+
+function paintEvalBar() {
+  const fill = els.evalBarFill;
+  const label = els.evalBarScore;
+  if (!fill && !label) return;
+  const cp = evalCpForWhite();
+  const pct = Math.max(0, Math.min(100, whiteEvalShare(cp)));
+  const text = formatEvalBarScore(cp);
+  if (fill) fill.style.width = `${pct.toFixed(2)}%`;
+  if (label) label.textContent = text;
+  if (els.evalBar) {
+    els.evalBar.setAttribute("aria-valuenow", String(Math.round(pct)));
+    els.evalBar.setAttribute("title", text);
+  }
+}
+
 function renderKingLives() {
+  paintEvalBar();
   paintOppHearts();
   const root = els.kingLives;
   if (!root) return;
@@ -3189,6 +3230,9 @@ const els = {
   kingTitle: document.getElementById("king-title"),
   kingLives: document.getElementById("king-lives"),
   oppLives: document.getElementById("opp-lives"),
+  evalBar: document.getElementById("eval-bar"),
+  evalBarFill: document.getElementById("eval-bar-fill"),
+  evalBarScore: document.getElementById("eval-bar-score"),
   kingReact: document.getElementById("king-react"),
   kingLegend: document.getElementById("king-legend"),
   turnBanner: document.getElementById("turn-banner"),
@@ -5038,6 +5082,7 @@ function applyRoundEval(value) {
   }
   if (els.roundEval) els.roundEval.value = state.roundEval ? "1" : "0";
   renderHints();
+  paintEvalBar();
 }
 
 function applyStoryIcons(value) {
