@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260822elo12";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827fumetto";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827fumettob";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -143,6 +143,13 @@ const FUMETTO_W_ROOK_DIR = "immagini-stile-fumetto/torrebianca";
 const FUMETTO_W_QUEEN_DIR = "immagini-stile-fumetto/reginabianca";
 const FUMETTO_W_KING_DIR = "immagini-stile-fumetto/rebianco";
 const FUMETTO_W_CASTLE_DIR = "immagini-stile-fumetto/arroccobianco";
+const FUMETTO_KNIGHT_DIR = "immagini-stile-fumetto/cavallonero";
+const FUMETTO_PAWN_DIR = "immagini-stile-fumetto/pedonennero";
+const FUMETTO_BISHOP_DIR = "immagini-stile-fumetto/alfierennero";
+const FUMETTO_ROOK_DIR = "immagini-stile-fumetto/torrenera";
+const FUMETTO_QUEEN_DIR = "immagini-stile-fumetto/reginanera";
+const FUMETTO_KING_DIR = "immagini-stile-fumetto/renero";
+const FUMETTO_CASTLE_DIR = "immagini-stile-fumetto/arrocconero";
 const FUMETTO_W_ROOK_ART = {
   ...WAR_W_ROOK_ART,
   captureQ: { file: "Torre Bianca Cattura Regina.png", title: "art.wrook.captureQ" },
@@ -1860,6 +1867,29 @@ function whiteIllustratedDir(piece) {
   }[piece];
 }
 
+function blackIllustratedDir(piece) {
+  if (state.cardStyle === "fumetto") {
+    return {
+      n: FUMETTO_KNIGHT_DIR,
+      p: FUMETTO_PAWN_DIR,
+      b: FUMETTO_BISHOP_DIR,
+      r: FUMETTO_ROOK_DIR,
+      q: FUMETTO_QUEEN_DIR,
+      k: FUMETTO_KING_DIR,
+      castle: FUMETTO_CASTLE_DIR,
+    }[piece];
+  }
+  return {
+    n: WAR_KNIGHT_DIR,
+    p: WAR_PAWN_DIR,
+    b: WAR_BISHOP_DIR,
+    r: WAR_ROOK_DIR,
+    q: WAR_QUEEN_DIR,
+    k: WAR_KING_DIR,
+    castle: WAR_CASTLE_DIR,
+  }[piece];
+}
+
 function blackKingPoseArt(n) {
   return numberedPoseArt("Re Nero Si muove da solo", "art.king.pose", n);
 }
@@ -1908,16 +1938,16 @@ function hintArtHtml(move, color, poses = {}) {
 }
 
 function storyArtHtml(move, color, poses = {}) {
-  if (color === "b" && move?.piece === "n") return warCardHtml(WAR_KNIGHT_DIR, blackKnightWarArt(move, poses.n));
-  if (color === "b" && move?.piece === "p") return warCardHtml(WAR_PAWN_DIR, blackPawnWarArt(move, poses.p));
-  if (color === "b" && move?.piece === "b") return warCardHtml(WAR_BISHOP_DIR, blackBishopWarArt(move, poses.b));
-  if (color === "b" && move?.piece === "r") return warCardHtml(WAR_ROOK_DIR, blackRookWarArt(move, poses.r));
-  if (color === "b" && move?.piece === "q") return warCardHtml(WAR_QUEEN_DIR, blackQueenWarArt(move, poses.q));
+  if (color === "b" && move?.piece === "n") return warCardHtml(blackIllustratedDir("n"), blackKnightWarArt(move, poses.n));
+  if (color === "b" && move?.piece === "p") return warCardHtml(blackIllustratedDir("p"), blackPawnWarArt(move, poses.p));
+  if (color === "b" && move?.piece === "b") return warCardHtml(blackIllustratedDir("b"), blackBishopWarArt(move, poses.b));
+  if (color === "b" && move?.piece === "r") return warCardHtml(blackIllustratedDir("r"), blackRookWarArt(move, poses.r));
+  if (color === "b" && move?.piece === "q") return warCardHtml(blackIllustratedDir("q"), blackQueenWarArt(move, poses.q));
   if (color === "b" && move?.piece === "k") {
     if (String(move?.san || "").startsWith("O-O")) {
-      return warCardHtml(WAR_CASTLE_DIR, blackCastlePoseArt(poses.castle));
+      return warCardHtml(blackIllustratedDir("castle"), blackCastlePoseArt(poses.castle));
     }
-    return warCardHtml(WAR_KING_DIR, blackKingWarArt(move, poses.k));
+    return warCardHtml(blackIllustratedDir("k"), blackKingWarArt(move, poses.k));
   }
   if (color === "w" && move?.piece === "n") {
     return warCardHtml(whiteIllustratedDir("n"), pickWarArt(WAR_W_KNIGHT_ART, whiteKnightPoseArt, move, poses.n));
