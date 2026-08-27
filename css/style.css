@@ -1298,6 +1298,8 @@ button, select { font: inherit; }
   text-align: left;
   cursor: pointer;
   color: #333;
+  white-space: normal;
+  line-height: 1.25;
 }
 .style-menu-item:hover {
   background: #f7fff0;

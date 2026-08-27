@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827elo13";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827prevopp";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -229,10 +229,27 @@ function readRoundEval() {
 
 function readEvalView() {
   try {
-    return localStorage.getItem(EVAL_VIEW_KEY) === "abs" ? "abs" : "delta";
+    const saved = localStorage.getItem(EVAL_VIEW_KEY);
+    if (saved === "abs" || saved === "prevOpp") return saved;
+    return "delta";
   } catch {
     return "delta";
   }
+}
+
+function normalizeEvalView(value) {
+  if (value === "abs" || value === "prevOpp") return value;
+  return "delta";
+}
+
+function isPrevOppEval() {
+  return state.evalView === "prevOpp";
+}
+
+function evalViewShortKey() {
+  if (state.evalView === "abs") return "tools.hintInfo.eval.abs";
+  if (state.evalView === "prevOpp") return "tools.hintInfo.eval.prevOpp";
+  return "tools.hintInfo.eval.delta";
 }
 
 function readHintInfo() {
@@ -1444,7 +1461,11 @@ function hintLifeDelta(hint) {
   if (!hint || hint.synthetic) return 0;
   const score = hintScore(hint);
   if (!Number.isFinite(score)) return 0;
-  const nowHalves = isTrainHold() && Number.isFinite(state.trainLives) ? state.trainLives : kingLifeHalves();
+  const nowHalves = isTrainHold() && Number.isFinite(state.trainLives) && !isPrevOppEval()
+    ? state.trainLives
+    : isPrevOppEval()
+      ? livesFromCp(hintBaselineEval())
+      : kingLifeHalves();
   const now = displayLifeHalves(nowHalves);
   const game = isTrainHold() && state.trainFen ? new Chess(state.trainFen) : state.game;
   const after = displayLifeHalves(livesFromCp(evalForPlayer(score, game)));
@@ -1585,6 +1606,13 @@ function formatHintEval(info) {
   return formatSignedPawns(moveEval);
 }
 
+function hintBaselineEval() {
+  if (isPrevOppEval()) {
+    return Number.isFinite(state.beforeOppEval) ? state.beforeOppEval : 0;
+  }
+  return positionEvalNow();
+}
+
 function formatHintDelta(info) {
   if (!info || info.synthetic) return "—";
   if (info.scoreType === "mate") {
@@ -1594,14 +1622,13 @@ function formatHintDelta(info) {
   }
   const moveEval = hintMoveEval(info);
   if (moveEval == null) return "—";
-  const now = positionEvalNow();
-  return formatSignedPawns(moveEval - now);
+  return formatSignedPawns(moveEval - hintBaselineEval());
 }
 
 function hintEvalDir(info) {
   const moveEval = hintMoveEval(info);
   if (moveEval == null) return "";
-  const now = positionEvalNow();
+  const now = hintBaselineEval();
   const step = state.roundEval ? 10 : 5;
   if (moveEval > now + step) return "up";
   if (moveEval < now - step) return "down";
@@ -1620,10 +1647,10 @@ function hintEvalHtml(info) {
   const dir = state.hintInfo?.arrow ? hintEvalDir(info) : "";
   const arrow = dir ? hintEvalArrowSvg(dir) : "";
   if (state.hintInfo?.score === "hearts") {
-    const hearts = state.evalView === "delta" ? hintHeartsHtml(info) : hintLivesRowHtml(info);
+    const hearts = state.evalView === "abs" ? hintLivesRowHtml(info) : hintHeartsHtml(info);
     return `${arrow}${hearts}`;
   }
-  const score = escapeHtml(state.evalView !== "delta" ? formatHintEval(info) : formatHintDelta(info));
+  const score = escapeHtml(state.evalView === "abs" ? formatHintEval(info) : formatHintDelta(info));
   return `${arrow}${score}`;
 }
 
@@ -2151,6 +2178,11 @@ function freezeKingLives(halves) {
 
 function thawKingLives() {
   state.livesHold = null;
+}
+
+function thawKingLivesAfterOpp() {
+  if (isPrevOppEval() && Number.isFinite(state.livesHold)) return;
+  thawKingLives();
 }
 
 function heartFill(halves, i) {
@@ -3155,10 +3187,11 @@ function syncHintSwitch(btn, on) {
 
 function fillHintEvalViewMenu() {
   if (!els.evalViewList) return;
-  const current = state.evalView === "abs" ? "abs" : "delta";
+  const current = normalizeEvalView(state.evalView);
   const items = [
     { id: "abs", key: "settings.evalView.abs" },
     { id: "delta", key: "settings.evalView.delta" },
+    { id: "prevOpp", key: "settings.evalView.prevOpp" },
   ];
   els.evalViewList.innerHTML = items
     .map(
@@ -3189,7 +3222,7 @@ function syncHintInfoUi() {
   fillHintEvalViewMenu();
   fillHintScoreModeMenu();
   if (els.evalViewBtn) {
-    els.evalViewBtn.textContent = t(state.evalView === "abs" ? "tools.hintInfo.eval.abs" : "tools.hintInfo.eval.delta");
+    els.evalViewBtn.textContent = t(evalViewShortKey());
   }
   if (els.scoreModeBtn) {
     els.scoreModeBtn.textContent = t(state.hintInfo.score === "hearts" ? "tools.hintInfo.score.hearts" : "tools.hintInfo.score.number");
@@ -3453,6 +3486,7 @@ const state = {
   hintBestScore: -Infinity,
   lastHintMix: "",
   gameEval: 0,
+  beforeOppEval: 0,
   standEval: 0,
   nextStandEval: null,
   livesForced: null,
@@ -4369,7 +4403,7 @@ async function applyOppMove(resolved) {
   state.board.setLastMove(played.from, played.to);
   await state.board.animateMove(played.from, played.to);
   if (gameId !== state.gameId) return;
-  thawKingLives();
+  thawKingLivesAfterOpp();
   state.board.setPosition(state.game.fen());
   flashThreatenedPieces(played);
   renderHistory();
@@ -4382,6 +4416,7 @@ async function applyOppMove(resolved) {
 
   adoptHintPool(pool);
   if (Number.isFinite(resolved.nextBest)) state.hintBestScore = resolved.nextBest;
+  state.beforeOppEval = Number.isFinite(state.gameEval) ? state.gameEval : 0;
   if (Number.isFinite(resolved.nextEval)) state.gameEval = resolved.nextEval;
   state.hintPage = 0;
   state.hintsUnlocked = 0;
@@ -4430,8 +4465,9 @@ async function playTrainOppOnBoard(resolved) {
     state.busy = false;
     return;
   }
-  thawKingLives();
+  thawKingLivesAfterOpp();
   state.trainLives = null;
+  state.beforeOppEval = Number.isFinite(state.gameEval) ? state.gameEval : 0;
   state.board.setPosition(state.game.fen());
   flashThreatenedPieces(played);
   renderHistory();
@@ -4574,7 +4610,8 @@ async function applyUserMove(from, to, promotion, chosenHint) {
   if (Number.isFinite(state.lastPlayerScore)) {
     state.gameEval = evalForPlayer(state.lastPlayerScore, state.game);
   }
-  if (!isLocalVsHuman()) freezeKingLives(livesBefore);
+  if (isPrevOppEval()) freezeKingLives(kingLifeHalves());
+  else if (!isLocalVsHuman()) freezeKingLives(livesBefore);
   const lifeKey = pickLifeFeedbackKey(kingLifeHalves() - livesBefore);
   const visDelta = displayLifeHalves(kingLifeHalves()) - displayLifeHalves(livesBefore);
   state.busy = true;
@@ -5055,7 +5092,7 @@ function openNewGameDialog(tab = "train") {
   if (els.hintLayout) els.hintLayout.value = HINT_LAYOUTS[state.hintLayout] ? state.hintLayout : "6x1";
   if (els.moveClockSelect) els.moveClockSelect.value = String(moveClockSec());
   if (els.roundEval) els.roundEval.value = state.roundEval ? "1" : "0";
-  if (els.evalView) els.evalView.value = state.evalView === "abs" ? "abs" : "delta";
+  if (els.evalView) els.evalView.value = normalizeEvalView(state.evalView);
   if (els.storyIcons) els.storyIcons.value = state.cardStyle || "war";
   if (els.btnNewCancel) els.btnNewCancel.hidden = !state.hasGame;
   setNewGameTab(tab);
@@ -5187,23 +5224,27 @@ function fillClockSelect() {
 function fillEvalViewSelect() {
   const select = els.evalView;
   if (!select) return;
-  const current = state.evalView === "abs" ? "abs" : "delta";
+  const current = normalizeEvalView(state.evalView);
   select.innerHTML = [
     `<option value="abs"${current === "abs" ? " selected" : ""}>${t("settings.evalView.abs")}</option>`,
     `<option value="delta"${current === "delta" ? " selected" : ""}>${t("settings.evalView.delta")}</option>`,
+    `<option value="prevOpp"${current === "prevOpp" ? " selected" : ""}>${t("settings.evalView.prevOpp")}</option>`,
   ].join("");
 }
 
 function applyEvalView(value) {
-  state.evalView = value === "abs" ? "abs" : "delta";
+  const wasPrev = isPrevOppEval();
+  state.evalView = normalizeEvalView(value);
   try {
     localStorage.setItem(EVAL_VIEW_KEY, state.evalView);
   } catch {
     /* ignore */
   }
   if (els.evalView) els.evalView.value = state.evalView;
+  if (wasPrev && !isPrevOppEval()) thawKingLives();
   syncHintInfoUi();
   renderHints();
+  renderKingLives();
 }
 
 function fillRoundEvalSelect() {
@@ -5443,6 +5484,7 @@ function startGame(playerColor = state.playerColor) {
     els.hintMix.hidden = true;
   }
   state.gameEval = 0;
+  state.beforeOppEval = 0;
   state.standEval = 0;
   state.nextStandEval = null;
   state.livesForced = null;
