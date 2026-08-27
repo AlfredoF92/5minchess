@@ -1,8 +1,8 @@
 import { Chess, SQUARES } from "./chess.min.js";
-import { Engine } from "./engine.js?v=20260822elo12";
+import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827hearts";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827elo13";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1361,7 +1361,7 @@ const ARROW_GREEN = "#8ec85a";
 const ARROW_GRAY = "#c5c5c5";
 
 const SKILL_LEVELS = {
-  1: { elo: 1200, skill: 0, movetime: 350 },
+  1: { elo: 1300, skill: 1, movetime: 380 },
   2: { elo: 1400, skill: 1, movetime: 400 },
   3: { elo: 1600, movetime: 500 },
   4: { elo: 1800, movetime: 600 },

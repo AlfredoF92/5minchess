@@ -128,7 +128,7 @@ export class Engine {
     });
   }
 
-  play(fen, { elo = 1200, unlimited = false, movetime = 1200, skill = 0 } = {}) {
+  play(fen, { elo = 1300, unlimited = false, movetime = 1200, skill = 1 } = {}) {
     return this.#enqueue(async () => {
       await this.ready;
       await this.#flush();
