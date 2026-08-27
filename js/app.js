@@ -1600,6 +1600,25 @@ function formatSignedPawns(cp) {
   return shown > 0 ? `+${digits}` : `-${digits}`;
 }
 
+function hintEvalShownCp(info) {
+  if (!info || info.synthetic) return null;
+  if (info.scoreType === "mate") return null;
+  const moveEval = hintMoveEval(info);
+  if (moveEval == null) return null;
+  return state.evalView === "abs" ? moveEval : moveEval - hintBaselineEval();
+}
+
+function hintEvalDir(info) {
+  if (!info || info.synthetic) return "";
+  if (info.scoreType === "mate") return info.score < 0 ? "down" : "up";
+  const cp = hintEvalShownCp(info);
+  if (cp == null) return "";
+  const raw = cp / 100;
+  const shown = state.roundEval ? Math.round(raw * 10) / 10 : raw;
+  if (!Number.isFinite(shown)) return "";
+  return shown < 0 ? "down" : "up";
+}
+
 function formatHintEval(info) {
   if (!info || info.synthetic) return "—";
   if (info.scoreType === "mate") {
@@ -1629,16 +1648,6 @@ function formatHintDelta(info) {
   const moveEval = hintMoveEval(info);
   if (moveEval == null) return "—";
   return formatSignedPawns(moveEval - hintBaselineEval());
-}
-
-function hintEvalDir(info) {
-  const moveEval = hintMoveEval(info);
-  if (moveEval == null) return "";
-  const now = hintBaselineEval();
-  const step = state.roundEval ? 10 : 5;
-  if (moveEval > now + step) return "up";
-  if (moveEval < now - step) return "down";
-  return "";
 }
 
 function hintEvalArrowSvg(dir) {
