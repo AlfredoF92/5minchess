@@ -2,12 +2,13 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260825sel";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827prevl";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260827admin";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
 const TRAIN_MODE_KEY = "5minchess.trainingMode";
 const AUTO_CONTINUE_KEY = "5minchess.autoContinue";
+const ADMIN_SOLUTIONS_KEY = "5minchess.adminSolutions";
 const AID_THREATS_KEY = "5minchess.aidThreats";
 const HINT_FAKE_LOAD_MS = 3000;
 const OPP_REPLY_MIN_MS = 10000;
@@ -206,6 +207,14 @@ function readTrainingMode() {
 function readAutoContinue() {
   try {
     return localStorage.getItem(AUTO_CONTINUE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readAdminSolutions() {
+  try {
+    return localStorage.getItem(ADMIN_SOLUTIONS_KEY) === "1";
   } catch {
     return false;
   }
@@ -3239,6 +3248,64 @@ function setAutoContinue(on) {
   }
 }
 
+function syncAdminSolutionsUi() {
+  if (!els.adminSolutionsBtn) return;
+  const on = Boolean(state.adminSolutions);
+  els.adminSolutionsBtn.textContent = switchLabel(on);
+  els.adminSolutionsBtn.classList.toggle("is-on", on);
+  els.adminSolutionsBtn.setAttribute("aria-pressed", on ? "true" : "false");
+}
+
+function setAdminSolutions(on) {
+  state.adminSolutions = Boolean(on);
+  try {
+    localStorage.setItem(ADMIN_SOLUTIONS_KEY, state.adminSolutions ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  syncAdminSolutionsUi();
+  renderAdminSolutions();
+}
+
+function adminSolutionScoreText(hint) {
+  if (!hint || hint.synthetic) return "—";
+  const abs = formatHintEval(hint);
+  if (isAbsLikeEval()) return abs;
+  return `${formatHintDelta(hint)} · ${abs}`;
+}
+
+function renderAdminSolutions() {
+  const box = els.adminSolutions;
+  const list = els.adminSolutionsList;
+  if (!box || !list) return;
+  if (!state.adminSolutions) {
+    box.hidden = true;
+    list.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  const placeMap = hintPlaceMap();
+  const items = (state.hintPool || [])
+    .filter((hint) => hint && !hint.synthetic && placeMap.has(hint.uci))
+    .sort((a, b) => placeMap.get(a.uci) - placeMap.get(b.uci));
+  if (!items.length) {
+    list.innerHTML = `<li class="admin-solutions-empty">${escapeHtml(t("admin.solutions.empty"))}</li>`;
+    return;
+  }
+  list.innerHTML = items.map((hint) => {
+    const place = placeMap.get(hint.uci);
+    const played = playedFromHint(hint);
+    const san = played ? localizeSan(played.san) : hint.uci;
+    const kind = hintRankKind(hint);
+    const best = kind === "best" ? " is-best" : "";
+    return `<li class="${best.trim()}">
+      <span class="admin-place">${escapeHtml(formatPlace(place))}</span>
+      <span class="admin-san">${escapeHtml(san)}</span>
+      <span class="admin-score">${escapeHtml(adminSolutionScoreText(hint))}</span>
+    </li>`;
+  }).join("");
+}
+
 function setTrainingMode(on) {
   const next = Boolean(on);
   state.trainingMode = next;
@@ -3986,6 +4053,9 @@ const els = {
   trainContinue: document.getElementById("btn-train-continue"),
   trainReply: document.getElementById("train-reply"),
   autoContinue: document.getElementById("btn-auto-continue"),
+  adminSolutions: document.getElementById("admin-solutions"),
+  adminSolutionsList: document.getElementById("admin-solutions-list"),
+  adminSolutionsBtn: document.getElementById("btn-admin-solutions"),
   roundEval: document.getElementById("round-eval"),
   evalView: document.getElementById("eval-view"),
   storyIcons: document.getElementById("story-icons"),
@@ -4065,6 +4135,7 @@ const state = {
   moveClockTick: null,
   trainingMode: readTrainingMode(),
   autoContinue: readAutoContinue(),
+  adminSolutions: readAdminSolutions(),
   trainHold: false,
   continueArmed: false,
   pendingOpp: null,
@@ -4668,6 +4739,7 @@ function renderHints() {
     state.board?.setArrows([]);
     syncTrainContinue();
     syncHintBoardPlay();
+    renderAdminSolutions();
     return;
   }
   state.hints = visibleHints();
@@ -4727,6 +4799,7 @@ function renderHints() {
   syncTrainContinue();
   paintKbdHint();
   syncHintBoardPlay();
+  renderAdminSolutions();
 }
 
 function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
@@ -5939,6 +6012,7 @@ function applyLanguage() {
   renderHints();
   syncTrainingModeUi();
   syncAutoContinueUi();
+  syncAdminSolutionsUi();
   replayKingTalk();
 }
 
@@ -6257,6 +6331,7 @@ els.hintOverlayList?.addEventListener("click", (event) => {
 });
 els.trainingMode?.addEventListener("click", () => setTrainingMode(!state.trainingMode));
 els.autoContinue?.addEventListener("click", () => setAutoContinue(!state.autoContinue));
+els.adminSolutionsBtn?.addEventListener("click", () => setAdminSolutions(!state.adminSolutions));
 els.trainContinue?.addEventListener("click", () => {
   if (els.trainContinue.disabled) return;
   continueTrainMove();
@@ -6309,6 +6384,7 @@ syncHintInfoUi();
 syncRecalcButton();
 syncTrainingModeUi();
 syncAutoContinueUi();
+syncAdminSolutionsUi();
 syncGameInfo();
 renderKingLives();
 renderKingLegend();

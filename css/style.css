@@ -1441,6 +1441,76 @@ button, select { font: inherit; }
   line-height: 1.2;
   color: #222;
 }
+.quick-tools-section.is-admin {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #ececec;
+  color: #7a3b00;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.admin-solutions {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #d6d6d6;
+  border-radius: 10px;
+  background: #fafafa;
+}
+.admin-solutions[hidden] {
+  display: none;
+}
+.admin-solutions h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #222;
+}
+.admin-solutions-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 240px;
+  overflow: auto;
+  font-variant-numeric: tabular-nums;
+}
+.admin-solutions-list li {
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #222;
+}
+.admin-solutions-list .admin-place {
+  color: #666;
+}
+.admin-solutions-list .admin-san {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-solutions-list .admin-score {
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+.admin-solutions-list li.is-best .admin-place,
+.admin-solutions-list li.is-best .admin-san {
+  color: #1a7a32;
+}
+.admin-solutions-empty {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #888;
+}
 .quick-tools-rows {
   display: flex;
   flex-direction: column;

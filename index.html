@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260827twbar">
+  <link rel="stylesheet" href="css/style.css?v=20260827admin">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -192,6 +192,10 @@
             <button type="button" id="btn-train-continue" class="train-continue" data-i18n="train.reply">Rispondi all'avversario</button>
           </div>
         </div>
+        <aside id="admin-solutions" class="admin-solutions" hidden>
+          <h3 data-i18n="admin.solutions">Le soluzioni</h3>
+          <ol id="admin-solutions-list" class="admin-solutions-list"></ol>
+        </aside>
         <div class="coach-tools">
           <button type="button" id="btn-quick-tools" class="coach-tools-open" data-i18n="tools.quick" aria-haspopup="dialog" aria-controls="quick-tools" aria-expanded="false">Impostazioni rapide</button>
         </div>
@@ -250,6 +254,11 @@
           <span class="coach-row-label" data-i18n="tools.hintInfo.overlay">Voglio visualizzare le info della valutazione delle cards dopo che ho scelto</span>
           <button type="button" id="btn-hint-overlay" class="coach-switch coach-switch-value" aria-expanded="false" aria-haspopup="true" data-i18n-aria="tools.hintInfo.overlayAria" aria-label="Come mostrare le info di valutazione sulle carte dopo la scelta">Esterna</button>
           <div id="hint-overlay-list" class="style-menu-list" hidden role="menu"></div>
+        </div>
+        <h3 class="quick-tools-section is-admin" data-i18n="tools.admin">Impostazioni per ADMIN</h3>
+        <div class="coach-row">
+          <span class="coach-row-label" data-i18n="tools.admin.solutions">Visualizza le soluzioni</span>
+          <button type="button" id="btn-admin-solutions" class="coach-switch" aria-pressed="false" data-i18n-aria="tools.admin.solutionsAria" aria-label="Visualizza le soluzioni">Off</button>
         </div>
       </div>
       <div class="quick-tools-actions">
@@ -408,6 +417,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260827twhide"></script>
+  <script type="module" src="js/app.js?v=20260827admin"></script>
 </body>
 </html>
