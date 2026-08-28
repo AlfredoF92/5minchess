@@ -1,6 +1,6 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
-import { Board } from "./board.js?v=20260828lab";
+import { Board } from "./board.js?v=20260828num";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
 import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828lab";
 
@@ -5034,26 +5034,19 @@ function reviewArrowKind(hint) {
 }
 
 function reviewArrowLabel(hint) {
-  if (!state.reviewArrowLabels || !hint?.uci) return "";
-  const place = hintPlaceMap().get(hint.uci);
-  if (!place) return "";
-  const dir = hintEvalDir(hint);
-  const arrow = dir === "up" ? "↑" : dir === "down" ? "↓" : "";
-  if (!arrow) return String(place);
-  let delta = "";
+  if (!state.reviewArrowLabels || !hint?.uci || hint.synthetic) return "";
   if (hint.scoreType === "mate") {
-    delta = String(Math.abs(hint.score));
-  } else {
-    const shown = evalShownPoints(hintEvalShownCp(hint));
-    if (shown) delta = shown > 0 ? `+${shown}` : `${shown}`;
-    else if (isTwentiethsEval()) {
-      const parts = twentiethsSwingParts(hint);
-      const n = (parts?.recovery || 0) + (parts?.damage || 0) - (parts?.heartLoss || 0) - (parts?.swordLoss || 0);
-      if (n) delta = n > 0 ? `+${n}` : `${n}`;
-    }
+    if (hint.score > 0) return `+M${hint.score}`;
+    if (hint.score < 0) return `-M${Math.abs(hint.score)}`;
+    return "";
   }
-  if (!delta) return dir === "down" ? `${place}↓` : String(place);
-  return `${place}${arrow}${delta}`;
+  let shown = evalShownPoints(hintEvalShownCp(hint));
+  if (!shown && isTwentiethsEval()) {
+    const parts = twentiethsSwingParts(hint);
+    shown = (parts?.recovery || 0) + (parts?.damage || 0) - (parts?.heartLoss || 0) - (parts?.swordLoss || 0);
+  }
+  if (!shown) return "";
+  return shown > 0 ? `+${shown}` : `${shown}`;
 }
 
 function paintHoldArrows(highlight = null) {
@@ -5071,7 +5064,6 @@ function paintHoldArrows(highlight = null) {
     ? null
     : new Set((Array.isArray(highlight) ? highlight : [highlight]).filter((i) => Number.isInteger(i)));
   const rank = { plain: 0, good: 1, best: 2 };
-  const destSeen = {};
   const arrows = (state.hints || [])
     .map((hint, i) => {
       if (!hint?.uci) return null;
@@ -5079,22 +5071,19 @@ function paintHoldArrows(highlight = null) {
       const active = Boolean(activeSet && activeSet.has(i));
       const isBest = kind === "best";
       const color = kind === "plain" ? ARROW_GRAY_LIGHT : ARROW_GREEN;
-      const to = hint.uci.slice(2, 4);
-      const slot = destSeen[to] || 0;
-      destSeen[to] = slot + 1;
+      const label = reviewArrowLabel(hint);
       return {
         from: hint.uci.slice(0, 2),
-        to,
+        to: hint.uci.slice(2, 4),
         color,
         stroke: isBest ? ARROW_GOLD : color,
         strokeWidth: isBest ? 0.085 : 0.02,
         strokeOpacity: isBest ? 0.95 : 0.72,
         opacity: active ? 0.9 : 0.78,
         width: active ? "0.28" : "0.22",
-        label: reviewArrowLabel(hint),
+        label,
         labelAt: "to",
-        labelDy: slot ? (slot % 2 ? 0.22 : -0.22) * Math.ceil(slot / 2) : 0,
-        labelColor: "#1f1f1f",
+        labelColor: label.startsWith("-") ? "#a61e1e" : "#2a6b1a",
         _rank: rank[kind] + (active ? 0.5 : 0),
       };
     })

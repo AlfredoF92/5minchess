@@ -433,32 +433,32 @@ export class Board {
 
       if (!arrow.label) continue;
       const dest = this.#squareCenter(arrow.to);
-      const atSquare = arrow.labelAt === "to";
+      const atCorner = arrow.labelAt === "to";
       const back = this.pieces[arrow.to] ? headLen + 0.16 : 0.02;
       labels.push({
         text: String(arrow.label),
-        x: atSquare ? dest.x : tx - ux * back,
-        y: atSquare ? dest.y + (Number(arrow.labelDy) || 0) : ty - uy * back,
-        atSquare,
+        x: atCorner ? dest.x + 0.44 : tx - ux * back,
+        y: atCorner ? dest.y - 0.42 : ty - uy * back,
+        atCorner,
         fill: arrow.labelColor || "#1f1f1f",
       });
     }
     for (const item of labels) {
-      const fontSize = item.text.length <= 2 ? 0.34 : item.text.length <= 4 ? 0.28 : item.text.length <= 6 ? 0.24 : 0.2;
+      const fontSize = item.text.length <= 3 ? 0.3 : item.text.length <= 4 ? 0.26 : 0.22;
       const text = document.createElementNS(ns, "text");
       text.setAttribute("x", String(item.x));
       text.setAttribute("y", String(item.y));
-      text.setAttribute("text-anchor", "middle");
-      text.setAttribute("dominant-baseline", "middle");
-      text.setAttribute("dy", item.atSquare ? "0.06" : "0.08");
+      text.setAttribute("text-anchor", item.atCorner ? "end" : "middle");
+      text.setAttribute("dominant-baseline", item.atCorner ? "hanging" : "middle");
+      text.setAttribute("dy", item.atCorner ? "0" : "0.08");
       text.setAttribute("fill", item.fill);
-      text.setAttribute("fill-opacity", "0.96");
-      text.setAttribute("stroke", "#fff8e8");
-      text.setAttribute("stroke-width", "0.09");
+      text.setAttribute("fill-opacity", "1");
+      text.setAttribute("stroke", "rgba(255, 248, 232, 0.85)");
+      text.setAttribute("stroke-width", "0.035");
       text.setAttribute("stroke-linejoin", "round");
       text.setAttribute("paint-order", "stroke");
       text.setAttribute("font-size", String(fontSize));
-      text.setAttribute("font-weight", "800");
+      text.setAttribute("font-weight", "700");
       text.setAttribute("font-family", '"Segoe UI", "Trebuchet MS", Arial, sans-serif');
       text.setAttribute("style", "pointer-events:none;user-select:none;");
       text.textContent = item.text;
