@@ -1,8 +1,8 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
-import { Board } from "./board.js?v=20260828rev";
+import { Board } from "./board.js?v=20260828lab";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828rev";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828lab";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -13,6 +13,7 @@ const AID_THREATS_KEY = "5minchess.aidThreats";
 const AID_MOVES_KEY = "5minchess.aidMoves";
 const CARD_CLICK_KEY = "5minchess.cardClick";
 const REVIEW_ARROWS_KEY = "5minchess.reviewArrows";
+const REVIEW_ARROW_LABELS_KEY = "5minchess.reviewArrowLabels";
 const HINT_FAKE_LOAD_MS = 3000;
 const OPP_REPLY_MIN_MS = 10000;
 const KING_TALK_HIDE = {
@@ -250,6 +251,14 @@ function readCardClick() {
 function readReviewArrows() {
   try {
     return localStorage.getItem(REVIEW_ARROWS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readReviewArrowLabels() {
+  try {
+    return localStorage.getItem(REVIEW_ARROW_LABELS_KEY) === "1";
   } catch {
     return false;
   }
@@ -1437,7 +1446,7 @@ function explainMove(before, move, after, hint) {
 const ARROW_GREEN = "#8ec85a";
 const ARROW_GRAY = "#c5c5c5";
 const ARROW_GRAY_LIGHT = "#d8d8d8";
-const ARROW_GOLD = "#e3b81f";
+const ARROW_GOLD = "#c6cc3a";
 const REVIEW_NEAR_BEST = 50;
 
 const SKILL_LEVELS = {
@@ -3810,6 +3819,7 @@ function syncAidButtons() {
   }
   syncCardClickUi();
   syncReviewArrowsUi();
+  syncReviewArrowLabelsUi();
   syncStoryIconsButton();
 }
 
@@ -3850,6 +3860,26 @@ function setReviewArrows(on) {
     /* ignore */
   }
   syncReviewArrowsUi();
+  paintHoldArrows();
+}
+
+function syncReviewArrowLabelsUi() {
+  const on = Boolean(state.reviewArrowLabels);
+  if (els.reviewArrowLabels) {
+    els.reviewArrowLabels.textContent = switchLabel(on);
+    els.reviewArrowLabels.classList.toggle("is-on", on);
+    els.reviewArrowLabels.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+}
+
+function setReviewArrowLabels(on) {
+  state.reviewArrowLabels = Boolean(on);
+  try {
+    localStorage.setItem(REVIEW_ARROW_LABELS_KEY, state.reviewArrowLabels ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  syncReviewArrowLabelsUi();
   paintHoldArrows();
 }
 
@@ -4211,6 +4241,7 @@ const els = {
   aidThreats: document.getElementById("btn-aid-threats"),
   cardClick: document.getElementById("btn-card-click"),
   reviewArrows: document.getElementById("btn-review-arrows"),
+  reviewArrowLabels: document.getElementById("btn-review-arrow-labels"),
   cardStyleBtn: document.getElementById("btn-card-style"),
   cardStyleList: document.getElementById("card-style-list"),
   cardStyleMenu: document.getElementById("card-style-menu"),
@@ -4294,6 +4325,7 @@ const state = {
   aids: { moves: readAidMoves(), threats: readAidThreats() },
   cardClick: readCardClick(),
   reviewArrows: readReviewArrows(),
+  reviewArrowLabels: readReviewArrowLabels(),
   aidTimer: null,
   aidToken: 0,
   flashToken: 0,
@@ -5001,6 +5033,29 @@ function reviewArrowKind(hint) {
   return "plain";
 }
 
+function reviewArrowLabel(hint) {
+  if (!state.reviewArrowLabels || !hint?.uci) return "";
+  const place = hintPlaceMap().get(hint.uci);
+  if (!place) return "";
+  const dir = hintEvalDir(hint);
+  const arrow = dir === "up" ? "↑" : dir === "down" ? "↓" : "";
+  if (!arrow) return String(place);
+  let delta = "";
+  if (hint.scoreType === "mate") {
+    delta = String(Math.abs(hint.score));
+  } else {
+    const shown = evalShownPoints(hintEvalShownCp(hint));
+    if (shown) delta = shown > 0 ? `+${shown}` : `${shown}`;
+    else if (isTwentiethsEval()) {
+      const parts = twentiethsSwingParts(hint);
+      const n = (parts?.recovery || 0) + (parts?.damage || 0) - (parts?.heartLoss || 0) - (parts?.swordLoss || 0);
+      if (n) delta = n > 0 ? `+${n}` : `${n}`;
+    }
+  }
+  if (!delta) return dir === "down" ? `${place}↓` : String(place);
+  return `${place}${arrow}${delta}`;
+}
+
 function paintHoldArrows(highlight = null) {
   if (!isTrainHold() || isHintFakeLoad()) {
     return false;
@@ -5016,6 +5071,7 @@ function paintHoldArrows(highlight = null) {
     ? null
     : new Set((Array.isArray(highlight) ? highlight : [highlight]).filter((i) => Number.isInteger(i)));
   const rank = { plain: 0, good: 1, best: 2 };
+  const destSeen = {};
   const arrows = (state.hints || [])
     .map((hint, i) => {
       if (!hint?.uci) return null;
@@ -5023,16 +5079,22 @@ function paintHoldArrows(highlight = null) {
       const active = Boolean(activeSet && activeSet.has(i));
       const isBest = kind === "best";
       const color = kind === "plain" ? ARROW_GRAY_LIGHT : ARROW_GREEN;
+      const to = hint.uci.slice(2, 4);
+      const slot = destSeen[to] || 0;
+      destSeen[to] = slot + 1;
       return {
         from: hint.uci.slice(0, 2),
-        to: hint.uci.slice(2, 4),
+        to,
         color,
         stroke: isBest ? ARROW_GOLD : color,
         strokeWidth: isBest ? 0.085 : 0.02,
-        strokeOpacity: isBest ? 0.95 : 0.5,
-        opacity: active ? 0.68 : 0.52,
+        strokeOpacity: isBest ? 0.95 : 0.72,
+        opacity: active ? 0.9 : 0.78,
         width: active ? "0.28" : "0.22",
-        label: "",
+        label: reviewArrowLabel(hint),
+        labelAt: "to",
+        labelDy: slot ? (slot % 2 ? 0.22 : -0.22) * Math.ceil(slot / 2) : 0,
+        labelColor: "#1f1f1f",
         _rank: rank[kind] + (active ? 0.5 : 0),
       };
     })
@@ -6721,6 +6783,7 @@ els.aidMoves.addEventListener("click", () => showAid("moves"));
 els.aidThreats?.addEventListener("click", () => showAid("threats"));
 els.cardClick?.addEventListener("click", () => setCardClick(!state.cardClick));
 els.reviewArrows?.addEventListener("click", () => setReviewArrows(!state.reviewArrows));
+els.reviewArrowLabels?.addEventListener("click", () => setReviewArrowLabels(!state.reviewArrowLabels));
 els.cardStyleBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleCardStyleMenu();

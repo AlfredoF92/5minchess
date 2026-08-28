@@ -377,6 +377,7 @@ export class Board {
     const drawn = [...this.arrows].sort(
       (left, right) => Number(left.opacity ?? 0) - Number(right.opacity ?? 0)
     );
+    const labels = [];
     for (const arrow of drawn) {
       const a = this.#squareCenter(arrow.from);
       const b = this.#squareCenter(arrow.to);
@@ -431,26 +432,36 @@ export class Board {
       this.arrowGroup.appendChild(path);
 
       if (!arrow.label) continue;
-      const label = String(arrow.label);
+      const dest = this.#squareCenter(arrow.to);
+      const atSquare = arrow.labelAt === "to";
       const back = this.pieces[arrow.to] ? headLen + 0.16 : 0.02;
-      const fontSize = label.length <= 2 ? 0.36 : label.length <= 3 ? 0.32 : label.length <= 4 ? 0.28 : 0.24;
+      labels.push({
+        text: String(arrow.label),
+        x: atSquare ? dest.x : tx - ux * back,
+        y: atSquare ? dest.y + (Number(arrow.labelDy) || 0) : ty - uy * back,
+        atSquare,
+        fill: arrow.labelColor || "#1f1f1f",
+      });
+    }
+    for (const item of labels) {
+      const fontSize = item.text.length <= 2 ? 0.34 : item.text.length <= 4 ? 0.28 : item.text.length <= 6 ? 0.24 : 0.2;
       const text = document.createElementNS(ns, "text");
-      text.setAttribute("x", String(tx - ux * back));
-      text.setAttribute("y", String(ty - uy * back));
+      text.setAttribute("x", String(item.x));
+      text.setAttribute("y", String(item.y));
       text.setAttribute("text-anchor", "middle");
       text.setAttribute("dominant-baseline", "middle");
-      text.setAttribute("dy", "0.08");
-      text.setAttribute("fill", arrow.labelColor || "#1f1f1f");
-      text.setAttribute("fill-opacity", "0.92");
+      text.setAttribute("dy", item.atSquare ? "0.06" : "0.08");
+      text.setAttribute("fill", item.fill);
+      text.setAttribute("fill-opacity", "0.96");
       text.setAttribute("stroke", "#fff8e8");
-      text.setAttribute("stroke-width", "0.07");
+      text.setAttribute("stroke-width", "0.09");
       text.setAttribute("stroke-linejoin", "round");
       text.setAttribute("paint-order", "stroke");
       text.setAttribute("font-size", String(fontSize));
-      text.setAttribute("font-weight", "700");
+      text.setAttribute("font-weight", "800");
       text.setAttribute("font-family", '"Segoe UI", "Trebuchet MS", Arial, sans-serif');
       text.setAttribute("style", "pointer-events:none;user-select:none;");
-      text.textContent = label;
+      text.textContent = item.text;
       this.arrowGroup.appendChild(text);
     }
   }
