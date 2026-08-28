@@ -1437,7 +1437,7 @@ function explainMove(before, move, after, hint) {
 const ARROW_GREEN = "#8ec85a";
 const ARROW_GRAY = "#c5c5c5";
 const ARROW_GRAY_LIGHT = "#d8d8d8";
-const ARROW_GOLD = "#c49a12";
+const ARROW_GOLD = "#e3b81f";
 const REVIEW_NEAR_BEST = 50;
 
 const SKILL_LEVELS = {
@@ -5021,13 +5021,17 @@ function paintHoldArrows(highlight = null) {
       if (!hint?.uci) return null;
       const kind = reviewArrowKind(hint);
       const active = Boolean(activeSet && activeSet.has(i));
-      const color = kind === "best" ? ARROW_GOLD : kind === "good" ? ARROW_GREEN : ARROW_GRAY_LIGHT;
+      const isBest = kind === "best";
+      const color = kind === "plain" ? ARROW_GRAY_LIGHT : ARROW_GREEN;
       return {
         from: hint.uci.slice(0, 2),
         to: hint.uci.slice(2, 4),
         color,
-        opacity: active ? 0.98 : 0.88,
-        width: active ? "0.24" : "0.16",
+        stroke: isBest ? ARROW_GOLD : color,
+        strokeWidth: isBest ? 0.085 : 0.02,
+        strokeOpacity: isBest ? 0.95 : 0.5,
+        opacity: active ? 0.68 : 0.52,
+        width: active ? "0.28" : "0.22",
         label: "",
         _rank: rank[kind] + (active ? 0.5 : 0),
       };
