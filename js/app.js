@@ -1895,10 +1895,10 @@ function hintEvalHtml(info) {
     return `${arrow}${hearts}`;
   }
   if (isPrevOppEval()) {
-    if (info.scoreType === "mate") return `${arrow}${escapeHtml(formatHintDelta(info))}${hintEvalHeartHtml()}`;
+    if (info.scoreType === "mate") return `${arrow}${escapeHtml(formatHintDelta(info))}`;
     const cp = hintEvalShownCp(info);
     const score = cp == null ? "—" : formatPawnCommaHtml(cp);
-    return `${arrow}${score}${hintEvalHeartHtml()}`;
+    return `${arrow}${score}`;
   }
   const score = escapeHtml(isAbsLikeEval() ? formatHintEval(info) : formatHintDelta(info));
   return `${arrow}${score}${hintEvalHeartHtml()}`;
