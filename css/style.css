@@ -5,6 +5,7 @@
   --muted: #6b6b6b;
   --line: #ececec;
   --green: #629924;
+  --best: #6f8214;
   --board-light: #f0d9b5;
   --board-dark: #b58863;
   --last: rgba(155, 199, 0, 0.41);
@@ -1421,9 +1422,9 @@ body.is-opening-intro .train-actions {
 .hint-btn.is-card.is-picked:disabled {
   border: 0;
   background: #fff;
-  outline: 8px solid var(--green);
+  outline: 8px solid var(--best);
   outline-offset: 1px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(98, 153, 36, 0.4);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(111, 130, 20, 0.4);
   transform: translateY(-3px);
   opacity: 1;
 }
@@ -1703,9 +1704,9 @@ body.is-opening-intro .train-actions {
 .hints.is-hold .hint-btn.is-card.is-picked:hover,
 .hints.is-hold .hint-btn.is-card.is-picked.is-kbd,
 .hints.is-hold .hint-btn.is-card.is-picked:disabled {
-  outline: 8px solid var(--green);
+  outline: 8px solid var(--best);
   outline-offset: 1px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(98, 153, 36, 0.4);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(111, 130, 20, 0.4);
   transform: translateY(-3px);
 }
 .hints.is-hold .hint-btn {
@@ -1724,9 +1725,9 @@ body.is-opening-intro .train-actions {
 .hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked:hover,
 .hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked.is-kbd,
 .hints.is-hold.is-opp-replied .hint-btn.is-card.is-picked:disabled {
-  outline: 8px solid var(--green);
+  outline: 8px solid var(--best);
   outline-offset: 1px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(98, 153, 36, 0.4);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(111, 130, 20, 0.4);
 }
 .hints.is-hold.is-wait-opp .hint-btn.is-card:not(.is-picked):not(.empty):hover,
 .hints.is-hold.is-wait-opp .hint-btn.is-card.is-kbd:not(.is-picked):not(.empty) {
@@ -2241,12 +2242,12 @@ body.is-opening-intro .train-actions {
 .hint-nav.is-wait-opp .more-hints:not(:disabled) {
   opacity: 0.65;
 }
-.hint-btn.best { border-color: #b7d48a; background: linear-gradient(#f7fff0, #fff); }
+.hint-btn.best { border-color: var(--best); background: linear-gradient(#f7fff0, #fff); }
 .hint-btn.is-picked,
 .hint-btn.is-picked:disabled {
-  border-color: var(--green);
+  border-color: var(--best);
   background: linear-gradient(#f4ffe8, #e4f5cd);
-  box-shadow: 0 0 0 2px rgba(98, 153, 36, 0.38);
+  box-shadow: 0 0 0 2px rgba(111, 130, 20, 0.38);
   opacity: 1;
 }
 .hint-btn.is-picked .hint-main,

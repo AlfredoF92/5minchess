@@ -441,7 +441,7 @@ export class Board {
         x: atCorner ? dest.x + 0.44 : tx - ux * back,
         y: atCorner ? dest.y - 0.18 : ty - uy * back,
         atCorner,
-        fill: arrow.labelColor || "#1f1f1f",
+        fill: "#111111",
       });
     }
     for (const item of labels) {
@@ -457,10 +457,10 @@ export class Board {
     text.setAttribute("text-anchor", item.atCorner ? "end" : "middle");
     text.setAttribute("dominant-baseline", item.atCorner ? "alphabetic" : "middle");
     text.setAttribute("dy", item.atCorner ? "0" : "0.08");
-    text.setAttribute("fill", item.fill);
+    text.setAttribute("fill", "#111111");
     text.setAttribute("fill-opacity", "1");
-    text.setAttribute("stroke", "rgba(255, 248, 232, 0.85)");
-    text.setAttribute("stroke-width", "0.035");
+    text.setAttribute("stroke", "#ffffff");
+    text.setAttribute("stroke-width", "0.08");
     text.setAttribute("stroke-linejoin", "round");
     text.setAttribute("paint-order", "stroke");
     text.setAttribute("font-family", family);
@@ -472,6 +472,8 @@ export class Board {
       text.setAttribute("font-weight", "800");
       if (parts.sign) {
         const sign = document.createElementNS(ns, "tspan");
+        sign.setAttribute("font-size", "0.48");
+        sign.setAttribute("font-weight", "900");
         sign.textContent = parts.sign;
         text.appendChild(sign);
       }
@@ -489,7 +491,19 @@ export class Board {
       const fontSize = item.text.length <= 3 ? 0.3 : item.text.length <= 4 ? 0.26 : 0.22;
       text.setAttribute("font-size", String(fontSize));
       text.setAttribute("font-weight", "700");
-      text.textContent = item.text;
+      const match = String(item.text).match(/^([+\-−])(.*)$/);
+      if (match) {
+        const sign = document.createElementNS(ns, "tspan");
+        sign.setAttribute("font-size", String(fontSize * 1.55));
+        sign.setAttribute("font-weight", "900");
+        sign.textContent = match[1];
+        text.appendChild(sign);
+        const rest = document.createElementNS(ns, "tspan");
+        rest.textContent = match[2];
+        text.appendChild(rest);
+      } else {
+        text.textContent = item.text;
+      }
     }
     this.arrowGroup.appendChild(text);
   }

@@ -1,6 +1,6 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
-import { Board } from "./board.js?v=20260828num2";
+import { Board } from "./board.js?v=20260828brd";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
 import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828arr";
 
@@ -1492,9 +1492,7 @@ function explainMove(before, move, after, hint) {
 }
 
 const ARROW_GREEN = "#8ec85a";
-const ARROW_GRAY = "#c5c5c5";
-const ARROW_GRAY_LIGHT = "#d8d8d8";
-const ARROW_GOLD = "#c6cc3a";
+const ARROW_GOLD = "#6f8214";
 const REVIEW_NEAR_BEST = 50;
 
 const SKILL_LEVELS = {
@@ -5460,7 +5458,7 @@ function buildHoldArrowSnap() {
       if (!hint?.uci || hint.synthetic) return null;
       const kind = reviewArrowKind(hint);
       const isBest = kind === "best";
-      const color = kind === "plain" ? ARROW_GRAY_LIGHT : ARROW_GREEN;
+      const color = ARROW_GREEN;
       const { text: label, parts: labelParts } = reviewArrowLabel(hint);
       return {
         from: hint.uci.slice(0, 2),
@@ -5475,7 +5473,6 @@ function buildHoldArrowSnap() {
         label,
         labelParts,
         labelAt: "to",
-        labelColor: label.startsWith("-") ? "#a61e1e" : "#2a6b1a",
         hintIndex: i,
         _rank: rank[kind],
       };
@@ -5561,13 +5558,12 @@ function showHintArrows(index = null, { reveal = false, onlyActive = false } = {
         return {
           from: hint.uci.slice(0, 2),
           to,
-          color: preview ? ARROW_GRAY : ARROW_GREEN,
+          color: ARROW_GREEN,
           opacity: preview
             ? active || onlyActive ? 0.72 : 0.48
             : active || onlyActive ? 0.95 : 0.64,
           width: active || onlyActive ? "0.24" : "0.15",
           label: active ? hintSan(hint) : "",
-          labelColor: "#1f1f1f",
         };
       })
       .filter(Boolean)
