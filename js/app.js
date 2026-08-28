@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260828num2";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828bar4";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828cards";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -26,12 +26,13 @@ const KING_TALK_HIDE = {
   talkAfterRank: true,
 };
 const HINT_LAYOUTS = {
-  "6x1": { perPage: 6, pages: 1 },
   "4x1": { perPage: 4, pages: 1 },
-  "6x2": { perPage: 6, pages: 2 },
-  "4x2": { perPage: 4, pages: 2 },
-  "4x3": { perPage: 4, pages: 3 },
+  "6x1": { perPage: 6, pages: 1 },
+  "4x2": { perPage: 8, pages: 1 },
+  "6x2": { perPage: 12, pages: 1 },
+  "4x3": { perPage: 12, pages: 1 },
 };
+const HINT_LAYOUT_ORDER = ["4x1", "6x1", "4x2", "6x2"];
 const CLOCK_KEY = "5minchess.moveClock";
 const ROUND_EVAL_KEY = "5minchess.roundEval";
 const STORY_ICONS_KEY = "5minchess.pieceCards";
@@ -173,6 +174,7 @@ const HINT_RECALC_MS = 8000;
 function readHintLayout() {
   try {
     const saved = localStorage.getItem(HINT_LAYOUT_KEY);
+    if (saved === "4x3") return "6x2";
     if (HINT_LAYOUTS[saved]) return saved;
   } catch {
     /* ignore */
@@ -3223,9 +3225,7 @@ function hintPageCount() {
 }
 
 function visibleHints() {
-  const perPage = hintsPerPage();
-  const start = state.hintPage * perPage;
-  return state.hintPool.slice(start, start + perPage);
+  return state.hintPool.slice(0, hintPoolSize());
 }
 
 function visibleHintDests() {
@@ -3349,28 +3349,20 @@ function syncHintBoardPlay() {
 }
 
 function syncHintLayoutUi() {
-  const n = hintsPerPage();
+  const n = hintPoolSize();
   els.hints?.classList.toggle("is-four", n === 4);
-  els.hints?.classList.toggle("is-six", n !== 4);
+  els.hints?.classList.toggle("is-six", n === 6);
+  els.hints?.classList.toggle("is-eight", n === 8);
+  els.hints?.classList.toggle("is-twelve", n >= 12);
+  els.hints?.classList.toggle("is-cols-4", n === 4 || n === 8 || n >= 12);
+  els.hints?.classList.toggle("is-cols-3", n === 6);
   els.hints?.classList.add("is-cards");
 }
 
 function syncHintNav() {
   const hidden = waitingForHints() && !isTrainHold();
-  const perPage = hintsPerPage();
-  const label = t("hints.more", { n: perPage });
   els.hints?.classList.toggle("is-waiting", hidden);
-  els.hintNav?.classList.toggle("is-waiting", hidden);
-  const hold = isTrainHold();
-  const canUse = (playerIsSideToMove() || hold) && !hidden && (!state.game.game_over() || hold);
-  const canToggle = canUse && hintPageCount() > 1 && (hold || !state.busy && !isHintFakeLoad());
-  if (els.hintNav) els.hintNav.hidden = hintPageCount() <= 1;
-  if (els.moreHints) {
-    els.moreHints.textContent = label;
-    els.moreHints.title = label;
-    els.moreHints.setAttribute("aria-label", label);
-    els.moreHints.disabled = !canToggle;
-  }
+  if (els.hintNav) els.hintNav.hidden = true;
   syncRecalcButton();
   syncHintMix();
 }
@@ -3786,7 +3778,6 @@ function worstImmediateLoss(game, defenderColor) {
 }
 
 function hintDanger(hint) {
-  if (state.hintPage === 0) return null;
   const { played, after } = tryHint(hint);
   if (!played || !after) return null;
   if (after.in_checkmate()) return lossPhrase("k");
@@ -5973,7 +5964,7 @@ function hintsAreSelectable() {
 }
 
 function moreHintsHotkeyReady() {
-  return Boolean(els.moreHints) && !els.moreHints.disabled && !els.hintNav?.hidden && hintPageCount() > 1 && hintPanelOpen();
+  return false;
 }
 
 function paintKbdHint() {
@@ -6094,11 +6085,6 @@ document.addEventListener("keydown", (event) => {
     }
     return;
   }
-  if (event.key === "5" && moreHintsHotkeyReady()) {
-    event.preventDefault();
-    els.moreHints.click();
-    return;
-  }
   if (event.key < "1" || event.key > "9") return;
   const index = Number(event.key) - 1;
   if (index >= hintsPerPage() || !hintsAreSelectable()) return;
@@ -6131,11 +6117,6 @@ els.hints.addEventListener("pointerout", (event) => {
   }
   if (state.aids.moves) showHintArrows(null, { reveal: true });
   else state.board.setArrows([]);
-});
-
-els.moreHints.addEventListener("click", () => {
-  if (els.moreHints.disabled) return;
-  showHintPage(state.hintPage + 1);
 });
 
 function startRecalcProgress(ms) {
@@ -6468,7 +6449,7 @@ function fillHintLayoutSelect() {
   const select = els.hintLayout;
   if (!select) return;
   const current = HINT_LAYOUTS[state.hintLayout] ? state.hintLayout : "6x1";
-  select.innerHTML = Object.keys(HINT_LAYOUTS)
+  select.innerHTML = HINT_LAYOUT_ORDER
     .map((id) => `<option value="${id}"${id === current ? " selected" : ""}>${t(`hints.layout.${id}`)}</option>`)
     .join("");
 }
@@ -6585,7 +6566,8 @@ function applyMoveClock(value) {
 }
 
 function applyHintLayout(id) {
-  const next = HINT_LAYOUTS[id] ? id : "6x1";
+  const mapped = id === "4x3" ? "6x2" : id;
+  const next = HINT_LAYOUTS[mapped] ? mapped : "6x1";
   state.hintLayout = next;
   try {
     localStorage.setItem(HINT_LAYOUT_KEY, next);

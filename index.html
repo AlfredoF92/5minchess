@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260828bar7">
+  <link rel="stylesheet" href="css/style.css?v=20260828cards">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -203,8 +203,8 @@
           <span id="move-clock-num" class="move-clock-num">20</span>
           <span class="move-clock-bar" aria-hidden="true"><i id="move-clock-fill"></i></span>
         </div>
-        <div id="hints" class="hints is-cards is-waiting" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
-        <div id="hint-nav" class="hint-nav is-waiting">
+        <div id="hints" class="hints is-cards is-six is-cols-3 is-waiting" data-i18n-aria="hints.aria" aria-label="The King's suggestions"></div>
+        <div id="hint-nav" class="hint-nav" hidden>
           <button id="btn-more-hints" class="more-hints" type="button" disabled>See the other 6 moves</button>
         </div>
         </div>
@@ -464,6 +464,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260828bar7"></script>
+  <script type="module" src="js/app.js?v=20260828cards"></script>
 </body>
 </html>
