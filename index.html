@@ -288,6 +288,15 @@
           <button type="button" id="btn-hint-overlay" class="coach-switch coach-switch-value" aria-expanded="false" aria-haspopup="true" data-i18n-aria="tools.hintInfo.overlayAria" aria-label="Come mostrare le info di valutazione sulle carte dopo la scelta">Esterna</button>
           <div id="hint-overlay-list" class="style-menu-list" hidden role="menu"></div>
         </div>
+        <h3 class="quick-tools-section" data-i18n="tools.evalBar">Barra di valutazione</h3>
+        <div class="coach-row">
+          <span class="coach-row-label" data-i18n="tools.evalBar.hideDiff">Nascondi differenza</span>
+          <button type="button" id="btn-eval-bar-hide-diff" class="coach-switch" aria-pressed="false" data-i18n-aria="tools.evalBar.hideDiffAria" aria-label="Nascondi il valore della mossa precedente e la differenza sulla barra">Off</button>
+        </div>
+        <div class="coach-row">
+          <span class="coach-row-label" data-i18n="tools.evalBar.blockOnly">Aggiorna solo il blocco</span>
+          <button type="button" id="btn-eval-bar-block-only" class="coach-switch" aria-pressed="false" data-i18n-aria="tools.evalBar.blockOnlyAria" aria-label="Aggiorna la barra solo quando il punteggio supera un blocco da un pedone">Off</button>
+        </div>
         <h3 class="quick-tools-section is-admin" data-i18n="tools.admin">Impostazioni per ADMIN</h3>
         <div class="coach-row">
           <span class="coach-row-label" data-i18n="tools.admin.solutions">Visualizza le soluzioni</span>
@@ -450,6 +459,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260828bar"></script>
+  <script type="module" src="js/app.js?v=20260828bar2"></script>
 </body>
 </html>

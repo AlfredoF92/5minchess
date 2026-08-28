@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260828num";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828lab";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828bar";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -14,6 +14,8 @@ const AID_MOVES_KEY = "5minchess.aidMoves";
 const CARD_CLICK_KEY = "5minchess.cardClick";
 const REVIEW_ARROWS_KEY = "5minchess.reviewArrows";
 const REVIEW_ARROW_LABELS_KEY = "5minchess.reviewArrowLabels";
+const EVAL_BAR_HIDE_DIFF_KEY = "5minchess.evalBarHideDiff";
+const EVAL_BAR_BLOCK_ONLY_KEY = "5minchess.evalBarBlockOnly";
 const HINT_FAKE_LOAD_MS = 3000;
 const OPP_REPLY_MIN_MS = 10000;
 const KING_TALK_HIDE = {
@@ -259,6 +261,22 @@ function readReviewArrows() {
 function readReviewArrowLabels() {
   try {
     return localStorage.getItem(REVIEW_ARROW_LABELS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readEvalBarHideDiff() {
+  try {
+    return localStorage.getItem(EVAL_BAR_HIDE_DIFF_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readEvalBarBlockOnly() {
+  try {
+    return localStorage.getItem(EVAL_BAR_BLOCK_ONLY_KEY) === "1";
   } catch {
     return false;
   }
@@ -2953,6 +2971,19 @@ function evalBarPlayerShare(playerCp, { ignoreMate = false } = {}) {
   return 50 + pawn * 5;
 }
 
+function evalBarBlockCp(playerCp) {
+  if (!Number.isFinite(playerCp)) return 0;
+  if (Math.abs(playerCp) >= 50000) return playerCp;
+  const pawn = Math.max(-10, Math.min(10, playerCp / 100));
+  return Math.trunc(pawn) * 100;
+}
+
+function evalBarSnapCp(playerCp) {
+  if (!state.evalBarBlockOnly) return playerCp;
+  if (state.game?.in_checkmate()) return playerCp;
+  return evalBarBlockCp(playerCp);
+}
+
 function paintEvalBar() {
   const fill = els.evalBarFill;
   const label = els.evalBarScore;
@@ -2961,16 +2992,17 @@ function paintEvalBar() {
   const prevWrap = els.evalBarPrevWrap;
   if (!fill && !label && !els.evalBarCells) return;
   ensureEvalBarChrome();
+  const hideDiff = Boolean(state.evalBarHideDiff);
   const blackBottom = state.board?.orientation === "black";
   rememberEvalBarPrev(evalBarSourceCp());
-  const shown = evalBarShownCp();
+  const shown = evalBarSnapCp(evalBarShownCp());
   const pct = Math.max(0, Math.min(100, evalBarPlayerShare(shown)));
   const text = formatEvalBarDisplay(shown);
-  const before = state.evalBarBefore;
-  const beforeShown = Number.isFinite(before) ? evalBarShownFromPlayer(before) : null;
+  const before = hideDiff ? null : state.evalBarBefore;
+  const beforeShown = Number.isFinite(before) ? evalBarSnapCp(evalBarShownFromPlayer(before)) : null;
   const nowPts = evalShownPoints(shown) || 0;
   const beforePts = Number.isFinite(beforeShown) ? (evalShownPoints(beforeShown) || 0) : nowPts;
-  const dir = nowPts > beforePts ? "up" : nowPts < beforePts ? "down" : "";
+  const dir = hideDiff ? "" : nowPts > beforePts ? "up" : nowPts < beforePts ? "down" : "";
   els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
   els.evalBar?.classList.toggle("is-twentieths", isTwentiethsEval());
   els.evalBar?.classList.toggle("is-prev-opp", isPrevOppEval());
@@ -2987,7 +3019,7 @@ function paintEvalBar() {
     label.classList.toggle("is-down", dir === "down");
   }
   if (prevLabel || prevWrap) {
-    const showPrev = Number.isFinite(beforeShown);
+    const showPrev = !hideDiff && Number.isFinite(beforeShown) && beforePts !== nowPts;
     if (prevWrap) prevWrap.hidden = !showPrev;
     if (prevLabel) {
       prevLabel.hidden = !showPrev;
@@ -3928,6 +3960,8 @@ function syncAidButtons() {
   syncCardClickUi();
   syncReviewArrowsUi();
   syncReviewArrowLabelsUi();
+  syncEvalBarHideDiffUi();
+  syncEvalBarBlockOnlyUi();
   syncStoryIconsButton();
 }
 
@@ -3990,6 +4024,46 @@ function setReviewArrowLabels(on) {
   syncReviewArrowLabelsUi();
   if (isTrainHold() && !state.trainNext) state.reviewArrowSnap = null;
   paintHoldArrows();
+}
+
+function syncEvalBarHideDiffUi() {
+  const on = Boolean(state.evalBarHideDiff);
+  if (els.evalBarHideDiff) {
+    els.evalBarHideDiff.textContent = switchLabel(on);
+    els.evalBarHideDiff.classList.toggle("is-on", on);
+    els.evalBarHideDiff.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+}
+
+function setEvalBarHideDiff(on) {
+  state.evalBarHideDiff = Boolean(on);
+  try {
+    localStorage.setItem(EVAL_BAR_HIDE_DIFF_KEY, state.evalBarHideDiff ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  syncEvalBarHideDiffUi();
+  paintEvalBar();
+}
+
+function syncEvalBarBlockOnlyUi() {
+  const on = Boolean(state.evalBarBlockOnly);
+  if (els.evalBarBlockOnly) {
+    els.evalBarBlockOnly.textContent = switchLabel(on);
+    els.evalBarBlockOnly.classList.toggle("is-on", on);
+    els.evalBarBlockOnly.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+}
+
+function setEvalBarBlockOnly(on) {
+  state.evalBarBlockOnly = Boolean(on);
+  try {
+    localStorage.setItem(EVAL_BAR_BLOCK_ONLY_KEY, state.evalBarBlockOnly ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  syncEvalBarBlockOnlyUi();
+  paintEvalBar();
 }
 
 function syncStoryIconsButton() {
@@ -4353,6 +4427,8 @@ const els = {
   cardClick: document.getElementById("btn-card-click"),
   reviewArrows: document.getElementById("btn-review-arrows"),
   reviewArrowLabels: document.getElementById("btn-review-arrow-labels"),
+  evalBarHideDiff: document.getElementById("btn-eval-bar-hide-diff"),
+  evalBarBlockOnly: document.getElementById("btn-eval-bar-block-only"),
   cardStyleBtn: document.getElementById("btn-card-style"),
   cardStyleList: document.getElementById("card-style-list"),
   cardStyleMenu: document.getElementById("card-style-menu"),
@@ -4437,6 +4513,8 @@ const state = {
   cardClick: readCardClick(),
   reviewArrows: readReviewArrows(),
   reviewArrowLabels: readReviewArrowLabels(),
+  evalBarHideDiff: readEvalBarHideDiff(),
+  evalBarBlockOnly: readEvalBarBlockOnly(),
   aidTimer: null,
   aidToken: 0,
   flashToken: 0,
@@ -6907,6 +6985,8 @@ els.aidThreats?.addEventListener("click", () => showAid("threats"));
 els.cardClick?.addEventListener("click", () => setCardClick(!state.cardClick));
 els.reviewArrows?.addEventListener("click", () => setReviewArrows(!state.reviewArrows));
 els.reviewArrowLabels?.addEventListener("click", () => setReviewArrowLabels(!state.reviewArrowLabels));
+els.evalBarHideDiff?.addEventListener("click", () => setEvalBarHideDiff(!state.evalBarHideDiff));
+els.evalBarBlockOnly?.addEventListener("click", () => setEvalBarBlockOnly(!state.evalBarBlockOnly));
 els.cardStyleBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleCardStyleMenu();
