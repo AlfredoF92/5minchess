@@ -1,6 +1,6 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
-import { Board } from "./board.js?v=20260828sgn";
+import { Board } from "./board.js?v=20260828ctr";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
 import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828arr";
 

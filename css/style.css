@@ -691,6 +691,8 @@ body.is-opening-intro .train-actions {
   grid-template-rows: repeat(8, 1fr);
   width: 100%;
   height: 100%;
+  position: relative;
+  z-index: 1;
   touch-action: none;
   user-select: none;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25);
@@ -819,7 +821,33 @@ body.is-opening-intro .train-actions {
   height: 100%;
   pointer-events: none;
   overflow: visible;
-  z-index: 6;
+  z-index: 2;
+}
+.board-pieces {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+.piece-cell {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+.board-arrow-labels {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 4;
 }
 
 .coords-ranks {

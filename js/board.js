@@ -79,6 +79,10 @@ export class Board {
           <svg class="board-arrows" viewBox="0 0 8 8" preserveAspectRatio="none">
             <g class="arrow-lines"></g>
           </svg>
+          <div class="board-pieces" aria-hidden="true"></div>
+          <svg class="board-arrow-labels" viewBox="0 0 8 8" preserveAspectRatio="none">
+            <g class="arrow-labels"></g>
+          </svg>
         </div>
         <ol class="coords-ranks"></ol>
         <ol class="coords-files"></ol>
@@ -87,6 +91,8 @@ export class Board {
 
     this.boardEl = this.root.querySelector(".board");
     this.arrowGroup = this.root.querySelector(".arrow-lines");
+    this.labelGroup = this.root.querySelector(".arrow-labels");
+    this.pieceLayer = this.root.querySelector(".board-pieces");
     this.ranksEl = this.root.querySelector(".coords-ranks");
     this.filesEl = this.root.querySelector(".coords-files");
 
@@ -97,7 +103,9 @@ export class Board {
 
   #buildSquares() {
     this.boardEl.innerHTML = "";
+    this.pieceLayer.innerHTML = "";
     this.squareEls = {};
+    this.pieceCells = {};
     for (let row = 0; row < 8; row += 1) {
       for (let col = 0; col < 8; col += 1) {
         const sq = document.createElement("div");
@@ -108,8 +116,17 @@ export class Board {
         else sq.classList.add("dark");
         this.boardEl.appendChild(sq);
         this.squareEls[square] = sq;
+        const cell = document.createElement("div");
+        cell.className = "piece-cell";
+        cell.dataset.square = square;
+        this.pieceLayer.appendChild(cell);
+        this.pieceCells[square] = cell;
       }
     }
+  }
+
+  #pieceEl(square) {
+    return this.pieceCells[square]?.querySelector(".piece") || null;
   }
 
   #visualToSquare(col, row) {
@@ -303,11 +320,11 @@ export class Board {
   }
 
   render() {
-    Object.values(this.squareEls).forEach((el) => {
+    Object.values(this.pieceCells).forEach((el) => {
       el.querySelector(".piece")?.remove();
     });
     Object.entries(this.pieces).forEach(([square, piece]) => {
-      const el = this.squareEls[square];
+      const el = this.pieceCells[square];
       if (!el) return;
       const img = document.createElement("img");
       img.className = "piece";
@@ -373,6 +390,7 @@ export class Board {
 
   #drawArrows() {
     this.arrowGroup.innerHTML = "";
+    if (this.labelGroup) this.labelGroup.innerHTML = "";
     const ns = "http://www.w3.org/2000/svg";
     const drawn = [...this.arrows].sort(
       (left, right) => Number(left.opacity ?? 0) - Number(right.opacity ?? 0)
@@ -394,16 +412,14 @@ export class Board {
       const strokeWidth = String(arrow.strokeWidth ?? 0.018);
       const strokeOpacity = String(arrow.strokeOpacity ?? opacity);
       const shaftHalf = (Number(arrow.width) || 0.15) / 2;
-      const startPad = 0.3;
-      const tipPad = 0.08;
-      const usable = Math.max(0.42, len - startPad - tipPad);
+      const usable = Math.max(0.42, len);
       const headLen = Math.min(0.42, usable * 0.52);
       const headHalf = Math.max(shaftHalf * 2.35, 0.2);
 
-      const sx = a.x + ux * startPad;
-      const sy = a.y + uy * startPad;
-      const tx = b.x - ux * tipPad;
-      const ty = b.y - uy * tipPad;
+      const sx = a.x;
+      const sy = a.y;
+      const tx = b.x;
+      const ty = b.y;
       const hx = tx - ux * headLen;
       const hy = ty - uy * headLen;
       const path = document.createElementNS(ns, "polygon");
@@ -450,7 +466,7 @@ export class Board {
       if (overlay) signOverlays.push(overlay);
     }
     for (const overlay of signOverlays) {
-      this.arrowGroup.appendChild(overlay);
+      (this.labelGroup || this.arrowGroup).appendChild(overlay);
     }
   }
 
@@ -520,7 +536,7 @@ export class Board {
         text.textContent = item.text;
       }
     }
-    this.arrowGroup.appendChild(text);
+    (this.labelGroup || this.arrowGroup).appendChild(text);
     if (!signChar) return null;
     let pos;
     try {
@@ -547,7 +563,7 @@ export class Board {
   }
 
   async animateMove(from, to) {
-    const fromEl = this.squareEls[from]?.querySelector(".piece");
+    const fromEl = this.#pieceEl(from);
     const toSquare = this.squareEls[to];
     if (!fromEl || !toSquare) {
       this.render();
@@ -567,7 +583,7 @@ export class Board {
     ghost.style.transition = "none";
     document.body.appendChild(ghost);
     fromEl.style.opacity = "0";
-    const captured = toSquare.querySelector(".piece");
+    const captured = this.#pieceEl(to);
     if (captured) captured.classList.add("is-captured");
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     ghost.style.transition = "transform 0.42s cubic-bezier(0.22, 0.72, 0.28, 1)";
@@ -609,7 +625,7 @@ export class Board {
 
   #liftPieceFromEvent(square, event) {
     this.#dropGhost();
-    const pieceEl = this.squareEls[square]?.querySelector(".piece");
+    const pieceEl = this.#pieceEl(square);
     if (!pieceEl) return;
     const rect = pieceEl.getBoundingClientRect();
     try {
@@ -644,7 +660,7 @@ export class Board {
   #dropGhost() {
     if (!this.drag) return;
     this.drag.ghost?.remove();
-    this.squareEls[this.drag.from]?.querySelector(".piece")?.classList.remove("dragging-source");
+    this.#pieceEl(this.drag.from)?.classList.remove("dragging-source");
     this.boardEl.classList.remove("is-dragging");
     try {
       if (this.drag.pointerId != null) this.boardEl.releasePointerCapture(this.drag.pointerId);
