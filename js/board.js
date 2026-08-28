@@ -444,13 +444,19 @@ export class Board {
         fill: "#111111",
       });
     }
+    const signOverlays = [];
     for (const item of labels) {
-      this.#drawArrowLabel(ns, item);
+      const overlay = this.#drawArrowLabel(ns, item);
+      if (overlay) signOverlays.push(overlay);
+    }
+    for (const overlay of signOverlays) {
+      this.arrowGroup.appendChild(overlay);
     }
   }
 
   #drawArrowLabel(ns, item) {
     const family = '"Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
+    const strokeW = "0.06";
     const text = document.createElementNS(ns, "text");
     text.setAttribute("x", String(item.x));
     text.setAttribute("y", String(item.y));
@@ -460,20 +466,25 @@ export class Board {
     text.setAttribute("fill", "#111111");
     text.setAttribute("fill-opacity", "1");
     text.setAttribute("stroke", "#ffffff");
-    text.setAttribute("stroke-width", "0.08");
+    text.setAttribute("stroke-width", strokeW);
     text.setAttribute("stroke-linejoin", "round");
     text.setAttribute("paint-order", "stroke");
     text.setAttribute("font-family", family);
     text.setAttribute("letter-spacing", "-0.02em");
     text.setAttribute("style", "pointer-events:none;user-select:none;");
     const parts = item.parts;
+    let signChar = "";
+    let signSize = 0.4;
     if (parts && (parts.int || parts.frac)) {
       text.setAttribute("font-size", "0.25");
       text.setAttribute("font-weight", "800");
       if (parts.sign) {
+        signChar = parts.sign;
         const sign = document.createElementNS(ns, "tspan");
-        sign.setAttribute("font-size", "0.48");
+        sign.setAttribute("font-size", String(signSize));
         sign.setAttribute("font-weight", "900");
+        sign.setAttribute("fill-opacity", "0");
+        sign.setAttribute("stroke-opacity", "0");
         sign.textContent = parts.sign;
         text.appendChild(sign);
       }
@@ -493,9 +504,13 @@ export class Board {
       text.setAttribute("font-weight", "700");
       const match = String(item.text).match(/^([+\-−])(.*)$/);
       if (match) {
+        signChar = match[1];
+        signSize = fontSize * 1.32;
         const sign = document.createElementNS(ns, "tspan");
-        sign.setAttribute("font-size", String(fontSize * 1.55));
+        sign.setAttribute("font-size", String(signSize));
         sign.setAttribute("font-weight", "900");
+        sign.setAttribute("fill-opacity", "0");
+        sign.setAttribute("stroke-opacity", "0");
         sign.textContent = match[1];
         text.appendChild(sign);
         const rest = document.createElementNS(ns, "tspan");
@@ -506,6 +521,29 @@ export class Board {
       }
     }
     this.arrowGroup.appendChild(text);
+    if (!signChar) return null;
+    let pos;
+    try {
+      pos = text.getStartPositionOfChar(0);
+    } catch {
+      return null;
+    }
+    const overlay = document.createElementNS(ns, "text");
+    overlay.setAttribute("x", String(pos.x));
+    overlay.setAttribute("y", String(pos.y));
+    overlay.setAttribute("text-anchor", "start");
+    overlay.setAttribute("dominant-baseline", "alphabetic");
+    overlay.setAttribute("fill", "#111111");
+    overlay.setAttribute("stroke", "#ffffff");
+    overlay.setAttribute("stroke-width", strokeW);
+    overlay.setAttribute("stroke-linejoin", "round");
+    overlay.setAttribute("paint-order", "stroke");
+    overlay.setAttribute("font-family", family);
+    overlay.setAttribute("font-size", String(signSize));
+    overlay.setAttribute("font-weight", "900");
+    overlay.setAttribute("style", "pointer-events:none;user-select:none;");
+    overlay.textContent = signChar;
+    return overlay;
   }
 
   async animateMove(from, to) {
