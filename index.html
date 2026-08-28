@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260828ctr">
+  <link rel="stylesheet" href="css/style.css?v=20260828adm">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -214,7 +214,30 @@
           </div>
         </div>
         <aside id="admin-solutions" class="admin-solutions" hidden>
-          <h3 data-i18n="admin.solutions">Le soluzioni</h3>
+          <h3 data-i18n="admin.solutions">Riquadro per admin</h3>
+          <div id="admin-ply" class="admin-ply">
+            <span class="admin-ply-badge">
+              <span id="admin-ply-num" class="admin-ply-num">1.</span>
+              <span id="admin-ply-dots" class="admin-ply-dots" hidden>...</span>
+            </span>
+            <div class="admin-ply-meta">
+              <strong id="admin-ply-turn">Bianco</strong>
+              <span id="admin-ply-last" class="admin-ply-last"></span>
+            </div>
+          </div>
+          <div id="admin-eval" class="admin-eval" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" data-i18n-aria="admin.eval.aria" aria-label="Valutazione Stockfish">
+            <div class="admin-eval-track" aria-hidden="true">
+              <i id="admin-eval-fill" class="admin-eval-fill"></i>
+            </div>
+            <div class="admin-eval-meta">
+              <span class="admin-eval-label" data-i18n="admin.eval">Stockfish</span>
+              <strong id="admin-eval-score" class="admin-eval-score">0,00</strong>
+              <span class="admin-eval-sides">
+                <span data-i18n="admin.eval.black">Nero</span>
+                <span data-i18n="admin.eval.white">Bianco</span>
+              </span>
+            </div>
+          </div>
           <ol id="admin-solutions-list" class="admin-solutions-list"></ol>
         </aside>
         <div class="coach-tools">
@@ -305,8 +328,8 @@
         </div>
         <h3 class="quick-tools-section is-admin" data-i18n="tools.admin">Impostazioni per ADMIN</h3>
         <div class="coach-row">
-          <span class="coach-row-label" data-i18n="tools.admin.solutions">Visualizza le soluzioni</span>
-          <button type="button" id="btn-admin-solutions" class="coach-switch" aria-pressed="false" data-i18n-aria="tools.admin.solutionsAria" aria-label="Visualizza le soluzioni">Off</button>
+          <span class="coach-row-label" data-i18n="tools.admin.solutions">Riquadro per admin</span>
+          <button type="button" id="btn-admin-solutions" class="coach-switch" aria-pressed="false" data-i18n-aria="tools.admin.solutionsAria" aria-label="Mostra il riquadro admin">Off</button>
         </div>
       </div>
       <div class="quick-tools-actions">
@@ -465,6 +488,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260828ctr"></script>
+  <script type="module" src="js/app.js?v=20260828adm"></script>
 </body>
 </html>

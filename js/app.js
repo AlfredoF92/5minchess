@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260828ctr";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828arr";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828adm";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -3183,6 +3183,7 @@ function paintEvalBar() {
     els.evalBar.setAttribute("aria-valuenow", String(Math.round(pct)));
     els.evalBar.setAttribute("title", showPrevTitle(text, beforeShown, dir));
   }
+  paintAdminEvalBar();
 }
 
 function showPrevTitle(text, beforeShown, dir) {
@@ -3657,6 +3658,77 @@ function setAdminSolutions(on) {
   renderAdminSolutions();
 }
 
+function adminEngineWhiteCp() {
+  if (state.game?.in_checkmate()) {
+    return state.game.turn() === "b" ? 100000 : -100000;
+  }
+  const cp = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+  if (isLocalVsHuman()) {
+    return state.game.turn() === "w" ? cp : -cp;
+  }
+  return state.playerColor === "w" ? cp : -cp;
+}
+
+function formatAdminEngineScore(cp) {
+  if (!Number.isFinite(cp)) return "—";
+  if (Math.abs(cp) >= 50000) {
+    const n = Math.max(1, Math.round(100000 - Math.abs(cp)));
+    return cp > 0 ? `M${n}` : `−M${n}`;
+  }
+  const pawns = cp / 100;
+  const abs = Math.abs(pawns).toFixed(2).replace(".", ",");
+  if (Math.abs(pawns) < 0.005) return "0,00";
+  return pawns > 0 ? `+${abs}` : `−${abs}`;
+}
+
+function adminEngineWhitePct(cp) {
+  if (!Number.isFinite(cp)) return 50;
+  if (Math.abs(cp) >= 50000) return cp > 0 ? 100 : 0;
+  const chance = 2 / (1 + Math.exp(-0.00368208 * cp)) - 1;
+  return Math.max(0, Math.min(100, 50 + 50 * chance));
+}
+
+function paintAdminPly() {
+  if (!els.adminPlyNum || !els.adminPlyTurn) return;
+  const hist = state.game?.history({ verbose: true }) || [];
+  const ply = hist.length;
+  const fullmove = Math.floor(ply / 2) + 1;
+  const whiteToMove = state.game?.turn() === "w";
+  els.adminPlyNum.textContent = `${fullmove}.`;
+  if (els.adminPlyDots) els.adminPlyDots.hidden = whiteToMove;
+  els.adminPlyTurn.textContent = t(whiteToMove ? "admin.ply.white" : "admin.ply.black");
+  if (els.adminPlyLast) {
+    if (!ply) {
+      els.adminPlyLast.textContent = t("admin.ply.start");
+    } else {
+      const last = hist[hist.length - 1];
+      const lastMove = Math.floor((ply - 1) / 2) + 1;
+      const prefix = last.color === "w" ? `${lastMove}.` : `${lastMove}...`;
+      els.adminPlyLast.textContent = t("admin.ply.last", {
+        move: `${prefix} ${localizeSan(last.san)}`,
+      });
+    }
+  }
+}
+
+function paintAdminEvalBar() {
+  const fill = els.adminEvalFill;
+  const score = els.adminEvalScore;
+  if (!fill && !score) return;
+  const cp = adminEngineWhiteCp();
+  const pct = adminEngineWhitePct(cp);
+  if (fill) fill.style.height = `${pct.toFixed(2)}%`;
+  if (score) {
+    score.textContent = formatAdminEngineScore(cp);
+    score.classList.toggle("is-white", cp > 8);
+    score.classList.toggle("is-black", cp < -8);
+  }
+  if (els.adminEval) {
+    els.adminEval.setAttribute("aria-valuenow", String(Math.round(pct)));
+    els.adminEval.setAttribute("title", formatAdminEngineScore(cp));
+  }
+}
+
 function adminSolutionScoreText(hint) {
   if (!hint || hint.synthetic) return "—";
   const abs = formatHintEval(hint);
@@ -3674,6 +3746,8 @@ function renderAdminSolutions() {
     return;
   }
   box.hidden = false;
+  paintAdminPly();
+  paintAdminEvalBar();
   const placeMap = hintPlaceMap();
   const items = (state.hintPool || [])
     .filter((hint) => hint && !hint.synthetic && placeMap.has(hint.uci))
@@ -3687,9 +3761,11 @@ function renderAdminSolutions() {
     const played = playedFromHint(hint);
     const san = played ? localizeSan(played.san) : hint.uci;
     const kind = hintRankKind(hint);
+    const first = place === 1 ? " is-first" : "";
     const best = kind === "best" ? " is-best" : "";
-    return `<li class="${best.trim()}">
-      <span class="admin-place">${escapeHtml(formatPlace(place))}</span>
+    const firstTag = place === 1 ? `<span class="admin-first">${escapeHtml(t("admin.first"))}</span>` : "";
+    return `<li class="${`${best}${first}`.trim()}">
+      <span class="admin-place"><i class="admin-place-mark" aria-hidden="true"></i>${escapeHtml(formatPlace(place))}${firstTag}</span>
       <span class="admin-san">${escapeHtml(san)}</span>
       <span class="admin-score">${escapeHtml(adminSolutionScoreText(hint))}</span>
     </li>`;
@@ -4659,6 +4735,13 @@ const els = {
   adminSolutions: document.getElementById("admin-solutions"),
   adminSolutionsList: document.getElementById("admin-solutions-list"),
   adminSolutionsBtn: document.getElementById("btn-admin-solutions"),
+  adminPlyNum: document.getElementById("admin-ply-num"),
+  adminPlyDots: document.getElementById("admin-ply-dots"),
+  adminPlyTurn: document.getElementById("admin-ply-turn"),
+  adminPlyLast: document.getElementById("admin-ply-last"),
+  adminEval: document.getElementById("admin-eval"),
+  adminEvalFill: document.getElementById("admin-eval-fill"),
+  adminEvalScore: document.getElementById("admin-eval-score"),
   roundEval: document.getElementById("round-eval"),
   evalView: document.getElementById("eval-view"),
   storyIcons: document.getElementById("story-icons"),
@@ -6727,6 +6810,7 @@ function applyLanguage() {
   syncTrainingModeUi();
   syncAutoContinueUi();
   syncAdminSolutionsUi();
+  renderAdminSolutions();
   replayKingTalk();
 }
 
