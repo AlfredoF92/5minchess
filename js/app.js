@@ -5053,8 +5053,8 @@ function paintHoldArrows(highlight = null) {
   if (!isTrainHold() || isHintFakeLoad()) {
     return false;
   }
-  if (!state.reviewArrows) {
-    if (highlight == null) {
+  if (state.trainNext || !state.reviewArrows) {
+    if (highlight == null || state.trainNext) {
       state.board?.setArrows([]);
       return true;
     }
@@ -5095,6 +5095,10 @@ function paintHoldArrows(highlight = null) {
 }
 
 function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
+  if (isTrainHold() && state.trainNext) {
+    state.board?.setArrows([]);
+    return;
+  }
   if (isTrainHold() && state.reviewArrows && !isHintFakeLoad()) {
     paintHoldArrows(index);
     return;
@@ -5390,6 +5394,7 @@ async function playTrainOppOnBoard(resolved) {
   state.continueArmed = false;
   state.pendingOpp = null;
   state.busy = false;
+  state.board.setArrows([]);
   syncTrainContinue();
   if (oppBand && !firstEngine) showKingReact(oppBand);
   const talk = kingComment(fen, played, true, oppKey, beforeEval);
@@ -5408,6 +5413,7 @@ function revealTrainNext() {
   state.continueArmed = false;
   clearTrainHold();
   hideHintPanel();
+  state.board?.setArrows([]);
   adoptHintPool(next.pool);
   if (Number.isFinite(next.nextBest)) state.hintBestScore = next.nextBest;
   if (Number.isFinite(next.nextEval)) state.gameEval = next.nextEval;
