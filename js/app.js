@@ -1,8 +1,8 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
-import { Board } from "./board.js?v=20260828drop";
+import { Board } from "./board.js?v=20260828rev";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828click";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828rev";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -12,6 +12,7 @@ const ADMIN_SOLUTIONS_KEY = "5minchess.adminSolutions";
 const AID_THREATS_KEY = "5minchess.aidThreats";
 const AID_MOVES_KEY = "5minchess.aidMoves";
 const CARD_CLICK_KEY = "5minchess.cardClick";
+const REVIEW_ARROWS_KEY = "5minchess.reviewArrows";
 const HINT_FAKE_LOAD_MS = 3000;
 const OPP_REPLY_MIN_MS = 10000;
 const KING_TALK_HIDE = {
@@ -243,6 +244,14 @@ function readCardClick() {
     return localStorage.getItem(CARD_CLICK_KEY) !== "0";
   } catch {
     return true;
+  }
+}
+
+function readReviewArrows() {
+  try {
+    return localStorage.getItem(REVIEW_ARROWS_KEY) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -1427,6 +1436,9 @@ function explainMove(before, move, after, hint) {
 
 const ARROW_GREEN = "#8ec85a";
 const ARROW_GRAY = "#c5c5c5";
+const ARROW_GRAY_LIGHT = "#d8d8d8";
+const ARROW_GOLD = "#c49a12";
+const REVIEW_NEAR_BEST = 50;
 
 const SKILL_LEVELS = {
   1: { elo: 1300, skill: 1, movetime: 380 },
@@ -3239,7 +3251,7 @@ function showHintPage(page) {
   }
   state.kbdHint = null;
   renderHints();
-  if (isTrainHold()) state.board.setArrows([]);
+  if (isTrainHold()) paintHoldArrows();
   else if (state.aids.moves) showHintArrows(null, { reveal: true });
 }
 
@@ -3797,6 +3809,7 @@ function syncAidButtons() {
     els.aidThreats.setAttribute("aria-pressed", on ? "true" : "false");
   }
   syncCardClickUi();
+  syncReviewArrowsUi();
   syncStoryIconsButton();
 }
 
@@ -3818,6 +3831,26 @@ function setCardClick(on) {
     /* ignore */
   }
   syncCardClickUi();
+}
+
+function syncReviewArrowsUi() {
+  const on = Boolean(state.reviewArrows);
+  if (els.reviewArrows) {
+    els.reviewArrows.textContent = switchLabel(on);
+    els.reviewArrows.classList.toggle("is-on", on);
+    els.reviewArrows.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+}
+
+function setReviewArrows(on) {
+  state.reviewArrows = Boolean(on);
+  try {
+    localStorage.setItem(REVIEW_ARROWS_KEY, state.reviewArrows ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  syncReviewArrowsUi();
+  paintHoldArrows();
 }
 
 function syncStoryIconsButton() {
@@ -4045,7 +4078,7 @@ function showAid(kind) {
     }
     state.board?.setShowDests(Boolean(state.aids.moves));
     if (state.aids.moves) showHintArrows(null, { reveal: true });
-    else state.board.setArrows([]);
+    else if (!paintHoldArrows()) state.board.setArrows([]);
     syncAidButtons();
     return;
   }
@@ -4177,6 +4210,7 @@ const els = {
   aidMoves: document.getElementById("btn-aid-moves"),
   aidThreats: document.getElementById("btn-aid-threats"),
   cardClick: document.getElementById("btn-card-click"),
+  reviewArrows: document.getElementById("btn-review-arrows"),
   cardStyleBtn: document.getElementById("btn-card-style"),
   cardStyleList: document.getElementById("card-style-list"),
   cardStyleMenu: document.getElementById("card-style-menu"),
@@ -4259,6 +4293,7 @@ const state = {
   startOpening: START_OPENINGS[0],
   aids: { moves: readAidMoves(), threats: readAidThreats() },
   cardClick: readCardClick(),
+  reviewArrows: readReviewArrows(),
   aidTimer: null,
   aidToken: 0,
   flashToken: 0,
@@ -4563,7 +4598,7 @@ function wrapHintSlot(buttonHtml, verdict = "") {
 
 function revealTrainPick() {
   renderHints();
-  state.board?.setArrows([]);
+  paintHoldArrows();
   showHintPanel();
   syncHintNav();
   syncTrainContinue();
@@ -4870,7 +4905,7 @@ function syncBoard(options = {}) {
   state.board.setCheck(state.game.in_check() ? kingSquare(state.game, state.game.turn()) : null);
   syncHintBoardPlay();
   if (isTrainHold()) {
-    if (!options.keepArrows) state.board.setArrows([]);
+    if (!options.keepArrows) paintHoldArrows();
   } else if (state.aids.moves && hintPanelOpen() && !waitingForHints()) showHintArrows(null, { reveal: true });
   else if (!options.keepArrows) state.board.setArrows([]);
   paintActiveThreats();
@@ -4953,9 +4988,65 @@ function renderHints() {
   paintKbdHint();
   syncHintBoardPlay();
   renderAdminSolutions();
+  if (hold) paintHoldArrows();
+}
+
+function reviewArrowKind(hint) {
+  if (!hint?.uci || hint.synthetic) return "plain";
+  const best = state.hintBestScore;
+  const drop = Number.isFinite(best) ? best - hintScore(hint) : Infinity;
+  if (drop <= 0) return "best";
+  if (hintEvalDir(hint) === "up") return "good";
+  if (Number.isFinite(drop) && drop <= REVIEW_NEAR_BEST) return "good";
+  return "plain";
+}
+
+function paintHoldArrows(highlight = null) {
+  if (!isTrainHold() || isHintFakeLoad()) {
+    return false;
+  }
+  if (!state.reviewArrows) {
+    if (highlight == null) {
+      state.board?.setArrows([]);
+      return true;
+    }
+    return false;
+  }
+  const activeSet = highlight == null
+    ? null
+    : new Set((Array.isArray(highlight) ? highlight : [highlight]).filter((i) => Number.isInteger(i)));
+  const rank = { plain: 0, good: 1, best: 2 };
+  const arrows = (state.hints || [])
+    .map((hint, i) => {
+      if (!hint?.uci) return null;
+      const kind = reviewArrowKind(hint);
+      const active = Boolean(activeSet && activeSet.has(i));
+      const stroke = kind === "best" ? ARROW_GOLD : kind === "good" ? ARROW_GREEN : ARROW_GRAY_LIGHT;
+      return {
+        from: hint.uci.slice(0, 2),
+        to: hint.uci.slice(2, 4),
+        color: ARROW_GRAY_LIGHT,
+        stroke,
+        strokeWidth: kind === "plain" ? 0.02 : 0.08,
+        strokeOpacity: kind === "plain" ? 0.7 : 1,
+        opacity: active ? 0.98 : 0.88,
+        width: active ? "0.24" : "0.16",
+        label: "",
+        _rank: rank[kind] + (active ? 0.5 : 0),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a._rank - b._rank)
+    .map(({ _rank, ...arrow }) => arrow);
+  state.board?.setArrows(arrows);
+  return true;
 }
 
 function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
+  if (isTrainHold() && state.reviewArrows && !isHintFakeLoad()) {
+    paintHoldArrows(index);
+    return;
+  }
   if (isHintFakeLoad() || !state.aids.moves && !onlyActive) {
     state.board?.setArrows([]);
     return;
@@ -5629,7 +5720,7 @@ els.hints.addEventListener("pointerover", (event) => {
 els.hints.addEventListener("pointerout", (event) => {
   if (event.relatedTarget && els.hints.contains(event.relatedTarget)) return;
   if (isTrainHold()) {
-    state.board.setArrows([]);
+    paintHoldArrows();
     return;
   }
   if (Number.isInteger(state.kbdHint)) {
@@ -6628,6 +6719,7 @@ els.quickTools?.addEventListener("click", (event) => {
 els.aidMoves.addEventListener("click", () => showAid("moves"));
 els.aidThreats?.addEventListener("click", () => showAid("threats"));
 els.cardClick?.addEventListener("click", () => setCardClick(!state.cardClick));
+els.reviewArrows?.addEventListener("click", () => setReviewArrows(!state.reviewArrows));
 els.cardStyleBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleCardStyleMenu();

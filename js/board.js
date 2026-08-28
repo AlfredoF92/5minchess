@@ -389,6 +389,9 @@ export class Board {
       const py = ux;
       const color = arrow.color || "#6aa329";
       const opacity = String(arrow.opacity ?? 0.85);
+      const stroke = arrow.stroke || color;
+      const strokeWidth = String(arrow.strokeWidth ?? 0.018);
+      const strokeOpacity = String(arrow.strokeOpacity ?? opacity);
       const shaftHalf = (Number(arrow.width) || 0.15) / 2;
       const startPad = 0.3;
       const tipPad = 0.08;
@@ -419,9 +422,10 @@ export class Board {
       );
       path.setAttribute("fill", color);
       path.setAttribute("fill-opacity", opacity);
-      path.setAttribute("stroke", color);
-      path.setAttribute("stroke-opacity", opacity);
-      path.setAttribute("stroke-width", "0.018");
+      path.setAttribute("stroke", stroke);
+      path.setAttribute("stroke-opacity", strokeOpacity);
+      path.setAttribute("stroke-width", strokeWidth);
+      path.setAttribute("paint-order", "fill stroke");
       path.setAttribute("stroke-linejoin", "miter");
       path.setAttribute("stroke-miterlimit", "8");
       this.arrowGroup.appendChild(path);
