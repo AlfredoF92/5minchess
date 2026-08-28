@@ -3282,6 +3282,7 @@ function clearTrainHold() {
   state.continueArmed = false;
   state.pendingOpp = null;
   state.trainNext = null;
+  state.reviewArrowSnap = null;
   state.oppWaitStartedAt = 0;
   state.oppSearchToken += 1;
 }
@@ -3880,6 +3881,7 @@ function setReviewArrowLabels(on) {
     /* ignore */
   }
   syncReviewArrowLabelsUi();
+  if (isTrainHold() && !state.trainNext) state.reviewArrowSnap = null;
   paintHoldArrows();
 }
 
@@ -4357,6 +4359,7 @@ const state = {
   autoContinue: readAutoContinue(),
   adminSolutions: readAdminSolutions(),
   trainHold: false,
+  reviewArrowSnap: null,
   continueArmed: false,
   pendingOpp: null,
   trainNext: null,
@@ -5049,26 +5052,12 @@ function reviewArrowLabel(hint) {
   return shown > 0 ? `+${shown}` : `${shown}`;
 }
 
-function paintHoldArrows(highlight = null) {
-  if (!isTrainHold() || isHintFakeLoad()) {
-    return false;
-  }
-  if (state.trainNext || !state.reviewArrows) {
-    if (highlight == null || state.trainNext) {
-      state.board?.setArrows([]);
-      return true;
-    }
-    return false;
-  }
-  const activeSet = highlight == null
-    ? null
-    : new Set((Array.isArray(highlight) ? highlight : [highlight]).filter((i) => Number.isInteger(i)));
+function buildHoldArrowSnap() {
   const rank = { plain: 0, good: 1, best: 2 };
-  const arrows = (state.hints || [])
+  return (state.hints || [])
     .map((hint, i) => {
       if (!hint?.uci) return null;
       const kind = reviewArrowKind(hint);
-      const active = Boolean(activeSet && activeSet.has(i));
       const isBest = kind === "best";
       const color = kind === "plain" ? ARROW_GRAY_LIGHT : ARROW_GREEN;
       const label = reviewArrowLabel(hint);
@@ -5079,26 +5068,52 @@ function paintHoldArrows(highlight = null) {
         stroke: isBest ? ARROW_GOLD : color,
         strokeWidth: isBest ? 0.085 : 0.02,
         strokeOpacity: isBest ? 0.95 : 0.72,
-        opacity: active ? 0.9 : 0.78,
-        width: active ? "0.28" : "0.22",
+        opacity: 0.78,
+        width: "0.22",
         label,
         labelAt: "to",
         labelColor: label.startsWith("-") ? "#a61e1e" : "#2a6b1a",
-        _rank: rank[kind] + (active ? 0.5 : 0),
+        hintIndex: i,
+        _rank: rank[kind],
       };
     })
     .filter(Boolean)
     .sort((a, b) => a._rank - b._rank)
     .map(({ _rank, ...arrow }) => arrow);
-  state.board?.setArrows(arrows);
+}
+
+function paintHoldArrows(highlight = null) {
+  if (!isTrainHold() || isHintFakeLoad()) {
+    return false;
+  }
+  if (!state.reviewArrows) {
+    state.board?.setArrows([]);
+    return true;
+  }
+  if (!state.reviewArrowSnap) {
+    if (state.trainNext) {
+      state.board?.setArrows([]);
+      return true;
+    }
+    state.reviewArrowSnap = buildHoldArrowSnap();
+  }
+  const activeSet = highlight == null
+    ? null
+    : new Set((Array.isArray(highlight) ? highlight : [highlight]).filter((i) => Number.isInteger(i)));
+  state.board?.setArrows(
+    state.reviewArrowSnap.map((arrow) => {
+      const active = Boolean(activeSet && activeSet.has(arrow.hintIndex));
+      return {
+        ...arrow,
+        opacity: active ? 0.9 : 0.78,
+        width: active ? "0.28" : "0.22",
+      };
+    })
+  );
   return true;
 }
 
 function showHintArrows(index = null, { reveal = false, onlyActive = false } = {}) {
-  if (isTrainHold() && state.trainNext) {
-    state.board?.setArrows([]);
-    return;
-  }
   if (isTrainHold() && state.reviewArrows && !isHintFakeLoad()) {
     paintHoldArrows(index);
     return;
@@ -5354,7 +5369,7 @@ async function playTrainOppOnBoard(resolved) {
 
   state.busy = true;
   syncTrainContinue();
-  state.board.setArrows([]);
+  if (!state.reviewArrows) state.board.setArrows([]);
   if (!firstEngine) await sleep(300);
   if (gameId !== state.gameId || state.game.fen() !== fen) {
     state.busy = false;
@@ -5394,7 +5409,6 @@ async function playTrainOppOnBoard(resolved) {
   state.continueArmed = false;
   state.pendingOpp = null;
   state.busy = false;
-  state.board.setArrows([]);
   syncTrainContinue();
   if (oppBand && !firstEngine) showKingReact(oppBand);
   const talk = kingComment(fen, played, true, oppKey, beforeEval);
