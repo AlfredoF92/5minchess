@@ -2383,6 +2383,7 @@ body.is-opening-intro .train-actions {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+  gap: 1px;
   line-height: 1;
 }
 .hint-sign-icon .hint-eval-heart {
@@ -2393,12 +2394,20 @@ body.is-opening-intro .train-actions {
 .hint-in-eval .hint-sign-icon .eval-sword {
   margin-left: 0;
 }
+.hint-sign-icon .hint-sign-dir {
+  width: 12px;
+  height: 12px;
+}
 .hint-in-eval .hint-sign-icon .eval-sword {
   width: 26px;
   height: 26px;
 }
 .hint-in-eval .hint-sign-icon .hint-eval-heart {
   font-size: 24px;
+}
+.hint-in-eval .hint-sign-icon .hint-eval-dir {
+  width: 20px;
+  height: 20px;
 }
 .hint-eval-dir {
   width: 13px;

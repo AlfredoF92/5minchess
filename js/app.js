@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260828num2";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828barh";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828arr";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1816,11 +1816,12 @@ function formatHintDelta(info) {
   return isPrevOppEval() ? formatPawnCommaText(cp) : formatSignedPawns(cp);
 }
 
-function hintEvalArrowSvg(dir) {
+function hintEvalArrowSvg(dir, extraClass = "") {
   const path = dir === "down"
     ? "M12 20 4 12h5V4h6v8h5Z"
     : "M12 4l8 8h-5v8h-6v-8H4Z";
-  return `<svg class="hint-eval-dir is-${dir}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${path}"/></svg>`;
+  const cls = ["hint-eval-dir", `is-${dir}`, extraClass].filter(Boolean).join(" ");
+  return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${path}"/></svg>`;
 }
 
 function evalBarPawnBlock(cp) {
@@ -1855,10 +1856,11 @@ function hintSignHtml(info) {
     const { hearts, swords } = hintBarMeterShift(info);
     const bits = [];
     if (hearts !== 0) {
-      bits.push(`<span class="hint-sign-icon is-heart">${hintEvalHeartHtml()}</span>`);
+      const dir = hearts > 0 ? "up" : "down";
+      bits.push(`<span class="hint-sign-icon is-heart">${hintEvalHeartHtml()}${hintEvalArrowSvg(dir, "hint-sign-dir")}</span>`);
     }
     if (swords > 0) {
-      bits.push(`<span class="hint-sign-icon is-sword">${evalSwordSvg()}</span>`);
+      bits.push(`<span class="hint-sign-icon is-sword">${evalSwordSvg()}${hintEvalArrowSvg("up", "hint-sign-dir")}</span>`);
     }
     return bits.join("");
   }
