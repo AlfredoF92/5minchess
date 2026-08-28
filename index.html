@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260828cards">
+  <link rel="stylesheet" href="css/style.css?v=20260828sign">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -269,9 +269,10 @@
           <span class="coach-row-label" data-i18n="tools.hintInfo.place">La posizione</span>
           <button type="button" id="btn-hint-place" class="coach-switch is-on" aria-pressed="true">On</button>
         </div>
-        <div class="coach-row">
-          <span class="coach-row-label" data-i18n="tools.hintInfo.arrow">La freccia (su e giù)</span>
-          <button type="button" id="btn-hint-arrow" class="coach-switch is-on" aria-pressed="true">On</button>
+        <div id="hint-sign-menu" class="coach-row style-menu is-drop-up">
+          <span class="coach-row-label" data-i18n="tools.hintInfo.sign">Info +/-</span>
+          <button type="button" id="btn-hint-sign" class="coach-switch coach-switch-value" aria-expanded="false" aria-haspopup="true" data-i18n-aria="tools.hintInfo.signAria" aria-label="Come mostrare se la mossa sale o scende">La freccia (su e giù)</button>
+          <div id="hint-sign-list" class="style-menu-list" hidden role="menu"></div>
         </div>
         <div id="hint-eval-view-menu" class="coach-row style-menu is-drop-up">
           <span class="coach-row-label" data-i18n="tools.hintInfo.eval">Valutazione punteggio</span>
@@ -464,6 +465,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260828cards"></script>
+  <script type="module" src="js/app.js?v=20260828sign"></script>
 </body>
 </html>
