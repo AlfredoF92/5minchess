@@ -838,6 +838,13 @@ body.is-opening-intro .train-actions {
 }
 .eval-bar.is-prev-opp .eval-bar-score {
   font-size: 22px;
+  align-items: baseline;
+}
+.eval-bar.is-prev-opp .eval-pawn-int {
+  font-size: 1.15em;
+}
+.eval-bar.is-prev-opp .eval-pawn-frac {
+  font-size: 0.62em;
 }
 .eval-bar.is-prev-opp .eval-bar-prev {
   font-size: 14px;
@@ -2173,6 +2180,21 @@ body.is-opening-intro .train-actions {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+.eval-pawn {
+  display: inline-flex;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.eval-pawn-int {
+  font-size: 1.45em;
+  font-weight: 800;
+}
+.eval-pawn-frac {
+  font-size: 0.78em;
+  font-weight: 700;
+  opacity: 0.9;
 }
 .hint-eval-dir {
   width: 13px;

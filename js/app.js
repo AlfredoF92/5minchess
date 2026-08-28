@@ -1659,7 +1659,6 @@ function positionEvalNow() {
 
 function evalShownPoints(cp) {
   if (!Number.isFinite(cp)) return null;
-  if (isPrevOppEval()) return Math.round(cp / 10);
   return state.roundEval ? Math.round(cp / 10) * 10 : Math.round(cp);
 }
 
@@ -1668,6 +1667,29 @@ function formatSignedPawns(cp) {
   if (shown == null) return "—";
   if (!shown) return "0";
   return shown > 0 ? `+${shown}` : `${shown}`;
+}
+
+function pawnCommaParts(cp) {
+  const shown = evalShownPoints(cp);
+  if (shown == null) return null;
+  const abs = Math.abs(shown);
+  return {
+    sign: shown > 0 ? "+" : shown < 0 ? "-" : "",
+    int: String(Math.floor(abs / 100)),
+    frac: String(abs % 100).padStart(2, "0"),
+  };
+}
+
+function formatPawnCommaText(cp) {
+  const parts = pawnCommaParts(cp);
+  if (!parts) return "—";
+  return `${parts.sign}${parts.int},${parts.frac}`;
+}
+
+function formatPawnCommaHtml(cp) {
+  const parts = pawnCommaParts(cp);
+  if (!parts) return "—";
+  return `<span class="eval-pawn">${escapeHtml(parts.sign)}<span class="eval-pawn-int">${escapeHtml(parts.int)}</span><span class="eval-pawn-frac">,${escapeHtml(parts.frac)}</span></span>`;
 }
 
 function hintEvalShownCp(info) {
@@ -1730,7 +1752,8 @@ function formatHintDelta(info) {
   }
   const moveEval = hintMoveEval(info);
   if (moveEval == null) return "—";
-  return formatSignedPawns(moveEval - hintBaselineEval());
+  const cp = moveEval - hintBaselineEval();
+  return isPrevOppEval() ? formatPawnCommaText(cp) : formatSignedPawns(cp);
 }
 
 function hintEvalArrowSvg(dir) {
@@ -1858,6 +1881,12 @@ function hintEvalHtml(info) {
   if (state.hintInfo?.score === "hearts") {
     const hearts = isAbsLikeEval() ? hintLivesRowHtml(info) : hintHeartsHtml(info);
     return `${arrow}${hearts}`;
+  }
+  if (isPrevOppEval()) {
+    if (info.scoreType === "mate") return `${arrow}${escapeHtml(formatHintDelta(info))}${hintEvalHeartHtml()}`;
+    const cp = hintEvalShownCp(info);
+    const score = cp == null ? "—" : formatPawnCommaHtml(cp);
+    return `${arrow}${score}${hintEvalHeartHtml()}`;
   }
   const score = escapeHtml(isAbsLikeEval() ? formatHintEval(info) : formatHintDelta(info));
   return `${arrow}${score}${hintEvalHeartHtml()}`;
@@ -2879,7 +2908,9 @@ function paintEvalBar() {
     fill.style.width = `${pct.toFixed(2)}%`;
   }
   if (label) {
-    label.textContent = text;
+    const pawn = isPrevOppEval() && Number.isFinite(shown) && Math.abs(shown) < 50000 && !state.game?.in_checkmate();
+    if (pawn) label.innerHTML = formatPawnCommaHtml(shown);
+    else label.textContent = text;
     label.classList.toggle("is-up", dir === "up");
     label.classList.toggle("is-down", dir === "down");
   }
@@ -2888,7 +2919,11 @@ function paintEvalBar() {
     if (prevWrap) prevWrap.hidden = !showPrev;
     if (prevLabel) {
       prevLabel.hidden = !showPrev;
-      if (showPrev) prevLabel.textContent = formatEvalBarDisplay(beforeShown, { ignoreMate: true });
+      if (showPrev) {
+        const pawnPrev = isPrevOppEval() && Number.isFinite(beforeShown) && Math.abs(beforeShown) < 50000;
+        if (pawnPrev) prevLabel.innerHTML = formatPawnCommaHtml(beforeShown);
+        else prevLabel.textContent = formatEvalBarDisplay(beforeShown, { ignoreMate: true });
+      }
     }
     if (els.evalBarPrevLabel) els.evalBarPrevLabel.textContent = t("eval.bar.prev");
   }
@@ -5043,7 +5078,12 @@ function reviewArrowLabel(hint) {
     if (hint.score < 0) return `-M${Math.abs(hint.score)}`;
     return "";
   }
-  let shown = evalShownPoints(hintEvalShownCp(hint));
+  const cp = hintEvalShownCp(hint);
+  if (isPrevOppEval()) {
+    if (cp == null || !evalShownPoints(cp)) return "";
+    return formatPawnCommaText(cp);
+  }
+  let shown = evalShownPoints(cp);
   if (!shown && isTwentiethsEval()) {
     const parts = twentiethsSwingParts(hint);
     shown = (parts?.recovery || 0) + (parts?.damage || 0) - (parts?.heartLoss || 0) - (parts?.swordLoss || 0);
