@@ -2954,12 +2954,13 @@ function evalBarCellKind(i) {
 }
 
 function evalBarIconMarkup(kind) {
-  if (kind === "heart" || kind === "skull" || kind === "cup") {
-    const glyph = kind === "heart" ? "♥" : kind === "skull" ? "💀" : "🏆";
+  if (kind === "heart" || kind === "cup") {
+    const glyph = kind === "heart" ? "♥" : "🏆";
     return `<span class="eval-bar-glyph is-${kind}" aria-hidden="true"><span class="eb-bg">${glyph}</span><span class="eb-fg">${glyph}</span></span>`;
   }
-  if (kind === "sword") {
-    return `<span class="eval-bar-glyph is-sword" aria-hidden="true"><img class="eb-bg" src="img/eval-sword.svg" alt=""><span class="eb-fg"><img src="img/eval-sword.svg" alt=""></span></span>`;
+  if (kind === "sword" || kind === "skull") {
+    const src = kind === "skull" ? "img/eval-skull.png" : "img/eval-sword.svg";
+    return `<span class="eval-bar-glyph is-${kind}" aria-hidden="true"><img class="eb-bg" src="${src}" alt=""><span class="eb-fg"><img src="${src}" alt=""></span></span>`;
   }
   return "";
 }

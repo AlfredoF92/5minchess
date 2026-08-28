@@ -545,19 +545,28 @@ body.is-opening-intro .train-actions {
   transition: width 0.45s ease;
 }
 .eval-bar-glyph.is-heart .eb-fg { color: #e03131; }
-.eval-bar-glyph.is-skull .eb-fg { color: #2c2c2c; }
 .eval-bar-glyph.is-cup .eb-fg { color: #c9a227; filter: none; }
-.eval-bar-glyph.is-sword img {
+.eval-bar-glyph.is-sword img,
+.eval-bar-glyph.is-skull img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
-.eval-bar-glyph.is-sword .eb-bg {
+.eval-bar-glyph.is-sword .eb-bg,
+.eval-bar-glyph.is-skull .eb-bg {
   opacity: 0.22;
   filter: grayscale(0.35);
 }
-.eval-bar-glyph.is-sword .eb-fg {
+.eval-bar-glyph.is-skull .eb-bg,
+.eval-bar-glyph.is-skull .eb-fg img {
+  filter: brightness(0);
+}
+.eval-bar-glyph.is-skull .eb-bg {
+  opacity: 0.22;
+}
+.eval-bar-glyph.is-sword .eb-fg,
+.eval-bar-glyph.is-skull .eb-fg {
   height: 100%;
 }
 .eval-bar-delta.is-up { background: #2f9e44; }
