@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260828num2";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828bar";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828bar4";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -16,6 +16,7 @@ const REVIEW_ARROWS_KEY = "5minchess.reviewArrows";
 const REVIEW_ARROW_LABELS_KEY = "5minchess.reviewArrowLabels";
 const EVAL_BAR_HIDE_DIFF_KEY = "5minchess.evalBarHideDiff";
 const EVAL_BAR_BLOCK_ONLY_KEY = "5minchess.evalBarBlockOnly";
+const EVAL_BAR_STYLE_KEY = "5minchess.evalBarStyle";
 const HINT_FAKE_LOAD_MS = 3000;
 const OPP_REPLY_MIN_MS = 10000;
 const KING_TALK_HIDE = {
@@ -280,6 +281,22 @@ function readEvalBarBlockOnly() {
   } catch {
     return false;
   }
+}
+
+function readEvalBarStyle() {
+  try {
+    const saved = localStorage.getItem(EVAL_BAR_STYLE_KEY);
+    if (saved === "standard" || saved === "blocks" || saved === "icons" || saved === "hearts") return saved;
+  } catch {
+    /* ignore */
+  }
+  return "blocks";
+}
+
+function evalBarStyle() {
+  const value = state.evalBarStyle;
+  if (value === "standard" || value === "blocks" || value === "icons" || value === "hearts") return value;
+  return "blocks";
 }
 
 function readRoundEval() {
@@ -2918,24 +2935,77 @@ const EVAL_BAR_TICKS = [
   { pawn: 5, text: "+5" },
   { pawn: 10, text: "10+", edge: "end" },
 ];
+const EVAL_BAR_TICKS_HEARTS = [
+  { pawn: -10, text: "−10", edge: "start" },
+  { pawn: -5, text: "−5" },
+  { pawn: -3, text: "−3" },
+  { pawn: -1, text: "−1" },
+  { pawn: 0, text: "0", zero: true, edge: "end" },
+];
+
+function evalBarCellKind(i) {
+  const style = evalBarStyle();
+  if (style === "hearts") return i < 10 ? "heart" : "off";
+  if (style !== "icons") return "block";
+  if (i === 0) return "skull";
+  if (i < 10) return "heart";
+  if (i < 19) return "sword";
+  return "cup";
+}
+
+function evalBarIconMarkup(kind) {
+  if (kind === "heart" || kind === "skull" || kind === "cup") {
+    const glyph = kind === "heart" ? "♥" : kind === "skull" ? "💀" : "🏆";
+    return `<span class="eval-bar-glyph is-${kind}" aria-hidden="true"><span class="eb-bg">${glyph}</span><span class="eb-fg">${glyph}</span></span>`;
+  }
+  if (kind === "sword") {
+    return `<span class="eval-bar-glyph is-sword" aria-hidden="true"><img class="eb-bg" src="img/eval-sword.svg" alt=""><span class="eb-fg"><img src="img/eval-sword.svg" alt=""></span></span>`;
+  }
+  return "";
+}
+
+function evalBarScaleTicks() {
+  if (evalBarStyle() === "hearts") {
+    return EVAL_BAR_TICKS_HEARTS.map((tick) => ({
+      ...tick,
+      left: ((tick.pawn + 10) / 10) * 100,
+    }));
+  }
+  return EVAL_BAR_TICKS.map((tick) => ({
+    ...tick,
+    left: ((tick.pawn + 10) / 20) * 100,
+  }));
+}
 
 function ensureEvalBarChrome() {
+  const style = evalBarStyle();
   const cells = els.evalBarCells;
-  if (cells && !cells.childElementCount) {
-    for (let i = 0; i < EVAL_BAR_CELLS; i += 1) {
-      cells.appendChild(document.createElement("span"));
+  if (cells) {
+    if (!cells.childElementCount) {
+      for (let i = 0; i < EVAL_BAR_CELLS; i += 1) {
+        cells.appendChild(document.createElement("span"));
+      }
     }
+    [...cells.children].forEach((cell, i) => {
+      const kind = evalBarCellKind(i);
+      if (cell.dataset.kind === kind && cell.dataset.barStyle === style) return;
+      cell.dataset.kind = kind;
+      cell.dataset.barStyle = style;
+      cell.innerHTML = evalBarIconMarkup(kind);
+    });
   }
   const scale = els.evalBarScale;
-  if (scale && !scale.childElementCount) {
-    for (const tick of EVAL_BAR_TICKS) {
+  if (scale && scale.dataset.barStyle !== style) {
+    scale.dataset.barStyle = style;
+    scale.innerHTML = "";
+    for (const tick of evalBarScaleTicks()) {
       const el = document.createElement("span");
       el.className = "eval-bar-tick";
       if (tick.zero) el.classList.add("is-zero");
       if (tick.edge === "start") el.classList.add("is-start");
       if (tick.edge === "end") el.classList.add("is-end");
       el.textContent = tick.text;
-      el.style.left = `${((tick.pawn + 10) / 20) * 100}%`;
+      el.style.left = `${tick.left}%`;
       scale.appendChild(el);
     }
   }
@@ -3003,9 +3073,15 @@ function paintEvalBar() {
   const nowPts = evalShownPoints(shown) || 0;
   const beforePts = Number.isFinite(beforeShown) ? (evalShownPoints(beforeShown) || 0) : nowPts;
   const dir = hideDiff ? "" : nowPts > beforePts ? "up" : nowPts < beforePts ? "down" : "";
+  const style = evalBarStyle();
+  const hideIconsDiff = style === "icons" || style === "hearts";
   els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
   els.evalBar?.classList.toggle("is-twentieths", isTwentiethsEval());
   els.evalBar?.classList.toggle("is-prev-opp", isPrevOppEval());
+  els.evalBar?.classList.toggle("is-standard", style === "standard");
+  els.evalBar?.classList.toggle("is-blocks", style === "blocks");
+  els.evalBar?.classList.toggle("is-icons", style === "icons");
+  els.evalBar?.classList.toggle("is-hearts", style === "hearts");
   paintEvalBarCells(pct);
   if (fill) {
     fill.style.height = "100%";
@@ -3032,7 +3108,7 @@ function paintEvalBar() {
     if (els.evalBarPrevLabel) els.evalBarPrevLabel.textContent = t("eval.bar.prev");
   }
   if (deltaEl) {
-    if (!dir || !Number.isFinite(before)) {
+    if (hideIconsDiff || !dir || !Number.isFinite(before)) {
       deltaEl.hidden = true;
     } else {
       const prevPct = Math.max(0, Math.min(100, evalBarPlayerShare(beforeShown, { ignoreMate: true })));
@@ -3962,6 +4038,7 @@ function syncAidButtons() {
   syncReviewArrowLabelsUi();
   syncEvalBarHideDiffUi();
   syncEvalBarBlockOnlyUi();
+  syncEvalBarStyleUi();
   syncStoryIconsButton();
 }
 
@@ -4063,6 +4140,54 @@ function setEvalBarBlockOnly(on) {
     /* ignore */
   }
   syncEvalBarBlockOnlyUi();
+  paintEvalBar();
+}
+
+function evalBarStyleShortKey() {
+  const style = evalBarStyle();
+  if (style === "standard") return "tools.evalBar.style.standard";
+  if (style === "icons") return "tools.evalBar.style.icons";
+  if (style === "hearts") return "tools.evalBar.style.hearts";
+  return "tools.evalBar.style.blocks";
+}
+
+function fillEvalBarStyleMenu() {
+  if (!els.evalBarStyleList) return;
+  const current = evalBarStyle();
+  const items = [
+    { id: "standard", key: "tools.evalBar.style.standard" },
+    { id: "blocks", key: "tools.evalBar.style.blocks" },
+    { id: "icons", key: "tools.evalBar.style.icons" },
+    { id: "hearts", key: "tools.evalBar.style.hearts" },
+  ];
+  els.evalBarStyleList.innerHTML = items
+    .map(
+      (item) =>
+        `<button type="button" role="menuitem" class="style-menu-item${item.id === current ? " is-on" : ""}" data-eval-bar-style="${item.id}">${t(item.key)}</button>`
+    )
+    .join("");
+}
+
+function syncEvalBarStyleUi() {
+  fillEvalBarStyleMenu();
+  if (els.evalBarStyleBtn) els.evalBarStyleBtn.textContent = t(evalBarStyleShortKey());
+}
+
+function applyEvalBarStyle(value) {
+  state.evalBarStyle = value === "standard" || value === "icons" || value === "hearts" ? value : "blocks";
+  try {
+    localStorage.setItem(EVAL_BAR_STYLE_KEY, state.evalBarStyle);
+  } catch {
+    /* ignore */
+  }
+  if (els.evalBarScale) els.evalBarScale.dataset.barStyle = "";
+  if (els.evalBarCells) {
+    [...els.evalBarCells.children].forEach((cell) => {
+      cell.dataset.kind = "";
+      cell.dataset.barStyle = "";
+    });
+  }
+  syncEvalBarStyleUi();
   paintEvalBar();
 }
 
@@ -4192,6 +4317,7 @@ function valueMenus() {
     { list: els.evalViewList, btn: els.evalViewBtn, root: els.evalViewMenu },
     { list: els.scoreModeList, btn: els.scoreModeBtn, root: els.scoreModeMenu },
     { list: els.hintOverlayList, btn: els.hintOverlayBtn, root: els.hintOverlayMenu },
+    { list: els.evalBarStyleList, btn: els.evalBarStyleBtn, root: els.evalBarStyleMenu },
   ];
 }
 
@@ -4429,6 +4555,9 @@ const els = {
   reviewArrowLabels: document.getElementById("btn-review-arrow-labels"),
   evalBarHideDiff: document.getElementById("btn-eval-bar-hide-diff"),
   evalBarBlockOnly: document.getElementById("btn-eval-bar-block-only"),
+  evalBarStyleBtn: document.getElementById("btn-eval-bar-style"),
+  evalBarStyleList: document.getElementById("eval-bar-style-list"),
+  evalBarStyleMenu: document.getElementById("eval-bar-style-menu"),
   cardStyleBtn: document.getElementById("btn-card-style"),
   cardStyleList: document.getElementById("card-style-list"),
   cardStyleMenu: document.getElementById("card-style-menu"),
@@ -4515,6 +4644,7 @@ const state = {
   reviewArrowLabels: readReviewArrowLabels(),
   evalBarHideDiff: readEvalBarHideDiff(),
   evalBarBlockOnly: readEvalBarBlockOnly(),
+  evalBarStyle: readEvalBarStyle(),
   aidTimer: null,
   aidToken: 0,
   flashToken: 0,
@@ -6988,6 +7118,16 @@ els.reviewArrows?.addEventListener("click", () => setReviewArrows(!state.reviewA
 els.reviewArrowLabels?.addEventListener("click", () => setReviewArrowLabels(!state.reviewArrowLabels));
 els.evalBarHideDiff?.addEventListener("click", () => setEvalBarHideDiff(!state.evalBarHideDiff));
 els.evalBarBlockOnly?.addEventListener("click", () => setEvalBarBlockOnly(!state.evalBarBlockOnly));
+els.evalBarStyleBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleValueMenu(els.evalBarStyleList, els.evalBarStyleBtn, fillEvalBarStyleMenu);
+});
+els.evalBarStyleList?.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-eval-bar-style]");
+  if (!item) return;
+  applyEvalBarStyle(item.getAttribute("data-eval-bar-style"));
+  closeValueMenus();
+});
 els.cardStyleBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleCardStyleMenu();

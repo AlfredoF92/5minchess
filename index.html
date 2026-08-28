@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260828bar">
+  <link rel="stylesheet" href="css/style.css?v=20260828bar4">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -143,7 +143,7 @@
             <div id="board-root"></div>
             <p id="board-pick-note" class="board-pick-note" hidden></p>
           </div>
-          <div id="eval-bar" class="eval-bar" data-i18n-aria="eval.bar" aria-label="Valutazione della posizione" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+          <div id="eval-bar" class="eval-bar is-blocks" data-i18n-aria="eval.bar" aria-label="Valutazione della posizione" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
             <div class="eval-bar-track" aria-hidden="true">
               <div id="eval-bar-cells" class="eval-bar-cells"></div>
               <i id="eval-bar-fill" class="eval-bar-fill"></i>
@@ -289,6 +289,11 @@
           <div id="hint-overlay-list" class="style-menu-list" hidden role="menu"></div>
         </div>
         <h3 class="quick-tools-section" data-i18n="tools.evalBar">Barra di valutazione</h3>
+        <div id="eval-bar-style-menu" class="coach-row style-menu is-drop-up">
+          <span class="coach-row-label" data-i18n="tools.evalBar.style">Stile barra</span>
+          <button type="button" id="btn-eval-bar-style" class="coach-switch coach-switch-value" aria-expanded="false" aria-haspopup="true" data-i18n-aria="tools.evalBar.styleAria" aria-label="Come mostrare la barra di valutazione">A blocchi</button>
+          <div id="eval-bar-style-list" class="style-menu-list" hidden role="menu"></div>
+        </div>
         <div class="coach-row">
           <span class="coach-row-label" data-i18n="tools.evalBar.hideDiff">Nascondi differenza</span>
           <button type="button" id="btn-eval-bar-hide-diff" class="coach-switch" aria-pressed="false" data-i18n-aria="tools.evalBar.hideDiffAria" aria-label="Nascondi il valore della mossa precedente e la differenza sulla barra">Off</button>
@@ -459,6 +464,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260828bar3"></script>
+  <script type="module" src="js/app.js?v=20260828bar4"></script>
 </body>
 </html>
