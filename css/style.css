@@ -507,6 +507,15 @@ body.is-opening-intro .train-actions {
   font-size: 32px;
   flex-shrink: 1;
 }
+.eval-bar.is-icons .eval-bar-cells span[data-kind="skull"] {
+  align-items: center;
+  justify-content: center;
+}
+.eval-bar.is-icons .eval-bar-glyph.is-skull {
+  width: 58%;
+  height: 58%;
+  flex-shrink: 0;
+}
 .eval-bar-glyph {
   position: relative;
   width: 22px;

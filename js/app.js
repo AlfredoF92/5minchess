@@ -5377,9 +5377,9 @@ function reviewArrowLabel(hint) {
 
 function buildHoldArrowSnap() {
   const rank = { plain: 0, good: 1, best: 2 };
-  return (state.hints || [])
+  return (state.hintPool || [])
     .map((hint, i) => {
-      if (!hint?.uci) return null;
+      if (!hint?.uci || hint.synthetic) return null;
       const kind = reviewArrowKind(hint);
       const isBest = kind === "best";
       const color = kind === "plain" ? ARROW_GRAY_LIGHT : ARROW_GREEN;
@@ -5387,6 +5387,7 @@ function buildHoldArrowSnap() {
       return {
         from: hint.uci.slice(0, 2),
         to: hint.uci.slice(2, 4),
+        uci: hint.uci,
         color,
         stroke: isBest ? ARROW_GOLD : color,
         strokeWidth: isBest ? 0.085 : 0.02,
@@ -5406,6 +5407,13 @@ function buildHoldArrowSnap() {
     .map(({ _rank, ...arrow }) => arrow);
 }
 
+function holdArrowActiveUcis(highlight) {
+  if (highlight == null) return null;
+  const indexes = (Array.isArray(highlight) ? highlight : [highlight]).filter((i) => Number.isInteger(i));
+  const ucis = indexes.map((i) => state.hints[i]?.uci).filter(Boolean);
+  return ucis.length ? new Set(ucis) : null;
+}
+
 function paintHoldArrows(highlight = null) {
   if (!isTrainHold() || isHintFakeLoad()) {
     return false;
@@ -5421,12 +5429,10 @@ function paintHoldArrows(highlight = null) {
     }
     state.reviewArrowSnap = buildHoldArrowSnap();
   }
-  const activeSet = highlight == null
-    ? null
-    : new Set((Array.isArray(highlight) ? highlight : [highlight]).filter((i) => Number.isInteger(i)));
+  const activeUcis = holdArrowActiveUcis(highlight);
   state.board?.setArrows(
     state.reviewArrowSnap.map((arrow) => {
-      const active = Boolean(activeSet && activeSet.has(arrow.hintIndex));
+      const active = Boolean(activeUcis && activeUcis.has(arrow.uci));
       return {
         ...arrow,
         opacity: active ? 0.9 : 0.78,
