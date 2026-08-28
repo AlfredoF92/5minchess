@@ -1673,23 +1673,35 @@ function pawnCommaParts(cp) {
   const shown = evalShownPoints(cp);
   if (shown == null) return null;
   const abs = Math.abs(shown);
+  const tenths = Math.floor(abs / 10);
+  if (tenths > 99) {
+    return {
+      sign: shown < 0 ? "-" : "",
+      int: "10",
+      frac: "+",
+      cap: true,
+    };
+  }
   return {
     sign: shown > 0 ? "+" : shown < 0 ? "-" : "",
-    int: String(Math.floor(abs / 100)),
-    frac: String(abs % 100).padStart(2, "0"),
+    int: String(Math.floor(tenths / 10)),
+    frac: String(tenths % 10),
+    cap: false,
   };
 }
 
 function formatPawnCommaText(cp) {
   const parts = pawnCommaParts(cp);
   if (!parts) return "—";
+  if (parts.cap) return `${parts.sign}${parts.int}${parts.frac}`;
   return `${parts.sign}${parts.int},${parts.frac}`;
 }
 
 function formatPawnCommaHtml(cp) {
   const parts = pawnCommaParts(cp);
   if (!parts) return "—";
-  return `<span class="eval-pawn">${escapeHtml(parts.sign)}<span class="eval-pawn-int">${escapeHtml(parts.int)}</span><span class="eval-pawn-frac">,${escapeHtml(parts.frac)}</span></span>`;
+  const frac = parts.cap ? escapeHtml(parts.frac) : `,${escapeHtml(parts.frac)}`;
+  return `<span class="eval-pawn">${escapeHtml(parts.sign)}<span class="eval-pawn-int">${escapeHtml(parts.int)}</span><span class="eval-pawn-frac">${frac}</span></span>`;
 }
 
 function hintEvalShownCp(info) {
