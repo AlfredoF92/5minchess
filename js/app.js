@@ -5021,14 +5021,11 @@ function paintHoldArrows(highlight = null) {
       if (!hint?.uci) return null;
       const kind = reviewArrowKind(hint);
       const active = Boolean(activeSet && activeSet.has(i));
-      const stroke = kind === "best" ? ARROW_GOLD : kind === "good" ? ARROW_GREEN : ARROW_GRAY_LIGHT;
+      const color = kind === "best" ? ARROW_GOLD : kind === "good" ? ARROW_GREEN : ARROW_GRAY_LIGHT;
       return {
         from: hint.uci.slice(0, 2),
         to: hint.uci.slice(2, 4),
-        color: ARROW_GRAY_LIGHT,
-        stroke,
-        strokeWidth: kind === "plain" ? 0.02 : 0.08,
-        strokeOpacity: kind === "plain" ? 0.7 : 1,
+        color,
         opacity: active ? 0.98 : 0.88,
         width: active ? "0.24" : "0.16",
         label: "",
