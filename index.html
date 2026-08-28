@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BM Chess — Trova la mossa migliore!</title>
-  <link rel="stylesheet" href="css/style.css?v=20260828pawn">
+  <link rel="stylesheet" href="css/style.css?v=20260828bar">
   <link rel="icon" href="img/logo.svg">
   <script>
     (function () {
@@ -145,9 +145,11 @@
           </div>
           <div id="eval-bar" class="eval-bar" data-i18n-aria="eval.bar" aria-label="Valutazione della posizione" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
             <div class="eval-bar-track" aria-hidden="true">
+              <div id="eval-bar-cells" class="eval-bar-cells"></div>
               <i id="eval-bar-fill" class="eval-bar-fill"></i>
               <i id="eval-bar-delta" class="eval-bar-delta" hidden></i>
             </div>
+            <div id="eval-bar-scale" class="eval-bar-scale" aria-hidden="true"></div>
             <div class="eval-bar-scores">
               <span id="eval-bar-score" class="eval-bar-score">0</span>
               <div id="eval-bar-prev-wrap" class="eval-bar-prev-wrap" hidden>
@@ -448,6 +450,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260828pawn2"></script>
+  <script type="module" src="js/app.js?v=20260828bar"></script>
 </body>
 </html>

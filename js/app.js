@@ -2888,10 +2888,69 @@ function resetEvalBarHistory() {
   state.evalBarBefore = null;
 }
 
-function whiteEvalShare(cp, { ignoreMate = false } = {}) {
-  if (!ignoreMate && state.game?.in_checkmate()) return state.game.turn() === "b" ? 100 : 0;
+const EVAL_BAR_CELLS = 20;
+const EVAL_BAR_TICKS = [
+  { pawn: -10, text: "−10", edge: "start" },
+  { pawn: -5, text: "−5" },
+  { pawn: -3, text: "−3" },
+  { pawn: -1, text: "−1" },
+  { pawn: 0, text: "0", zero: true },
+  { pawn: 1, text: "+1" },
+  { pawn: 3, text: "+3" },
+  { pawn: 5, text: "+5" },
+  { pawn: 10, text: "10+", edge: "end" },
+];
+
+function ensureEvalBarChrome() {
+  const cells = els.evalBarCells;
+  if (cells && !cells.childElementCount) {
+    for (let i = 0; i < EVAL_BAR_CELLS; i += 1) {
+      cells.appendChild(document.createElement("span"));
+    }
+  }
+  const scale = els.evalBarScale;
+  if (scale && !scale.childElementCount) {
+    for (const tick of EVAL_BAR_TICKS) {
+      const el = document.createElement("span");
+      el.className = "eval-bar-tick";
+      if (tick.zero) el.classList.add("is-zero");
+      if (tick.edge === "start") el.classList.add("is-start");
+      if (tick.edge === "end") el.classList.add("is-end");
+      el.textContent = tick.text;
+      el.style.left = `${((tick.pawn + 10) / 20) * 100}%`;
+      scale.appendChild(el);
+    }
+  }
+}
+
+function paintEvalBarCells(pct) {
+  const cells = els.evalBarCells?.children;
+  if (!cells?.length) return;
+  const n = cells.length;
+  const value = Math.max(0, Math.min(100, pct));
+  for (let i = 0; i < n; i += 1) {
+    const start = (i / n) * 100;
+    const end = ((i + 1) / n) * 100;
+    let cut = 0;
+    if (value >= end) cut = 100;
+    else if (value > start) cut = ((value - start) / (end - start)) * 100;
+    cells[i].style.setProperty("--cut", `${cut.toFixed(2)}%`);
+  }
+}
+
+function evalBarPlayerShare(playerCp, { ignoreMate = false } = {}) {
+  if (!ignoreMate && state.game?.in_checkmate()) {
+    if (isLocalVsHuman()) {
+      const whiteWon = state.game.turn() === "b";
+      const bottomWon = state.board?.orientation === "black" ? !whiteWon : whiteWon;
+      return bottomWon ? 100 : 0;
+    }
+    return state.game.turn() !== state.playerColor ? 100 : 0;
+  }
+  const cp = Number.isFinite(playerCp) ? playerCp : 0;
   if (Math.abs(cp) >= 50000) return cp > 0 ? 100 : 0;
-  return 50 + Math.tanh(cp / 400) * 50;
+  const pawn = Math.max(-10, Math.min(10, cp / 100));
+  return 50 + pawn * 5;
 }
 
 function paintEvalBar() {
@@ -2900,12 +2959,12 @@ function paintEvalBar() {
   const deltaEl = els.evalBarDelta;
   const prevLabel = els.evalBarPrev;
   const prevWrap = els.evalBarPrevWrap;
-  if (!fill && !label) return;
+  if (!fill && !label && !els.evalBarCells) return;
+  ensureEvalBarChrome();
   const blackBottom = state.board?.orientation === "black";
   rememberEvalBarPrev(evalBarSourceCp());
   const shown = evalBarShownCp();
-  const cpWhite = evalCpForWhite();
-  const pct = Math.max(0, Math.min(100, whiteEvalShare(cpWhite)));
+  const pct = Math.max(0, Math.min(100, evalBarPlayerShare(shown)));
   const text = formatEvalBarDisplay(shown);
   const before = state.evalBarBefore;
   const beforeShown = Number.isFinite(before) ? evalBarShownFromPlayer(before) : null;
@@ -2915,6 +2974,7 @@ function paintEvalBar() {
   els.evalBar?.classList.toggle("is-black-bottom", blackBottom);
   els.evalBar?.classList.toggle("is-twentieths", isTwentiethsEval());
   els.evalBar?.classList.toggle("is-prev-opp", isPrevOppEval());
+  paintEvalBarCells(pct);
   if (fill) {
     fill.style.height = "100%";
     fill.style.width = `${pct.toFixed(2)}%`;
@@ -2943,12 +3003,12 @@ function paintEvalBar() {
     if (!dir || !Number.isFinite(before)) {
       deltaEl.hidden = true;
     } else {
-      const prevPct = Math.max(0, Math.min(100, whiteEvalShare(evalCpForWhiteFromPlayer(before), { ignoreMate: true })));
+      const prevPct = Math.max(0, Math.min(100, evalBarPlayerShare(beforeShown, { ignoreMate: true })));
       const width = Math.abs(pct - prevPct);
       if (width < 0.8) {
         deltaEl.hidden = true;
       } else {
-        const left = blackBottom ? 100 - Math.max(pct, prevPct) : Math.min(pct, prevPct);
+        const left = Math.min(pct, prevPct);
         deltaEl.hidden = false;
         deltaEl.style.left = `${left.toFixed(2)}%`;
         deltaEl.style.width = `${width.toFixed(2)}%`;
@@ -4254,6 +4314,8 @@ const els = {
   oppLives: document.getElementById("opp-lives"),
   evalBar: document.getElementById("eval-bar"),
   evalBarFill: document.getElementById("eval-bar-fill"),
+  evalBarCells: document.getElementById("eval-bar-cells"),
+  evalBarScale: document.getElementById("eval-bar-scale"),
   evalBarScore: document.getElementById("eval-bar-score"),
   evalBarDelta: document.getElementById("eval-bar-delta"),
   evalBarPrev: document.getElementById("eval-bar-prev"),
