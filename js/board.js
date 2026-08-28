@@ -437,33 +437,61 @@ export class Board {
       const back = this.pieces[arrow.to] ? headLen + 0.16 : 0.02;
       labels.push({
         text: String(arrow.label),
+        parts: arrow.labelParts || null,
         x: atCorner ? dest.x + 0.44 : tx - ux * back,
-        y: atCorner ? dest.y - 0.42 : ty - uy * back,
+        y: atCorner ? dest.y - 0.18 : ty - uy * back,
         atCorner,
         fill: arrow.labelColor || "#1f1f1f",
       });
     }
     for (const item of labels) {
+      this.#drawArrowLabel(ns, item);
+    }
+  }
+
+  #drawArrowLabel(ns, item) {
+    const family = '"Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
+    const text = document.createElementNS(ns, "text");
+    text.setAttribute("x", String(item.x));
+    text.setAttribute("y", String(item.y));
+    text.setAttribute("text-anchor", item.atCorner ? "end" : "middle");
+    text.setAttribute("dominant-baseline", item.atCorner ? "alphabetic" : "middle");
+    text.setAttribute("dy", item.atCorner ? "0" : "0.08");
+    text.setAttribute("fill", item.fill);
+    text.setAttribute("fill-opacity", "1");
+    text.setAttribute("stroke", "rgba(255, 248, 232, 0.85)");
+    text.setAttribute("stroke-width", "0.035");
+    text.setAttribute("stroke-linejoin", "round");
+    text.setAttribute("paint-order", "stroke");
+    text.setAttribute("font-family", family);
+    text.setAttribute("letter-spacing", "-0.02em");
+    text.setAttribute("style", "pointer-events:none;user-select:none;");
+    const parts = item.parts;
+    if (parts && (parts.int || parts.frac)) {
+      text.setAttribute("font-size", "0.25");
+      text.setAttribute("font-weight", "800");
+      if (parts.sign) {
+        const sign = document.createElementNS(ns, "tspan");
+        sign.textContent = parts.sign;
+        text.appendChild(sign);
+      }
+      const intEl = document.createElementNS(ns, "tspan");
+      intEl.setAttribute("font-size", "0.36");
+      intEl.setAttribute("font-weight", "800");
+      intEl.textContent = parts.int;
+      text.appendChild(intEl);
+      const fracEl = document.createElementNS(ns, "tspan");
+      fracEl.setAttribute("font-size", "0.19");
+      fracEl.setAttribute("font-weight", "700");
+      fracEl.textContent = parts.cap ? parts.frac : `,${parts.frac}`;
+      text.appendChild(fracEl);
+    } else {
       const fontSize = item.text.length <= 3 ? 0.3 : item.text.length <= 4 ? 0.26 : 0.22;
-      const text = document.createElementNS(ns, "text");
-      text.setAttribute("x", String(item.x));
-      text.setAttribute("y", String(item.y));
-      text.setAttribute("text-anchor", item.atCorner ? "end" : "middle");
-      text.setAttribute("dominant-baseline", item.atCorner ? "hanging" : "middle");
-      text.setAttribute("dy", item.atCorner ? "0" : "0.08");
-      text.setAttribute("fill", item.fill);
-      text.setAttribute("fill-opacity", "1");
-      text.setAttribute("stroke", "rgba(255, 248, 232, 0.85)");
-      text.setAttribute("stroke-width", "0.035");
-      text.setAttribute("stroke-linejoin", "round");
-      text.setAttribute("paint-order", "stroke");
       text.setAttribute("font-size", String(fontSize));
       text.setAttribute("font-weight", "700");
-      text.setAttribute("font-family", '"Segoe UI", "Trebuchet MS", Arial, sans-serif');
-      text.setAttribute("style", "pointer-events:none;user-select:none;");
       text.textContent = item.text;
-      this.arrowGroup.appendChild(text);
     }
+    this.arrowGroup.appendChild(text);
   }
 
   async animateMove(from, to) {

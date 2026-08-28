@@ -1,6 +1,6 @@
 import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
-import { Board } from "./board.js?v=20260828num";
+import { Board } from "./board.js?v=20260828num2";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
 import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828bar";
 
@@ -5224,24 +5224,24 @@ function reviewArrowKind(hint) {
 }
 
 function reviewArrowLabel(hint) {
-  if (!state.reviewArrowLabels || !hint?.uci || hint.synthetic) return "";
+  if (!state.reviewArrowLabels || !hint?.uci || hint.synthetic) return { text: "", parts: null };
   if (hint.scoreType === "mate") {
-    if (hint.score > 0) return `+M${hint.score}`;
-    if (hint.score < 0) return `-M${Math.abs(hint.score)}`;
-    return "";
+    if (hint.score > 0) return { text: `+M${hint.score}`, parts: null };
+    if (hint.score < 0) return { text: `-M${Math.abs(hint.score)}`, parts: null };
+    return { text: "", parts: null };
   }
   const cp = hintEvalShownCp(hint);
   if (isPrevOppEval()) {
-    if (cp == null || !evalShownPoints(cp)) return "";
-    return formatPawnCommaText(cp);
+    if (cp == null || !evalShownPoints(cp)) return { text: "", parts: null };
+    return { text: formatPawnCommaText(cp), parts: pawnCommaParts(cp) };
   }
   let shown = evalShownPoints(cp);
   if (!shown && isTwentiethsEval()) {
     const parts = twentiethsSwingParts(hint);
     shown = (parts?.recovery || 0) + (parts?.damage || 0) - (parts?.heartLoss || 0) - (parts?.swordLoss || 0);
   }
-  if (!shown) return "";
-  return shown > 0 ? `+${shown}` : `${shown}`;
+  if (!shown) return { text: "", parts: null };
+  return { text: shown > 0 ? `+${shown}` : `${shown}`, parts: null };
 }
 
 function buildHoldArrowSnap() {
@@ -5252,7 +5252,7 @@ function buildHoldArrowSnap() {
       const kind = reviewArrowKind(hint);
       const isBest = kind === "best";
       const color = kind === "plain" ? ARROW_GRAY_LIGHT : ARROW_GREEN;
-      const label = reviewArrowLabel(hint);
+      const { text: label, parts: labelParts } = reviewArrowLabel(hint);
       return {
         from: hint.uci.slice(0, 2),
         to: hint.uci.slice(2, 4),
@@ -5263,6 +5263,7 @@ function buildHoldArrowSnap() {
         opacity: 0.78,
         width: "0.22",
         label,
+        labelParts,
         labelAt: "to",
         labelColor: label.startsWith("-") ? "#a61e1e" : "#2a6b1a",
         hintIndex: i,
