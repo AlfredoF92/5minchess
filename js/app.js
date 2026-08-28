@@ -2,7 +2,7 @@ import { Chess, SQUARES } from "./chess.min.js";
 import { Engine } from "./engine.js?v=20260827elo13";
 import { Board } from "./board.js?v=20260828num2";
 import { loadOpenings, describePosition, START_OPENINGS } from "./openings.js";
-import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828sign";
+import { applyStaticI18n, getLang, t } from "./i18n.js?v=20260828barh";
 
 const PIECE_VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const HINT_LAYOUT_KEY = "5minchess.hintLayout";
@@ -1823,23 +1823,44 @@ function hintEvalArrowSvg(dir) {
   return `<svg class="hint-eval-dir is-${dir}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="${path}"/></svg>`;
 }
 
-function hintBlockShift(info) {
-  if (!info || info.synthetic) return 0;
-  if (info.scoreType === "mate") return info.score < 0 ? -1 : 1;
+function evalBarPawnBlock(cp) {
+  if (!Number.isFinite(cp)) return 0;
+  if (Math.abs(cp) >= 50000) return cp > 0 ? 10 : -10;
+  return Math.trunc(Math.max(-10, Math.min(10, cp / 100)));
+}
+
+function evalBarHeartCount(cp) {
+  return Math.max(0, Math.min(9, evalBarPawnBlock(cp) + 9));
+}
+
+function evalBarSwordCount(cp) {
+  return Math.max(0, Math.min(9, evalBarPawnBlock(cp)));
+}
+
+function hintBarMeterShift(info) {
+  if (!info || info.synthetic) return { hearts: 0, swords: 0 };
   const nextCp = hintMoveEval(info);
-  const prevCp = Number.isFinite(state.gameEval) ? state.gameEval : positionEvalNow();
-  if (!Number.isFinite(nextCp) || !Number.isFinite(prevCp)) return 0;
-  return Math.sign(evalBarBlockCp(nextCp) - evalBarBlockCp(prevCp));
+  const prevCp = Number.isFinite(state.gameEval) ? state.gameEval : 0;
+  if (!Number.isFinite(nextCp)) return { hearts: 0, swords: 0 };
+  return {
+    hearts: evalBarHeartCount(nextCp) - evalBarHeartCount(prevCp),
+    swords: evalBarSwordCount(nextCp) - evalBarSwordCount(prevCp),
+  };
 }
 
 function hintSignHtml(info) {
   const mode = hintInfoSign();
   if (mode === "off") return "";
   if (mode === "icons") {
-    const shift = hintBlockShift(info);
-    if (shift > 0) return `<span class="hint-sign-icon is-up">${evalSwordSvg()}</span>`;
-    if (shift < 0) return `<span class="hint-sign-icon is-down">${hintEvalHeartHtml()}</span>`;
-    return "";
+    const { hearts, swords } = hintBarMeterShift(info);
+    const bits = [];
+    if (hearts !== 0) {
+      bits.push(`<span class="hint-sign-icon is-heart">${hintEvalHeartHtml()}</span>`);
+    }
+    if (swords > 0) {
+      bits.push(`<span class="hint-sign-icon is-sword">${evalSwordSvg()}</span>`);
+    }
+    return bits.join("");
   }
   const dir = hintEvalDir(info);
   return dir ? hintEvalArrowSvg(dir) : "";
